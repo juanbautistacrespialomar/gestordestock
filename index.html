@@ -12,29 +12,32 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="Gestor">
 <title>Gestor de Stock</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter+Tight:wght@400;500;600;700;800;900&family=Spline+Sans+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 <style>
   :root{
-    --ink:#1b2430;
-    --ink-soft:#28323f;
-    --paper:#f4f1ea;
+    --ink:#111317;
+    --ink-soft:#2b2f36;
+    --paper:#ffffff;
     --surface:#ffffff;
-    --surface-2:#faf8f3;
-    --line:#e2ddd1;
-    --line-strong:#cbc4b2;
-    --accent:#2f6f6b;
-    --accent-ink:#1f4d4a;
-    --up:#2e7d5b;
-    --up-bg:#e7f1eb;
-    --down:#b5622c;
-    --down-bg:#f6ebe2;
-    --alert:#b23b3b;
-    --alert-bg:#f7e6e6;
-    --muted:#6b7280;
-    --text:#212a34;
-    --radius:10px;
-    --mono:ui-monospace,"SF Mono","SFMono-Regular","Menlo","Consolas","Roboto Mono",monospace;
-    --sans:-apple-system,BlinkMacSystemFont,"Segoe UI","Helvetica Neue",Arial,sans-serif;
-    --shadow:0 1px 2px rgba(27,36,48,.06),0 8px 24px rgba(27,36,48,.06);
+    --surface-2:#fafbfc;
+    --line:#eaecef;
+    --line-strong:#dde0e5;
+    --accent:#1d4ed8;
+    --accent-ink:#1d4ed8;
+    --up:#1d4ed8;
+    --up-bg:#eef2fb;
+    --down:#dc2626;
+    --down-bg:#fbeaea;
+    --alert:#dc2626;
+    --alert-bg:#fbeaea;
+    --muted:#8a909b;
+    --text:#111317;
+    --radius:4px;
+    --mono:"Spline Sans Mono",ui-monospace,"SF Mono","Menlo","Consolas",monospace;
+    --sans:"Inter Tight",-apple-system,BlinkMacSystemFont,"Segoe UI","Helvetica Neue",Arial,sans-serif;
+    --shadow:0 1px 2px rgba(17,19,23,.04);
   }
   *{box-sizing:border-box}
   html,body{margin:0;padding:0}
@@ -56,30 +59,30 @@
   /* ---------- Layout ---------- */
   .app{display:grid;grid-template-columns:232px 1fr;min-height:100vh}
   .side{
-    background:var(--ink);color:#cdd5df;padding:22px 16px;
-    display:flex;flex-direction:column;gap:4px;position:sticky;top:0;height:100vh;
+    background:#ffffff;color:var(--muted);padding:22px 16px;
+    display:flex;flex-direction:column;gap:4px;position:sticky;top:0;height:100vh;border-right:1px solid var(--line);
   }
-  .brand{display:flex;align-items:center;gap:10px;padding:0 8px 20px;border-bottom:1px solid #2c3644;margin-bottom:14px}
-  .brand-logo{border-radius:8px;flex-shrink:0;box-shadow:0 2px 8px rgba(0,0,0,.4)}
-  .brand h1{font-size:14px;font-weight:680;color:#eef2f7;margin:0;letter-spacing:-.2px}
+  .brand{display:flex;align-items:center;gap:10px;padding:0 8px 20px;border-bottom:1px solid var(--line);margin-bottom:14px}
+  .brand-logo{border-radius:7px;flex-shrink:0;box-shadow:0 2px 8px rgba(17,19,23,.14)}
+  .brand h1{font-size:15px;font-weight:800;color:var(--text);margin:0;letter-spacing:-.4px}
   .side-logout{
     display:flex;align-items:center;gap:6px;background:none;border:0;
-    color:#5c6775;font-size:12px;font-weight:600;padding:0;margin-top:14px;cursor:pointer;
+    color:#9aa1ae;font-size:12px;font-weight:600;padding:0;margin-top:14px;cursor:pointer;
     transition:color .12s;
   }
-  .side-logout:hover{color:#aeb8c4}
+  .side-logout:hover{color:var(--text)}
   .brand-m-logo{border-radius:6px;align-self:center;margin-right:6px}
   .nav{display:flex;flex-direction:column;gap:2px}
   .nav button{
     display:flex;align-items:center;gap:11px;width:100%;text-align:left;
-    background:none;border:0;color:#aeb8c4;padding:10px 12px;border-radius:8px;
-    font-size:14.5px;font-weight:500;transition:background .12s,color .12s;
+    background:none;border:0;color:#4b5563;padding:10px 12px;border-radius:6px;
+    font-size:14px;font-weight:500;transition:background .12s,color .12s;
   }
-  .nav button .ico{width:18px;text-align:center;font-family:var(--mono);font-size:15px;opacity:.85}
-  .nav button:hover{background:#232d3a;color:#e8edf3}
+  .nav button .ico{width:18px;text-align:center;font-family:var(--mono);font-size:14px;opacity:.7}
+  .nav button:hover{background:var(--surface-2);color:var(--text)}
   .nav button.on{background:var(--accent);color:#fff}
   .nav button.on .ico{opacity:1}
-  .side .foot{margin-top:auto;padding:0 8px;font-size:11.5px;color:#5c6775;line-height:1.6}
+  .side .foot{margin-top:auto;padding:0 8px;font-size:11.5px;color:var(--muted);line-height:1.6}
 
   .main{padding:32px 40px 80px;max-width:1180px;width:100%}
   .head{display:flex;align-items:flex-end;justify-content:space-between;gap:16px;margin-bottom:26px}
@@ -111,7 +114,7 @@
   .kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:26px}
   .kpi{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);padding:16px 18px;box-shadow:var(--shadow)}
   .kpi .lbl{font-size:11.5px;text-transform:uppercase;letter-spacing:.6px;color:var(--muted);font-weight:600;margin-bottom:8px}
-  .kpi .val{font-family:var(--mono);font-size:25px;font-weight:600;letter-spacing:-.5px;line-height:1.1}
+  .kpi .val{font-family:var(--sans);font-size:30px;font-weight:800;font-variant-numeric:tabular-nums;letter-spacing:-.5px;line-height:1.1}
   .kpi .sub{font-size:12.5px;color:var(--muted);margin-top:5px}
   .kpi.warn .val{color:var(--alert)}
 
@@ -208,9 +211,9 @@
   @media (max-width:860px){
     .app{grid-template-columns:1fr}
     .side{display:none}
-    .mobtop{display:flex;position:sticky;top:0;z-index:40;background:var(--ink);color:#fff;padding:10px 14px;gap:4px;overflow-x:auto}
+    .mobtop{display:flex;position:sticky;top:0;z-index:40;background:#fff;color:var(--text);padding:10px 14px;gap:4px;overflow-x:auto;border-bottom:1px solid var(--line)}
     .mobtop .brand-m{font-family:var(--mono);font-weight:700;margin-right:8px;white-space:nowrap;align-self:center}
-    .mobtop button{background:none;border:0;color:#aeb8c4;padding:8px 12px;border-radius:7px;font-size:13.5px;font-weight:600;white-space:nowrap}
+    .mobtop button{background:none;border:0;color:#6b7280;padding:8px 12px;border-radius:6px;font-size:13.5px;font-weight:600;white-space:nowrap}
     .mobtop button.on{background:var(--accent);color:#fff}
     .main{padding:20px 16px 90px}
     .kpis{grid-template-columns:repeat(2,1fr)}
@@ -224,27 +227,25 @@
   #login[hidden]{display:none}
   .login-scrim{
     position:fixed;inset:0;z-index:100;display:flex;align-items:center;justify-content:center;padding:20px;
-    background:
-      radial-gradient(1100px 600px at 70% -10%, rgba(47,111,107,.25), transparent 60%),
-      radial-gradient(900px 500px at 10% 110%, rgba(124,58,180,.22), transparent 55%),
-      #05060a;
+    background:#f4f5f7;
   }
   .login-card{
-    width:100%;max-width:360px;background:rgba(255,255,255,.03);
-    border:1px solid rgba(255,255,255,.09);border-radius:18px;padding:34px 28px 28px;text-align:center;
-    box-shadow:0 24px 70px rgba(0,0,0,.55);backdrop-filter:blur(4px);
+    width:100%;max-width:360px;background:#ffffff;
+    border:1px solid var(--line);border-radius:6px;padding:38px 30px 30px;text-align:center;
+    box-shadow:0 1px 2px rgba(17,19,23,.04),0 20px 50px rgba(17,19,23,.08);
   }
-  .login-logo{border-radius:20px;box-shadow:0 8px 30px rgba(0,0,0,.5);margin-bottom:16px}
-  .login-card h1{color:#fff;font-size:22px;margin:0 0 6px;letter-spacing:-.3px;font-weight:680}
-  .login-sub{color:#9aa6b4;font-size:13.5px;margin:0 0 22px;line-height:1.5}
+  .login-logo{border-radius:16px;box-shadow:0 8px 24px rgba(17,19,23,.18);margin-bottom:18px}
+  .login-card h1{color:var(--text);font-size:24px;margin:0 0 6px;letter-spacing:-.6px;font-weight:900}
+  .login-sub{color:var(--muted);font-size:13.5px;margin:0 0 24px;line-height:1.5}
   .login-card .field{text-align:left;margin-bottom:14px}
-  .login-card .field label{color:#8b97a6}
-  .login-card .inp{background:rgba(255,255,255,.06);border-color:rgba(255,255,255,.14);color:#fff}
-  .login-card .inp:focus{border-color:var(--accent);background:rgba(255,255,255,.09)}
+  .login-card .field label{color:var(--muted)}
+  .login-card .inp{background:#fff;border-color:var(--line-strong);color:var(--text)}
+  .login-card .inp:focus{border-color:var(--accent)}
   .login-btn{width:100%;justify-content:center;padding:11px;font-size:15px;margin-top:6px}
-  .login-err{color:#ff9a9a;font-size:13px;min-height:18px;margin:2px 0 6px;text-align:left}
-  .login-build{color:#5c6775;font-size:11px;margin:16px 0 0;letter-spacing:.4px}
+  .login-err{color:var(--down);font-size:13px;min-height:18px;margin:2px 0 6px;text-align:left}
+  .login-build{color:#b3b8c2;font-size:11px;margin:16px 0 0;letter-spacing:.4px}
 </style>
+</head>
 </head>
 <body>
 <div id="login" class="login-scrim" hidden>
@@ -258,7 +259,7 @@
       <input class="inp" id="loginPass" type="password" autocomplete="current-password"></div>
     <div id="loginErr" class="login-err"></div>
     <button class="btn primary login-btn" id="loginBtn">Entrar</button>
-    <p class="login-build">build v8</p>
+    <p class="login-build">build v9</p>
   </div>
 </div>
 <div class="app">
