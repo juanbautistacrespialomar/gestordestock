@@ -10,8 +10,8 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<meta name="apple-mobile-web-app-title" content="Mayor">
-<title>Mayor de Stock</title>
+<meta name="apple-mobile-web-app-title" content="Gestor">
+<title>Gestor de Stock</title>
 <style>
   :root{
     --ink:#1b2430;
@@ -59,11 +59,16 @@
     background:var(--ink);color:#cdd5df;padding:22px 16px;
     display:flex;flex-direction:column;gap:4px;position:sticky;top:0;height:100vh;
   }
-  .brand{display:flex;align-items:baseline;gap:9px;padding:0 8px 20px;border-bottom:1px solid #2c3644;margin-bottom:14px}
-  .brand .mark{font-family:var(--mono);font-weight:700;font-size:20px;color:#fff;letter-spacing:-.5px}
-  .brand .mark small{color:var(--up);font-size:20px}
-  .brand .mark em{color:var(--down);font-style:normal;font-size:20px}
-  .brand h1{font-size:13px;font-weight:600;color:#8b97a6;margin:0;letter-spacing:.3px;text-transform:uppercase}
+  .brand{display:flex;align-items:center;gap:10px;padding:0 8px 20px;border-bottom:1px solid #2c3644;margin-bottom:14px}
+  .brand-logo{border-radius:8px;flex-shrink:0;box-shadow:0 2px 8px rgba(0,0,0,.4)}
+  .brand h1{font-size:14px;font-weight:680;color:#eef2f7;margin:0;letter-spacing:-.2px}
+  .side-logout{
+    display:flex;align-items:center;gap:6px;background:none;border:0;
+    color:#5c6775;font-size:12px;font-weight:600;padding:0;margin-top:14px;cursor:pointer;
+    transition:color .12s;
+  }
+  .side-logout:hover{color:#aeb8c4}
+  .brand-m-logo{border-radius:6px;align-self:center;margin-right:6px}
   .nav{display:flex;flex-direction:column;gap:2px}
   .nav button{
     display:flex;align-items:center;gap:11px;width:100%;text-align:left;
@@ -245,7 +250,7 @@
 <div id="login" class="login-scrim" hidden>
   <div class="login-card">
     <img src="icon-512.png" alt="" class="login-logo" width="88" height="88">
-    <h1>Mayor de Stock</h1>
+    <h1>Gestor de Stock</h1>
     <p class="login-sub">Entrá con tu usuario y vas a ver tu inventario desde cualquier dispositivo.</p>
     <div class="field"><label>Usuario</label>
       <input class="inp" id="loginUser" autocomplete="username" autocapitalize="none" spellcheck="false"></div>
@@ -253,14 +258,14 @@
       <input class="inp" id="loginPass" type="password" autocomplete="current-password"></div>
     <div id="loginErr" class="login-err"></div>
     <button class="btn primary login-btn" id="loginBtn">Entrar</button>
-    <p class="login-build">build v7</p>
+    <p class="login-build">build v8</p>
   </div>
 </div>
 <div class="app">
   <aside class="side">
     <div class="brand">
-      <div class="mark"><small>+</small>M<em>−</em></div>
-      <h1>Mayor de Stock</h1>
+      <img src="icon-192.png" alt="" class="brand-logo" width="34" height="34">
+      <h1>Gestor de Stock</h1>
     </div>
     <nav class="nav" id="nav">
       <button data-view="dash" class="on"><span class="ico">▤</span>Panel</button>
@@ -273,11 +278,12 @@
     <div class="foot">
       <div data-syncchip style="font-weight:700;font-size:12.5px;margin-bottom:10px">●</div>
       Último costo. Compras suman stock, ventas restan.
+      <button class="side-logout" data-logout-side>⎋ Cerrar sesión</button>
     </div>
   </aside>
 
   <div class="mobtop" id="navMob">
-    <span class="brand-m">+M−</span>
+    <img src="icon-192.png" alt="" class="brand-m-logo" width="24" height="24">
     <button data-view="dash" class="on">Panel</button>
     <button data-view="prod">Productos</button>
     <button data-view="compras">Compras</button>
@@ -296,7 +302,7 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <script>
 /* ============================================================
-   Mayor de Stock — vanilla, localStorage, último costo
+   Gestor de Stock — vanilla, último costo, sincronizado
    ============================================================ */
 if (window.pdfjsLib) {
   pdfjsLib.GlobalWorkerOptions.workerSrc =
@@ -1412,6 +1418,8 @@ function closeModal(){
 document.getElementById("loginBtn").onclick = doLogin;
 document.getElementById("loginUser").addEventListener("keydown", e=>{ if(e.key==="Enter") document.getElementById("loginPass").focus(); });
 document.getElementById("loginPass").addEventListener("keydown", e=>{ if(e.key==="Enter") doLogin(); });
+// Botón de cerrar sesión del sidebar (estático)
+const _slo=document.querySelector("[data-logout-side]"); if(_slo) _slo.onclick=logout;
 
 if(session){
   hideLogin();
