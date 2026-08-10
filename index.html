@@ -417,7 +417,12 @@ async function doLogin(){
   try{
     const res=await fetch(apiBase()+"/login",{ method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify({user,pass}) });
     if(res.status===401){ errEl.textContent="Usuario o contraseña incorrectos"; return; }
-    if(!res.ok) throw new Error("HTTP "+res.status);
+    if(!res.ok){
+      let msg="Error "+res.status;
+      try{ const ej=await res.json(); if(ej.error) msg=ej.error; if(ej.detalle) msg+=" — "+ej.detalle; }catch(_){}
+      errEl.textContent=msg;
+      return;
+    }
     const j=await res.json();
     const switching = !session || session.user!==j.user;
     session={ user:j.user, token:j.token, space:j.space||"main" }; saveSession();
@@ -428,7 +433,7 @@ async function doLogin(){
     setSyncState("idle");
     hideLogin(); render(); paintSync();
     await pullNow();
-  }catch(e){ errEl.textContent="No se pudo conectar con el servidor. Revisá tu internet."; }
+  }catch(e){ errEl.textContent="No se pudo conectar con el servidor ("+(e&&e.message||e)+")"; }
   finally{ btn.disabled=false; btn.textContent="Entrar"; }
 }
 function logout(){
