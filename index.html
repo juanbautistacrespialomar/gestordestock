@@ -65,12 +65,18 @@
   .brand{display:flex;align-items:center;gap:10px;padding:0 8px 20px;border-bottom:1px solid var(--line);margin-bottom:14px}
   .brand-logo{border-radius:7px;flex-shrink:0;box-shadow:0 2px 8px rgba(17,19,23,.14)}
   .brand h1{font-size:15px;font-weight:800;color:var(--text);margin:0;letter-spacing:-.4px}
-  .side-logout{
-    display:flex;align-items:center;gap:6px;background:none;border:0;
-    color:#9aa1ae;font-size:12px;font-weight:600;padding:0;margin-top:14px;cursor:pointer;
-    transition:color .12s;
+  .side-actions{display:flex;flex-direction:column;gap:6px;margin-top:14px;align-items:flex-start}
+  .side-btn{
+    display:inline-flex;align-items:center;justify-content:center;
+    width:34px;height:34px;padding:0;border-radius:8px;
+    background:none;border:1px solid transparent;color:#9aa1ae;
+    transition:color .12s,background .12s,border-color .12s;
   }
-  .side-logout:hover{color:var(--text)}
+  .side-btn:hover{color:var(--text);background:var(--surface-2);border-color:var(--line)}
+  .side-btn.is-logout:hover{color:var(--down);border-color:var(--line-strong)}
+  .side-btn svg{width:17px;height:17px;display:block}
+  @keyframes side-spin{to{transform:rotate(360deg)}}
+  .side-btn.spin svg{animation:side-spin .8s linear infinite;transform-origin:center}
   .brand-m-logo{border-radius:6px;align-self:center;margin-right:6px}
   .nav{display:flex;flex-direction:column;gap:2px}
   .nav button{
@@ -277,9 +283,20 @@
       <button data-view="datos"><span class="ico">⤓</span>Datos</button>
     </nav>
     <div class="foot">
-      <div data-syncchip style="font-weight:700;font-size:12.5px;margin-bottom:10px">●</div>
       Último costo. Compras suman stock, ventas restan.
-      <button class="side-logout" data-logout-side>⎋ Cerrar sesión</button>
+      <div class="side-actions">
+        <button class="side-btn" data-syncside data-syncicon aria-label="Sincronizar" title="Sincronizar">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M3 12a9 9 0 0 1 15-6.7L21 8"/><path d="M21 3v5h-5"/>
+            <path d="M21 12a9 9 0 0 1-15 6.7L3 16"/><path d="M3 21v-5h5"/>
+          </svg>
+        </button>
+        <button class="side-btn is-logout" data-logout-side aria-label="Cerrar sesión" title="Cerrar sesión">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="M16 17l5-5-5-5"/><path d="M21 12H9"/>
+          </svg>
+        </button>
+      </div>
     </div>
   </aside>
 
@@ -414,6 +431,11 @@ function paintSync(){
   };
   const [dot,txt,col]=map[syncState]||map.off;
   document.querySelectorAll("[data-syncchip]").forEach(el=>{ el.style.color=col; el.textContent=dot+" "+txt; });
+  document.querySelectorAll("[data-syncicon]").forEach(el=>{
+    el.style.color = (syncState==="idle"||syncState==="off") ? "" : col;
+    el.classList.toggle("spin", syncState==="saving");
+    el.title = "Sincronizar · "+txt.toLowerCase();
+  });
 }
 
 /* ---------- Login / Logout ---------- */
@@ -1419,8 +1441,9 @@ function closeModal(){
 document.getElementById("loginBtn").onclick = doLogin;
 document.getElementById("loginUser").addEventListener("keydown", e=>{ if(e.key==="Enter") document.getElementById("loginPass").focus(); });
 document.getElementById("loginPass").addEventListener("keydown", e=>{ if(e.key==="Enter") doLogin(); });
-// Botón de cerrar sesión del sidebar (estático)
+// Botones estáticos del sidebar (cerrar sesión / sincronizar)
 const _slo=document.querySelector("[data-logout-side]"); if(_slo) _slo.onclick=logout;
+const _ssy=document.querySelector("[data-syncside]"); if(_ssy) _ssy.onclick=()=> pullNow();
 
 if(session){
   hideLogin();
