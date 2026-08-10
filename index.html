@@ -365,7 +365,7 @@ function viewDash(){
       if(p.stock<0) cls+=" neg"; else if(bajoStock(p)) cls+=" low";
       const flag = p.stock<0 ? '<span class="pill low">negativo</span>'
                  : bajoStock(p) ? '<span class="pill low">reponer</span>' : "";
-      return `<tr>
+      return `<tr data-ficha="${p.id}" style="cursor:pointer">
         <td><span class="sku">${esc(p.sku||"—")}</span></td>
         <td>${esc(p.nombre)} ${flag}</td>
         <td class="r ${cls}">${qty(p.stock)}</td>
@@ -391,7 +391,7 @@ function viewDash(){
   </div>
 
   <div class="panel">
-    <div class="phead"><h3>Existencias</h3><span class="hint">ordenado por valorización</span></div>
+    <div class="phead"><h3>Existencias</h3><span class="hint">tocá un producto para ver su historial</span></div>
     ${db.productos.length ? `<div class="table-scroll"><table>
       <thead><tr><th>SKU</th><th>Producto</th><th class="r">Stock</th><th class="r">Últ. costo</th><th class="r">Valorizado</th></tr></thead>
       <tbody>${rows}</tbody>
@@ -405,7 +405,7 @@ function viewDash(){
 function viewProd(){
   const rows = db.productos.map(p=>{
     let cls="stock-cell"; if(p.stock<0) cls+=" neg"; else if(bajoStock(p)) cls+=" low";
-    return `<tr>
+    return `<tr data-ficha="${p.id}" style="cursor:pointer">
       <td><span class="sku">${esc(p.sku||"—")}</span></td>
       <td>${esc(p.nombre)}</td>
       <td class="c">${esc(p.unidad||"u")}</td>
@@ -539,7 +539,8 @@ function wire(){
   const m = document.getElementById("main");
   m.querySelectorAll("[data-open]").forEach(b=> b.onclick=()=> openDoc(b.dataset.open));
   m.querySelectorAll("[data-newp]").forEach(b=> b.onclick=()=> openProd());
-  m.querySelectorAll("[data-editp]").forEach(b=> b.onclick=()=> openProd(b.dataset.editp));
+  m.querySelectorAll("[data-ficha]").forEach(tr=> tr.onclick=()=> openFicha(tr.dataset.ficha));
+  m.querySelectorAll("[data-editp]").forEach(b=> b.onclick=(e)=>{ e.stopPropagation(); openProd(b.dataset.editp); });
   m.querySelectorAll("[data-import]").forEach(b=> b.onclick=()=> openImport());
   m.querySelectorAll("[data-vdoc]").forEach(b=> b.onclick=()=>{
     const [t,id]=b.dataset.vdoc.split(":"); verDoc(t,id);
@@ -613,7 +614,7 @@ function openDoc(tipo, pre){
   draft.tipo = tipo;
   renderDocModal();
 }
-function blankLine(){ return { key:uid(), productoId:"", sku:"", nombre:"", cantidad:1, precio:0, crear:false }; }
+function blankLine(){ return { key:uid(), productoId:"", sku:"", nombre:"", cantidad:1, precio:0, precioVentaSugerido:0, crear:false }; }
 
 function renderDocModal(){
   const isC = draft.tipo==="compra";
@@ -721,8 +722,8 @@ function confirmDoc(){
     let p=null;
     if(l.crear){
       if(!l.nombre.trim()){ toast("Falta el nombre de un producto nuevo","warn"); return; }
-      p = { id:uid(), sku:l.sku.trim(), unidad:"u", nombre:l.nombre.trim(),
-            stock:0, ultimoCosto:0, precioVenta: isC?0:l.precio, puntoRepedido:0 };
+      p = { id:uid(), sku:(l.sku||"").trim(), unidad:"u", nombre:l.nombre.trim(),
+            stock:0, ultimoCosto:0, precioVenta: isC?(l.precioVentaSugerido||0):l.precio, puntoRepedido:0 };
       db.productos.push(p);
     } else {
       p = prodById(l.productoId);
@@ -825,8 +826,8 @@ async function handlePdf(file){
       lines = lines.concat(reconstructLines(tc.items));
     }
     pdfLines = lines.filter(l=>l.trim().length);
-    const candidatos = pdfLines.map(parseCandidate).filter(Boolean);
-    showImportEditor(file.name, candidatos);
+    const parsed = parseInvoice(pdfLines);
+    showImportEditor(file.name, parsed);
   }catch(e){
     console.error(e);
     out.innerHTML=`<div class="banner warn">No pude leer ese PDF (${esc(e.message||"error")}). Puede estar escaneado como imagen. Cargá la compra a mano.</div>`;
@@ -850,6 +851,74 @@ function reconstructLines(items){
     .map(([,arr])=> arr.sort((a,b)=>a.x-b.x).map(o=>o.s).join(" ").replace(/\s+/g," ").trim());
 }
 
+/* ---------- Parser de factura ----------
+   1) Intento estructurado: renglones "SKU: descripción ... QTY UOM MSRP NET EXT"
+      (formato tipo Coqui Hobby). Costo = NET PRICE, precio venta sugerido = MSRP.
+   2) Si no encuentra nada, cae a la heurística genérica línea por línea.        */
+function parseInvoice(lines){
+  const blob = lines.join("\n");
+  const meta = extractMeta(lines, blob);
+  let items = parseStructured(blob);
+  let mode = "estructurado";
+  if(!items.length){
+    items = lines.map(parseCandidate).filter(Boolean).map(c=>({
+      sku:"", desc:c.desc, cantidad:c.cantidad, costo:c.costo, msrp:0, ext:c.cantidad*c.costo, raw:c.raw
+    }));
+    mode = "heuristico";
+  }
+  // detectar flete/handling para avisar (no se agrega como stock)
+  const fre = blob.match(/(freight[^\n]*?|flete[^\n]*?)\s([\d.,]+)\s*$/im) || blob.match(/freight[^\d]*([\d.,]+)/i);
+  meta.flete = fre ? parseNum(fre[fre.length-1]) : 0;
+  return { meta, items, mode };
+}
+
+/* SKU: desc ... QTY UOM MSRP NET EXT  (UOM = EACH/EA/CASE/BOX/PACK/UNIT/PCS) */
+function parseStructured(blob){
+  const re = /(?=[A-Z0-9\-]*\d)([A-Z0-9][A-Z0-9\-]{3,}):\s*([\s\S]+?)\s+(\d+(?:[.,]\d+)?)\s+(EACH|EA|CASE|BOX|PACK|UNIT|PCS?|UN)\s+([\d.,]+)\s+([\d.,]+)\s+([\d.,]+)(?=\s|$)/gi;
+  const out=[]; let m;
+  while((m=re.exec(blob))){
+    const sku = m[1].trim();
+    const desc = m[2].replace(/\s+/g," ").trim();
+    const cantidad = parseNum(m[3]);
+    const msrp = parseNum(m[5]);   // precio sugerido
+    const net  = parseNum(m[6]);   // costo real (lo que pagás)
+    const ext  = parseNum(m[7]);   // total línea
+    if(cantidad<=0) continue;
+    out.push({ sku, desc, cantidad, costo:net, msrp, ext, raw:(sku+": "+desc+" | "+m[3]+" "+m[4]+" "+m[5]+" "+m[6]+" "+m[7]) });
+  }
+  return out;
+}
+
+/* Metadata: N° de comprobante, fecha, proveedor */
+function extractMeta(lines, blob){
+  const meta = { numero:"", fecha:"", proveedor:"", flete:0 };
+  const ref = blob.match(/Reference\s*No\.?:?\s*([A-Z0-9\-]+)/i)
+           || blob.match(/(?:Invoice|Factura|Comprobante)\s*(?:No\.?|#|N[°º])?:?\s*([A-Z0-9\-]{3,})/i);
+  if(ref) meta.numero = ref[1].trim();
+  const date = blob.match(/\bDate:?\s*([0-3]?\d[-\/][A-Za-z]{3,}[-\/]\d{2,4})/i)
+            || blob.match(/\bFecha:?\s*([0-3]?\d[-\/][0-1]?\d[-\/]\d{2,4})/i);
+  if(date) meta.fecha = normDate(date[1]);
+  const skip = /^(invoice|factura|reference|date|fecha|customer|currency|salesperson|bill to|ship to|terms|contact|due date|no\.|item)\b/i;
+  for(const l of lines){
+    const t=l.trim();
+    if(t.length>2 && /[A-Za-z]/.test(t) && !skip.test(t)){ meta.proveedor=t.replace(/\s+/g," "); break; }
+  }
+  return meta;
+}
+function normDate(s){
+  let m=s.match(/(\d{1,2})[-\/]([A-Za-z]{3,})[-\/](\d{2,4})/);
+  const months={jan:1,feb:2,mar:3,apr:4,may:5,jun:6,jul:7,aug:8,sep:9,oct:10,nov:11,dec:12,
+                ene:1,abr:4,ago:8,dic:12};
+  if(m){
+    const mo=months[m[2].slice(0,3).toLowerCase()]; if(!mo) return "";
+    const yr=m[3].length===2?"20"+m[3]:m[3];
+    return `${yr}-${String(mo).padStart(2,"0")}-${String(+m[1]).padStart(2,"0")}`;
+  }
+  m=s.match(/(\d{1,2})[-\/](\d{1,2})[-\/](\d{2,4})/);
+  if(m){ const yr=m[3].length===2?"20"+m[3]:m[3]; return `${yr}-${String(+m[2]).padStart(2,"0")}-${String(+m[1]).padStart(2,"0")}`; }
+  return "";
+}
+
 /* Heurística: intentar detectar cantidad / costo en una línea */
 function parseCandidate(line){
   const nums=[...line.matchAll(/-?\d{1,3}(?:[.,]\d{3})*(?:[.,]\d+)?|-?\d+(?:[.,]\d+)?/g)].map(m=>m[0]);
@@ -867,49 +936,68 @@ function parseCandidate(line){
   return { desc, cantidad: cantidad||1, costo: costo||0, raw:line };
 }
 
-function showImportEditor(fname, cands){
+function showImportEditor(fname, parsed){
   const out=document.getElementById("importOut");
-  if(!cands.length){
+  const { meta, items, mode } = parsed;
+  if(!items.length){
     out.innerHTML=`<div class="banner warn">Extraje el texto pero no encontré renglones con cantidad y precio. Revisá el texto crudo abajo y cargá a mano si hace falta.</div>
       <details open><summary>Texto extraído</summary><div class="rawbox">${esc(pdfLines.join("\n"))}</div></details>`;
     return;
   }
-  // mapear cada candidato a producto por coincidencia de nombre/sku
-  cands.forEach(c=>{
-    const match = db.productos.find(p=> c.desc.toLowerCase().includes((p.nombre||"").toLowerCase()) && p.nombre) ;
+  // mapear cada ítem a un producto existente por SKU (o por nombre)
+  items.forEach(c=>{
+    const bySku = c.sku ? findProdBySku(c.sku) : null;
+    const byName = bySku ? null : db.productos.find(p=> p.nombre && c.desc.toLowerCase().includes(p.nombre.toLowerCase()));
+    const match = bySku || byName;
     c.productoId = match ? match.id : "";
     c.crear = !match;
     c.nombre = match ? match.nombre : c.desc;
-    c.sku = match ? match.sku : "";
     c.sel = true;
   });
-  window._cands = cands;
-  const rows=cands.map((c,i)=>`<tr>
+  window._cands = items;
+
+  const rows=items.map((c,i)=>`<tr>
     <td class="c"><input type="checkbox" data-sel="${i}" ${c.sel?"checked":""}></td>
-    <td style="font-size:12.5px;max-width:230px">${esc(c.desc)}<div style="font-size:10.5px;color:var(--muted);margin-top:2px" class="num">${esc(c.raw)}</div></td>
-    <td style="width:80px"><input class="inp num" data-imp="cantidad" data-i="${i}" value="${c.cantidad}"></td>
-    <td style="width:110px"><input class="inp num" data-imp="costo" data-i="${i}" value="${c.costo}"></td>
-    <td style="min-width:170px">
-      <select class="inp" data-imp="prod" data-i="${i}">${prodOptions(c.productoId)}</select>
-    </td>
+    <td class="c">${c.sku?`<span class="sku">${esc(c.sku)}</span>`:'<span style="color:var(--muted)">—</span>'}</td>
+    <td style="font-size:12.5px;max-width:250px">${esc(c.desc)}
+      <div style="font-size:10.5px;color:var(--muted);margin-top:2px" class="num">${esc(c.raw)}</div></td>
+    <td style="width:74px"><input class="inp num" data-imp="cantidad" data-i="${i}" value="${c.cantidad}"></td>
+    <td style="width:104px"><input class="inp num" data-imp="costo" data-i="${i}" value="${c.costo}"></td>
+    <td style="width:104px"><input class="inp num" data-imp="msrp" data-i="${i}" value="${c.msrp||0}"></td>
+    <td style="min-width:170px"><select class="inp" data-imp="prod" data-i="${i}">${prodOptions(c.productoId)}</select></td>
   </tr>`).join("");
+
+  const metaBits = [
+    meta.numero ? `N° <b>${esc(meta.numero)}</b>` : "",
+    meta.fecha ? `fecha <b>${esc(meta.fecha)}</b>` : "",
+    meta.proveedor ? `prov. <b>${esc(meta.proveedor)}</b>` : ""
+  ].filter(Boolean).join(" · ");
+
   out.innerHTML=`
-    <div class="banner ok">Detecté ${cands.length} renglón(es) en <b>${esc(fname)}</b>. Ajustá lo que haga falta y mandalo al editor de compra.</div>
+    <div class="banner ok">
+      Detecté <b>${items.length}</b> renglón(es) en <b>${esc(fname)}</b> ${mode==="estructurado"?"(formato reconocido)":"(detección genérica — revisá bien)"}.
+      ${metaBits?`<br><span style="font-weight:400">${metaBits}</span>`:""}
+    </div>
+    ${meta.flete? `<div class="banner">Detecté un cargo de <b>flete/handling</b> por ${money(meta.flete)} que <b>no</b> se agrega como stock. Si querés prorratearlo al costo, avisame y lo sumamos.</div>`:""}
+    <p style="font-size:12px;color:var(--muted);margin:0 0 8px">
+      <b>Costo</b> = lo que pagás (NET) e impacta el último costo. <b>P. venta</b> = sugerido (MSRP) para productos nuevos.
+    </p>
     <div class="table-scroll"><table class="line-tbl">
-      <thead><tr><th class="c">✓</th><th>Descripción detectada</th><th class="r">Cant.</th><th class="r">Costo</th><th>Producto destino</th></tr></thead>
+      <thead><tr><th class="c">✓</th><th class="c">SKU</th><th>Descripción</th><th class="r">Cant.</th><th class="r">Costo</th><th class="r">P. venta</th><th>Producto destino</th></tr></thead>
       <tbody>${rows}</tbody></table></div>
     <details><summary>Ver texto crudo del PDF</summary><div class="rawbox">${esc(pdfLines.join("\n"))}</div></details>
     <div style="display:flex;justify-content:flex-end;margin-top:16px">
       <button class="btn up" id="toDraft">Pasar a editor de compra →</button>
     </div>`;
 
-  out.querySelectorAll("[data-sel]").forEach(cb=> cb.onchange=()=> cands[+cb.dataset.sel].sel=cb.checked);
+  out.querySelectorAll("[data-sel]").forEach(cb=> cb.onchange=()=> items[+cb.dataset.sel].sel=cb.checked);
   out.querySelectorAll("[data-imp]").forEach(inp=>{
     const i=+inp.dataset.i, k=inp.dataset.imp;
     inp.oninput=()=>{
-      const c=cands[i];
+      const c=items[i];
       if(k==="cantidad") c.cantidad=parseNum(inp.value);
       else if(k==="costo") c.costo=parseNum(inp.value);
+      else if(k==="msrp") c.msrp=parseNum(inp.value);
       else if(k==="prod"){
         if(inp.value==="__new"){ c.crear=true; c.productoId=""; }
         else { c.crear=false; c.productoId=inp.value; const p=prodById(inp.value); if(p) c.nombre=p.nombre; }
@@ -917,17 +1005,109 @@ function showImportEditor(fname, cands){
     };
   });
   document.getElementById("toDraft").onclick=()=>{
-    const chosen=cands.filter(c=>c.sel && c.cantidad>0);
+    const chosen=items.filter(c=>c.sel && c.cantidad>0);
     if(!chosen.length){ toast("Marcá al menos un renglón","warn"); return; }
     const lineas=chosen.map(c=>({
       key:uid(),
       productoId: c.crear?"":c.productoId,
       crear: c.crear,
-      sku: c.crear?"":"", nombre: c.crear?c.nombre:"",
+      sku: c.crear?(c.sku||""):"",
+      nombre: c.crear?c.nombre:"",
+      precioVentaSugerido: c.msrp||0,
       cantidad:c.cantidad, precio:c.costo
     }));
-    openDoc("compra", { tipo:"compra", contraparte:"", fecha:new Date().toISOString().slice(0,10), numero:"", lineas });
+    openDoc("compra", { tipo:"compra", contraparte:meta.proveedor||"", fecha:meta.fecha||new Date().toISOString().slice(0,10), numero:meta.numero||"", lineas });
   };
+}
+
+/* ============================================================
+   FICHA DE PRODUCTO: kardex individual + evolución
+   ============================================================ */
+function openFicha(id){
+  const p = prodById(id); if(!p) return;
+  const movs = db.movimientos.filter(m=>m.productoId===id)
+                 .sort((a,b)=> new Date(a.fecha)-new Date(b.fecha));
+
+  let bal=0; const serie=[0];
+  const rows = movs.map(m=>{
+    const up = m.tipo==="entrada";
+    bal += up ? m.cantidad : -m.cantidad;
+    serie.push(bal);
+    const d=new Date(m.fecha);
+    const fecha = d.toLocaleDateString("es-AR") + " " + d.toLocaleTimeString("es-AR",{hour:"2-digit",minute:"2-digit"});
+    const origen = (m.refTipo==="compra"||m.refTipo==="venta") && m.refId
+      ? `<button class="btn ghost sm" data-fdoc="${m.refTipo}:${m.refId}">${esc(m.ref||"ver factura")}</button>`
+      : `<span style="color:var(--muted)">${esc(m.ref||"—")}</span>`;
+    return `<tr>
+      <td class="num">${fecha}</td>
+      <td><span class="pill ${up?'in':'out'}">${up?'↑ entró':'↓ salió'}</span></td>
+      <td class="r delta ${up?'up':'down'}">${up?'+':'−'}${qty(m.cantidad)}</td>
+      <td class="r num">${money(m.valorUnit)}</td>
+      <td class="r num" style="font-weight:600">${qty(bal)}</td>
+      <td>${origen}</td>
+    </tr>`;
+  }).reverse().join("");
+
+  const totComp = movs.filter(m=>m.refTipo==="compra").reduce((a,m)=>a+m.cantidad,0);
+  const totVend = movs.filter(m=>m.refTipo==="venta").reduce((a,m)=>a+m.cantidad,0);
+  const margen = (p.precioVenta||0)-(p.ultimoCosto||0);
+  const margenPct = p.precioVenta>0 ? (margen/p.precioVenta*100) : 0;
+  const val = (p.stock||0)*(p.ultimoCosto||0);
+
+  const body = `
+    <div class="kpis" style="grid-template-columns:repeat(4,1fr);margin-bottom:18px">
+      <div class="kpi"><div class="lbl">Stock actual</div><div class="val" style="color:${p.stock<0?'var(--alert)':'inherit'}">${qty(p.stock)}</div><div class="sub">${esc(p.unidad||"u")}</div></div>
+      <div class="kpi"><div class="lbl">Últ. costo</div><div class="val">${db.config.moneda}${nf0.format(p.ultimoCosto)}</div><div class="sub">valorizado ${money(val)}</div></div>
+      <div class="kpi"><div class="lbl">Precio venta</div><div class="val">${db.config.moneda}${nf0.format(p.precioVenta)}</div><div class="sub">${p.precioVenta>0?`margen ${nf0.format(margenPct)}%`:'sin precio'}</div></div>
+      <div class="kpi"><div class="lbl">Comprado / Vendido</div><div class="val" style="font-size:20px"><span class="delta up">${qty(totComp)}</span> / <span class="delta down">${qty(totVend)}</span></div><div class="sub">acumulado histórico</div></div>
+    </div>
+
+    ${serie.length>2 ? `<div class="panel" style="box-shadow:none;margin-bottom:16px">
+      <div class="phead"><h3>Evolución del stock</h3><span class="hint">${movs.length} movimientos</span></div>
+      <div style="padding:12px 14px 6px">${sparkline(serie)}</div>
+    </div>` : ""}
+
+    <div class="panel" style="box-shadow:none">
+      <div class="phead"><h3>Kardex del producto</h3><span class="hint">cada suba y baja con su factura</span></div>
+      ${movs.length ? `<div class="table-scroll"><table>
+        <thead><tr><th>Fecha</th><th>Movimiento</th><th class="r">Cant.</th><th class="r">Valor unit.</th><th class="r">Saldo</th><th>Origen</th></tr></thead>
+        <tbody>${rows}</tbody></table></div>`
+        : `<div class="empty"><p>Este producto todavía no tiene movimientos.</p></div>`}
+    </div>`;
+
+  buildModal(`${p.sku?("["+esc(p.sku)+"] "):""}${esc(p.nombre)}`, body, [
+    {label:"Editar producto",cls:"btn",act:()=>{ closeModal(); openProd(id); }},
+    {label:"Cerrar",cls:"btn primary",act:closeModal}
+  ], true);
+
+  document.querySelectorAll("[data-fdoc]").forEach(b=> b.onclick=()=>{
+    const [t,i]=b.dataset.fdoc.split(":"); verDoc(t,i);
+  });
+}
+
+/* Mini-gráfico de evolución (SVG, sin librerías) */
+function sparkline(vals){
+  if(vals.length<2) return "";
+  const w=620,h=76,pad=8;
+  const max=Math.max(...vals), min=Math.min(...vals,0);
+  const range=(max-min)||1;
+  const step=(w-2*pad)/(vals.length-1);
+  const pts = vals.map((v,i)=>{
+    const x=pad+i*step;
+    const y=h-pad-((v-min)/range)*(h-2*pad);
+    return `${x.toFixed(1)},${y.toFixed(1)}`;
+  });
+  const area = `${pad},${h-pad} ${pts.join(" ")} ${(pad+(vals.length-1)*step).toFixed(1)},${h-pad}`;
+  const zeroY = h-pad-((0-min)/range)*(h-2*pad);
+  const last = vals[vals.length-1];
+  const lastX = pad+(vals.length-1)*step;
+  const lastY = h-pad-((last-min)/range)*(h-2*pad);
+  return `<svg viewBox="0 0 ${w} ${h}" width="100%" height="${h}" preserveAspectRatio="none" style="display:block">
+    <polygon points="${area}" fill="var(--up-bg)"/>
+    <line x1="${pad}" y1="${zeroY.toFixed(1)}" x2="${w-pad}" y2="${zeroY.toFixed(1)}" stroke="var(--line-strong)" stroke-dasharray="3 3"/>
+    <polyline points="${pts.join(" ")}" fill="none" stroke="var(--accent)" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
+    <circle cx="${lastX.toFixed(1)}" cy="${lastY.toFixed(1)}" r="3.5" fill="var(--accent)"/>
+  </svg>`;
 }
 
 /* ============================================================
