@@ -1,10 +1,13 @@
 /* ============================================================
    Service Worker — Mayor de Stock
-   CONVENCIÓN: cada vez que tocás index.html, subí este string
-   (mayor-stock-v1 -> mayor-stock-v4) y pusheá los dos archivos
-   juntos, o el navegador sigue sirviendo la versión cacheada.
+   - index.html / navegación: NETWORK-FIRST (siempre la última
+     versión si hay internet; cache solo como respaldo offline).
+   - iconos y estáticos: cache-first.
+   - API (workers.dev): sin intervención (siempre a la red).
+   - pdf.js (CDN): cache-first para importar offline.
+   Igual conviene subir este string al cambiar la app, por prolijidad.
    ============================================================ */
-const CACHE = "mayor-stock-v4";
+const CACHE = "mayor-stock-v5";
 
 const ASSETS = [
   "./",
@@ -17,7 +20,6 @@ const ASSETS = [
   "./favicon.png"
 ];
 
-// pdf.js se sirve desde CDN: se cachea en runtime al primer uso (para import offline)
 const CDN = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/";
 
 self.addEventListener("install", e => {
@@ -35,15 +37,20 @@ self.addEventListener("activate", e => {
 });
 
 self.addEventListener("fetch", e => {
-  const url = e.request.url;
+  const req = e.request;
+  let url;
+  try { url = new URL(req.url); } catch { return; }
 
-  // pdf.js desde CDN: cache-first, y guardo copia para poder importar sin conexión
-  if (url.startsWith(CDN)) {
+  // API: no la tocamos, va siempre a la red
+  if (url.hostname.endsWith("workers.dev")) return;
+
+  // pdf.js (CDN): cache-first, guardando copia para offline
+  if (req.url.startsWith(CDN)) {
     e.respondWith(
-      caches.match(e.request).then(hit =>
-        hit || fetch(e.request).then(res => {
+      caches.match(req).then(hit =>
+        hit || fetch(req).then(res => {
           const copy = res.clone();
-          caches.open(CACHE).then(c => c.put(e.request, copy));
+          caches.open(CACHE).then(c => c.put(req, copy));
           return res;
         }).catch(() => hit)
       )
@@ -51,10 +58,23 @@ self.addEventListener("fetch", e => {
     return;
   }
 
-  // Assets propios: cache-first con fallback a red
-  if (e.request.method === "GET") {
+  if (req.method !== "GET") return;
+
+  // Navegación / index.html: NETWORK-FIRST
+  const isNav = req.mode === "navigate" ||
+                url.pathname.endsWith("/") ||
+                url.pathname.endsWith("/index.html");
+  if (isNav) {
     e.respondWith(
-      caches.match(e.request).then(hit => hit || fetch(e.request))
+      fetch(req).then(res => {
+        const copy = res.clone();
+        caches.open(CACHE).then(c => c.put("./index.html", copy)).catch(() => {});
+        return res;
+      }).catch(() => caches.match("./index.html").then(h => h || caches.match("./")))
     );
+    return;
   }
+
+  // Resto (iconos, manifest, etc.): cache-first con fallback a red
+  e.respondWith(caches.match(req).then(hit => hit || fetch(req)));
 });

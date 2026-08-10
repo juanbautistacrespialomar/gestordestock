@@ -236,6 +236,7 @@
   .login-card .inp:focus{border-color:var(--accent);background:rgba(255,255,255,.09)}
   .login-btn{width:100%;justify-content:center;padding:11px;font-size:15px;margin-top:6px}
   .login-err{color:#ff9a9a;font-size:13px;min-height:18px;margin:2px 0 6px;text-align:left}
+  .login-build{color:#5c6775;font-size:11px;margin:16px 0 0;letter-spacing:.4px}
 </style>
 </head>
 <body>
@@ -250,6 +251,7 @@
       <input class="inp" id="loginPass" type="password" autocomplete="current-password"></div>
     <div id="loginErr" class="login-err"></div>
     <button class="btn primary login-btn" id="loginBtn">Entrar</button>
+    <p class="login-build">build v5</p>
   </div>
 </div>
 <div class="app">
@@ -415,7 +417,9 @@ async function doLogin(){
   if(!user||!pass){ errEl.textContent="Completá usuario y contraseña"; return; }
   btn.disabled=true; btn.textContent="Entrando…";
   try{
+    console.log("[login] POST", apiBase()+"/login", "user:", user);
     const res=await fetch(apiBase()+"/login",{ method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify({user,pass}) });
+    console.log("[login] status", res.status);
     if(res.status===401){ errEl.textContent="Usuario o contraseña incorrectos"; return; }
     if(!res.ok){
       let msg="Error "+res.status;
@@ -424,6 +428,7 @@ async function doLogin(){
       return;
     }
     const j=await res.json();
+    console.log("[login] ok, entrando como", j.user);
     const switching = !session || session.user!==j.user;
     session={ user:j.user, token:j.token, space:j.space||"main" }; saveSession();
     if(switching){
