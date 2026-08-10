@@ -4,7 +4,7 @@
    (mayor-stock-v1 -> mayor-stock-v2) y pusheá los dos archivos
    juntos, o el navegador sigue sirviendo la versión cacheada.
    ============================================================ */
-const CACHE = "mayor-stock-v1";
+const CACHE = "mayor-stock-v2";
 
 const ASSETS = [
   "./",
@@ -12,6 +12,7 @@ const ASSETS = [
   "./manifest.json",
   "./icon-192.png",
   "./icon-512.png",
+  "./icon-maskable-512.png",
   "./apple-touch-icon.png",
   "./favicon.png"
 ];
