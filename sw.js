@@ -7,7 +7,7 @@
    - pdf.js (CDN): cache-first para importar offline.
    Igual conviene subir este string al cambiar la app, por prolijidad.
    ============================================================ */
-const CACHE = "mayor-stock-v10";
+const CACHE = "mayor-stock-v11";
 
 const ASSETS = [
   "./",
