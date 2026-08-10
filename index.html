@@ -86,7 +86,9 @@
   }
   .num{font-family:var(--mono);font-variant-numeric:tabular-nums}
   button{font-family:inherit;cursor:pointer}
-  input,select{font-family:inherit;font-size:14px}
+  input,select,textarea{font-family:inherit;font-size:14px;color:var(--text)}
+  input::placeholder,textarea::placeholder{color:var(--muted);opacity:1}
+  :root[data-theme="dark"] input[type="date"]::-webkit-calendar-picker-indicator{filter:invert(1) opacity(.7)}
   input:focus-visible,select:focus-visible,button:focus-visible{
     outline:2px solid var(--accent);outline-offset:2px;
   }
@@ -112,6 +114,18 @@
   .side-btn svg{width:17px;height:17px;display:block}
   @keyframes side-spin{to{transform:rotate(360deg)}}
   .side-btn.spin svg{animation:side-spin .8s linear infinite;transform-origin:center}
+
+  /* ---------- Switch de tema (deslizable, arriba a la derecha) ---------- */
+  .theme-switch{position:fixed;top:14px;right:20px;z-index:45;background:none;border:0;padding:0;cursor:pointer;-webkit-tap-highlight-color:transparent}
+  .theme-switch .ts-track{position:relative;display:block;width:60px;height:28px;border-radius:20px;background:var(--surface-2);border:1px solid var(--line-strong);box-shadow:var(--shadow);transition:background .2s,border-color .2s}
+  .theme-switch .ts-hint{position:absolute;top:0;height:100%;width:28px;display:flex;align-items:center;justify-content:center;color:var(--muted);opacity:.5}
+  .theme-switch .ts-hint svg{width:13px;height:13px}
+  .theme-switch .ts-hint-sun{left:2px}
+  .theme-switch .ts-hint-moon{right:2px}
+  .theme-switch .ts-thumb{position:absolute;top:2px;left:2px;width:22px;height:22px;border-radius:50%;background:#fff;box-shadow:0 1px 3px rgba(0,0,0,.3);display:flex;align-items:center;justify-content:center;color:#e0a11a;transition:transform .22s ease,background .2s,color .2s}
+  .theme-switch .ts-thumb svg{width:13px;height:13px}
+  :root[data-theme="dark"] .theme-switch .ts-thumb{transform:translateX(32px);background:#e6e9ee;color:#3b4b66}
+  @media (max-width:860px){.theme-switch{top:auto;bottom:18px;right:16px}}
   .brand-m-logo{border-radius:6px;align-self:center;margin-right:6px}
   .nav{display:flex;flex-direction:column;gap:2px}
   .nav button{
@@ -125,7 +139,7 @@
   .nav button.on .ico{opacity:1}
   .side .foot{margin-top:auto;padding:0 8px;font-size:11.5px;color:var(--muted);line-height:1.6}
 
-  .main{padding:32px 40px 80px;max-width:1180px;width:100%}
+  .main{padding:32px 44px 80px;max-width:1560px;width:100%}
   .head{display:flex;align-items:flex-end;justify-content:space-between;gap:16px;margin-bottom:26px}
   .head .title h2{font-size:26px;margin:0 0 3px;letter-spacing:-.4px;font-weight:650}
   .head .title p{margin:0;color:var(--muted);font-size:14px}
@@ -182,6 +196,9 @@
   .pill.in{background:var(--up-bg);color:var(--up)}
   .pill.out{background:var(--down-bg);color:var(--down)}
   .pill.low{background:var(--alert-bg);color:var(--alert)}
+  .pill.adj{background:rgba(186,117,23,.14);color:#b26b0f}
+  :root[data-theme="dark"] .pill.adj{background:rgba(239,159,39,.16);color:#efb35a}
+  .delta.flat{color:var(--muted)}
   .delta{font-family:var(--mono);font-weight:600}
   .delta.up{color:var(--up)}
   .delta.down{color:var(--down)}
@@ -197,7 +214,7 @@
   /* ---------- Forms / rows ---------- */
   .field{display:flex;flex-direction:column;gap:5px}
   .field label{font-size:12px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.4px}
-  .inp{border:1px solid var(--line-strong);border-radius:7px;padding:8px 10px;background:var(--surface);width:100%}
+  .inp{border:1px solid var(--line-strong);border-radius:7px;padding:8px 10px;background:var(--surface);color:var(--text);width:100%}
   .inp:focus{border-color:var(--accent)}
   .inp.num{text-align:right}
   .grid-form{display:grid;gap:14px;padding:18px}
@@ -258,7 +275,7 @@
   .chart .ctitle{font-size:13px;font-weight:650;margin:0 0 3px}
   .chart .csub{font-size:12px;color:var(--muted);margin:0 0 14px}
   .crow{display:flex;align-items:center;gap:10px;padding:5px 0}
-  .crow .cl{width:40%;font-size:12.5px;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .crow .cl{width:44%;font-size:12.5px;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
   .crow .cl .sku{font-size:11px;padding:1px 5px}
   .crow .ct{flex:1;background:var(--surface-2);border-radius:5px;height:18px;overflow:hidden;border:1px solid var(--line)}
   .crow .cf{height:100%;border-radius:5px 0 0 5px;min-width:2px;transition:width .4s ease}
@@ -340,7 +357,6 @@
     </nav>
     <div class="foot">
       <div class="side-actions">
-        <button class="side-btn" data-theme-toggle data-themeicon aria-label="Cambiar tema" title="Tema oscuro"></button>
         <button class="side-btn" data-syncside data-syncicon aria-label="Sincronizar" title="Sincronizar">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
             <path d="M3 12a9 9 0 0 1 15-6.7L21 8"/><path d="M21 3v5h-5"/>
@@ -371,6 +387,13 @@
   <main class="main" id="main"></main>
 </div>
 
+<button class="theme-switch" data-theme-toggle aria-label="Cambiar tema" title="Cambiar tema">
+  <span class="ts-track">
+    <span class="ts-hint ts-hint-sun"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg></span>
+    <span class="ts-hint ts-hint-moon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg></span>
+    <span class="ts-thumb"><span data-themeicon></span></span>
+  </span>
+</button>
 <div id="modalRoot"></div>
 <div id="toasts"></div>
 
@@ -590,14 +613,16 @@ function valorizacion(){
 function unidadesTotales(){ return db.productos.reduce((a,p)=> a + (p.stock||0), 0); }
 function bajoStock(p){ return p.puntoRepedido>0 && p.stock <= p.puntoRepedido; }
 
-/* Registrar movimiento */
-function moverStock(prod, delta, valorUnit, refTipo, refId, ref){
+/* Registrar movimiento. opts (opcional): { tipo, obs, fecha } */
+function moverStock(prod, delta, valorUnit, refTipo, refId, ref, opts){
+  opts = opts || {};
   prod.stock = +( (prod.stock||0) + delta ).toFixed(4);
   db.movimientos.push({
-    id: uid(), fecha:new Date().toISOString(),
-    tipo: delta>=0 ? "entrada" : "salida",
+    id: uid(), fecha: opts.fecha || new Date().toISOString(),
+    tipo: opts.tipo || (delta>=0 ? "entrada" : "salida"),
     productoId: prod.id, sku:prod.sku, nombre:prod.nombre,
-    cantidad: Math.abs(delta), valorUnit, refTipo, refId, ref
+    cantidad: Math.abs(delta), delta: delta, valorUnit, refTipo, refId, ref,
+    obs: opts.obs || ""
   });
 }
 
@@ -686,9 +711,10 @@ function hbars(items, fmt, color){
   return vals.map(i=>{
     const pct = Math.max(2, (i.value/max)*100);
     const c = i.color || color;
-    const lab = i.sku ? `<span class="sku">${esc(i.sku)}</span>` : esc(i.label);
+    const chip = i.sku ? `<span class="sku">${esc(i.sku)}</span> ` : "";
+    const full = (i.sku?("["+i.sku+"] "):"") + i.label;
     return `<div class="crow">
-      <div class="cl" title="${esc(i.label)}">${lab}</div>
+      <div class="cl" title="${esc(full)}">${chip}${esc(i.label)}</div>
       <div class="ct"><div class="cf" style="width:${pct.toFixed(1)}%;background:${c}"></div></div>
       <div class="cv">${fmt(i.value)}</div>
     </div>`;
@@ -811,7 +837,7 @@ function viewDocs(tipo){
       <td>${esc(d.contraparte||"—")}</td>
       <td class="c num">${qty(items)}</td>
       <td class="r num">${money(d.total)}</td>
-      <td class="r"><button class="btn ghost sm" data-vdoc="${tipo}:${d.id}">Ver</button></td>
+      <td class="r" style="white-space:nowrap"><button class="btn ghost sm" data-vdoc="${tipo}:${d.id}">Ver</button><button class="btn ghost sm" data-editdoc="${tipo}:${d.id}">Editar</button><button class="btn ghost sm" data-deldoc="${tipo}:${d.id}" style="color:var(--alert)">Borrar</button></td>
     </tr>`;
   }).join("");
 
@@ -843,26 +869,34 @@ function viewDocs(tipo){
    ============================================================ */
 function viewMov(){
   const rows = [...db.movimientos].reverse().slice(0,400).map(m=>{
-    const up = m.tipo==="entrada";
+    const isAdj = m.tipo==="ajuste";
+    const signed = (m.delta!=null) ? m.delta : (m.tipo==="entrada"? m.cantidad : -m.cantidad);
+    const up = signed>=0;
     const d = new Date(m.fecha);
     const fecha = d.toLocaleDateString("es-AR") + " " + d.toLocaleTimeString("es-AR",{hour:"2-digit",minute:"2-digit",hour12:false});
+    const pill = isAdj ? `<span class="pill adj">⇄ ajuste</span>`
+                       : `<span class="pill ${up?'in':'out'}">${up?'↑ entrada':'↓ salida'}</span>`;
+    const deltaCls = isAdj ? "flat" : (up?'up':'down');
     return `<tr>
       <td class="num">${fecha}</td>
-      <td><span class="pill ${up?'in':'out'}">${up?'↑ entrada':'↓ salida'}</span></td>
+      <td>${pill}</td>
       <td><span class="sku">${esc(m.sku||"—")}</span> ${esc(m.nombre)}</td>
-      <td class="r delta ${up?'up':'down'}">${up?'+':'−'}${qty(m.cantidad)}</td>
+      <td class="r delta ${deltaCls}">${up?'+':'−'}${qty(Math.abs(signed))}</td>
       <td class="r num">${money(m.valorUnit)}</td>
       <td class="num">${esc(m.ref||"—")}</td>
     </tr>`;
   }).join("");
   return `
-  <div class="head"><div class="title"><h2>Movimientos</h2><p>Trazabilidad de cada entrada y salida, con su documento de origen.</p></div></div>
+  <div class="head">
+    <div class="title"><h2>Movimientos</h2><p>Trazabilidad de cada entrada, salida y ajuste, con su documento de origen.</p></div>
+    <div class="actions"><button class="btn" data-adjust>⇄ Ajuste de inventario</button></div>
+  </div>
   <div class="panel">
     <div class="phead"><h3>Kardex</h3><span class="hint">${db.movimientos.length} asientos${db.movimientos.length>400?" · mostrando 400":""}</span></div>
     ${db.movimientos.length ? `<div class="table-scroll"><table>
       <thead><tr><th>Fecha</th><th>Tipo</th><th>Producto</th><th class="r">Cant.</th><th class="r">Valor unit.</th><th>Origen</th></tr></thead>
       <tbody>${rows}</tbody></table></div>`
-      : emptyState("Todavía no hay movimientos","Cada compra y cada venta deja su rastro acá.")}
+      : emptyState("Todavía no hay movimientos","Cada compra, venta o ajuste deja su rastro acá.")}
   </div>`;
 }
 
@@ -937,8 +971,15 @@ function wire(){
   m.querySelectorAll("[data-ficha]").forEach(tr=> tr.onclick=()=> openFicha(tr.dataset.ficha));
   m.querySelectorAll("[data-editp]").forEach(b=> b.onclick=(e)=>{ e.stopPropagation(); openProd(b.dataset.editp); });
   m.querySelectorAll("[data-import]").forEach(b=> b.onclick=()=> openImport());
+  const adj=m.querySelector("[data-adjust]"); if(adj) adj.onclick=()=> openAjuste();
   m.querySelectorAll("[data-vdoc]").forEach(b=> b.onclick=()=>{
     const [t,id]=b.dataset.vdoc.split(":"); verDoc(t,id);
+  });
+  m.querySelectorAll("[data-editdoc]").forEach(b=> b.onclick=()=>{
+    const [t,id]=b.dataset.editdoc.split(":"); editDoc(t,id);
+  });
+  m.querySelectorAll("[data-deldoc]").forEach(b=> b.onclick=()=>{
+    const [t,id]=b.dataset.deldoc.split(":"); deleteDoc(t,id);
   });
   const exp=m.querySelector("[data-export]"); if(exp) exp.onclick=exportJSON;
   const imp=m.querySelector("[data-import-json]"); if(imp) imp.onclick=importJSON;
@@ -1036,11 +1077,12 @@ function renderDocModal(){
     <div id="docWarn"></div>
   `;
   const total = draft.lineas.reduce((a,l)=> a + l.cantidad*l.precio, 0);
+  const editing = !!draft.editingId;
   buildModal(
-    isC?"Cargar compra":"Nueva venta", body,
+    isC?(editing?"Editar compra":"Cargar compra"):(editing?"Editar venta":"Nueva venta"), body,
     [
-      {label:"Cancelar",cls:"btn",act:closeModal},
-      {label:isC?"Confirmar compra (+stock)":"Confirmar venta (−stock)",cls:isC?"btn up":"btn down",act:confirmDoc}
+      {label:"Cancelar",cls:"btn",act:()=>{ draft.editingId=null; closeModal(); }},
+      {label: editing?"Guardar cambios" : (isC?"Confirmar compra (+stock)":"Confirmar venta (−stock)"),cls:isC?"btn up":"btn down",act:confirmDoc}
     ],
     true,
     `<div class="totrow"><span style="color:var(--muted)">Total documento</span><span class="num">${money(total)}</span></div>`
@@ -1051,6 +1093,86 @@ function renderDocModal(){
   document.getElementById("d_nu").oninput=e=>draft.numero=e.target.value;
   document.getElementById("addLine").onclick=()=>{ draft.lineas.push(blankLine()); renderLines(); refreshTotal(); };
   const imp=document.getElementById("d_import"); if(imp) imp.onclick=()=> openImport();
+}
+
+/* ============================================================
+   AJUSTE DE INVENTARIO (movimiento tipo "ajuste")
+   ============================================================ */
+let adjDraft = null;
+function openAjuste(prodId){
+  adjDraft = { productoId: prodId||"", modo:"delta", cantidad:"", fecha:new Date().toISOString().slice(0,10), obs:"" };
+  renderAjuste();
+}
+function renderAjuste(){
+  const p = prodById(adjDraft.productoId);
+  const opts = `<option value="">— elegir —</option>` +
+    db.productos.map(x=>`<option value="${x.id}" ${x.id===adjDraft.productoId?"selected":""}>${esc(x.sku?("["+x.sku+"] "):"")}${esc(x.nombre)}</option>`).join("");
+  const stockActual = p ? qty(p.stock) : "—";
+  // preview del resultado
+  let previewTxt = "";
+  if(p && adjDraft.cantidad!=="" && !isNaN(+adjDraft.cantidad)){
+    const nuevo = adjDraft.modo==="recuento" ? +adjDraft.cantidad : (p.stock||0)+(+adjDraft.cantidad);
+    const delta = nuevo-(p.stock||0);
+    const col = delta===0?"var(--muted)":(delta>0?"var(--up)":"var(--down)");
+    previewTxt = `<div class="banner ${delta>=0?'ok':'warn'}" style="margin:2px 0 0">Stock: <b>${qty(p.stock)}</b> → <b>${qty(nuevo)}</b> <span style="color:${col}">(${delta>=0?'+':'−'}${qty(Math.abs(delta))})</span></div>`;
+  }
+  const body = `
+    <div class="grid-form" style="grid-template-columns:1fr 1fr;padding:0;margin-bottom:8px">
+      <div class="field" style="grid-column:1/3"><label>Producto</label>
+        <select class="inp" id="aj_prod">${opts}</select>
+        ${p?`<div style="font-size:11.5px;color:var(--muted);margin-top:4px">Stock actual: <b class="num">${stockActual}</b> · último costo ${money(p.ultimoCosto)}</div>`:""}
+      </div>
+      <div class="field"><label>Tipo de ajuste</label>
+        <select class="inp" id="aj_modo">
+          <option value="delta" ${adjDraft.modo==="delta"?"selected":""}>Diferencia (+/−)</option>
+          <option value="recuento" ${adjDraft.modo==="recuento"?"selected":""}>Recuento (stock final)</option>
+        </select>
+      </div>
+      <div class="field"><label>${adjDraft.modo==="recuento"?"Stock contado":"Cantidad (+ suma / − resta)"}</label>
+        <input class="inp num" id="aj_cant" type="number" step="any" value="${esc(adjDraft.cantidad)}" placeholder="0"></div>
+      <div class="field"><label>Fecha</label><input class="inp" type="date" id="aj_fe" value="${esc(adjDraft.fecha)}"></div>
+      <div class="field"><label>Observación (obligatoria)</label><input class="inp" id="aj_obs" value="${esc(adjDraft.obs)}" placeholder="Ej: rotura, recuento físico, faltante proveedor…"></div>
+    </div>
+    <div id="aj_prev">${previewTxt}</div>
+  `;
+  buildModal("Ajuste de inventario", body, [
+    {label:"Cancelar", cls:"btn", act:()=>{ adjDraft=null; closeModal(); }},
+    {label:"Registrar ajuste", cls:"btn", act:confirmAjuste}
+  ]);
+  const sync=()=>{
+    adjDraft.productoId=document.getElementById("aj_prod").value;
+    adjDraft.modo=document.getElementById("aj_modo").value;
+    adjDraft.cantidad=document.getElementById("aj_cant").value;
+    adjDraft.fecha=document.getElementById("aj_fe").value;
+    adjDraft.obs=document.getElementById("aj_obs").value;
+  };
+  document.getElementById("aj_prod").onchange=()=>{ sync(); renderAjuste(); };
+  document.getElementById("aj_modo").onchange=()=>{ sync(); renderAjuste(); };
+  document.getElementById("aj_cant").oninput=()=>{ sync(); const prev=document.getElementById("aj_prev"); const pp=prodById(adjDraft.productoId);
+    if(pp && adjDraft.cantidad!=="" && !isNaN(+adjDraft.cantidad)){
+      const nuevo=adjDraft.modo==="recuento"?+adjDraft.cantidad:(pp.stock||0)+(+adjDraft.cantidad);
+      const delta=nuevo-(pp.stock||0); const col=delta===0?"var(--muted)":(delta>0?"var(--up)":"var(--down)");
+      prev.innerHTML=`<div class="banner ${delta>=0?'ok':'warn'}" style="margin:2px 0 0">Stock: <b>${qty(pp.stock)}</b> → <b>${qty(nuevo)}</b> <span style="color:${col}">(${delta>=0?'+':'−'}${qty(Math.abs(delta))})</span></div>`;
+    } else prev.innerHTML="";
+  };
+  document.getElementById("aj_obs").oninput=e=>adjDraft.obs=e.target.value;
+  document.getElementById("aj_fe").oninput=e=>adjDraft.fecha=e.target.value;
+}
+function confirmAjuste(){
+  const p = prodById(adjDraft.productoId);
+  if(!p){ toast("Elegí un producto","warn"); return; }
+  if(adjDraft.cantidad==="" || isNaN(+adjDraft.cantidad)){ toast("Ingresá una cantidad válida","warn"); return; }
+  if(!adjDraft.obs.trim()){ toast("La observación es obligatoria","warn"); return; }
+  const nuevo = adjDraft.modo==="recuento" ? +adjDraft.cantidad : (p.stock||0)+(+adjDraft.cantidad);
+  const delta = +(nuevo-(p.stock||0)).toFixed(4);
+  if(delta===0){ toast("El ajuste no cambia el stock","warn"); return; }
+  if(!confirm(`Confirmás el ajuste?\n\n${p.nombre}\nStock ${qty(p.stock)} → ${qty(nuevo)} (${delta>=0?'+':'−'}${qty(Math.abs(delta))})\nMotivo: ${adjDraft.obs.trim()}`)) return;
+  const ref = "Ajuste · " + adjDraft.obs.trim();
+  const fechaISO = new Date(adjDraft.fecha+"T12:00:00").toISOString();
+  moverStock(p, delta, p.ultimoCosto||0, "ajuste", null, ref, { tipo:"ajuste", obs:adjDraft.obs.trim(), fecha:fechaISO });
+  adjDraft=null; save(); closeModal();
+  toast(`Ajuste registrado · ${delta>=0?'+':'−'}${qty(Math.abs(delta))} u`, delta>=0?"up":"down");
+  render();
 }
 
 function prodOptions(sel){
@@ -1141,22 +1263,45 @@ function confirmDoc(){
   }
   if(!resolved.length){ toast("Cargá al menos una línea válida","warn"); return; }
 
-  // Validación de stock en ventas
+  // Si estamos editando, calculamos (sin mutar) el efecto de revertir el documento original
+  const editing = !!draft.editingId;
+  let oldDoc=null; const revertMap={};
+  if(editing){
+    const list0 = isC?db.compras:db.ventas;
+    oldDoc = list0.find(x=>x.id===draft.editingId) || null;
+    if(oldDoc){
+      oldDoc.lineas.forEach(l=>{
+        const d = isC ? -l.cantidad : +l.cantidad;   // deshacer el efecto original
+        revertMap[l.productoId] = (revertMap[l.productoId]||0) + d;
+      });
+    }
+  }
+
+  // Validación de stock en ventas (contra el stock que quedaría tras revertir el original)
   if(!isC){
-    const faltantes = resolved.filter(r=> r.prod.stock < r.cantidad);
+    const faltantes = resolved.filter(r=>{
+      const eff = (r.prod.stock||0) + (revertMap[r.prod.id]||0);
+      return eff < r.cantidad;
+    });
     if(faltantes.length){
-      const det = faltantes.map(f=>`• ${f.prod.nombre}: hay ${qty(f.prod.stock)}, pedís ${qty(f.cantidad)}`).join("\n");
+      const det = faltantes.map(f=>{
+        const eff = (f.prod.stock||0) + (revertMap[f.prod.id]||0);
+        return `• ${f.prod.nombre}: hay ${qty(eff)}, pedís ${qty(f.cantidad)}`;
+      }).join("\n");
       if(!confirm("Stock insuficiente:\n\n"+det+"\n\n¿Confirmar igual y dejar stock negativo?")) return;
     }
   }
 
   const doc = {
-    id:uid(), tipo:draft.tipo, contraparte:draft.contraparte.trim(),
+    id: editing ? draft.editingId : uid(), tipo:draft.tipo, contraparte:draft.contraparte.trim(),
     fecha:draft.fecha, numero:draft.numero.trim(),
     lineas: resolved.map(r=>({ productoId:r.prod.id, sku:r.prod.sku, nombre:r.prod.nombre, cantidad:r.cantidad, precio:r.precio })),
     total: resolved.reduce((a,r)=>a+r.cantidad*r.precio,0)
   };
   const refTxt = (isC?"Compra":"Venta") + (doc.numero?(" "+doc.numero):"") + (doc.contraparte?(" · "+doc.contraparte):"");
+
+  // Recién ahora mutamos: primero revertimos el documento original (si estábamos editando)
+  if(oldDoc) revertDoc(oldDoc);
 
   resolved.forEach(r=>{
     if(isC){
@@ -1168,10 +1313,56 @@ function confirmDoc(){
   });
 
   (isC?db.compras:db.ventas).push(doc);
+  draft.editingId=null;
   save(); closeModal();
-  toast(isC?`Compra cargada · +${qty(doc.lineas.reduce((a,l)=>a+l.cantidad,0))} u`
-           :`Venta registrada · −${qty(doc.lineas.reduce((a,l)=>a+l.cantidad,0))} u`, isC?"up":"down");
+  const uds=qty(doc.lineas.reduce((a,l)=>a+l.cantidad,0));
+  toast(editing ? `Documento actualizado`
+       : (isC?`Compra cargada · +${uds} u` : `Venta registrada · −${uds} u`), isC?"up":"down");
   render();
+}
+
+/* ---- Revertir / borrar / editar documentos ---- */
+function recomputeUltimoCosto(prod){
+  // último costo = precio de la compra más reciente que todavía contenga este producto
+  for(let i=db.compras.length-1;i>=0;i--){
+    const l = db.compras[i].lineas.find(x=>x.productoId===prod.id);
+    if(l){ prod.ultimoCosto = l.precio; return; }
+  }
+  // si no queda ninguna compra con ese producto, dejamos el último costo como está
+}
+function revertDoc(doc){
+  const isC = doc.tipo==="compra";
+  doc.lineas.forEach(l=>{
+    const p = prodById(l.productoId);
+    if(p) p.stock = +((p.stock||0) + (isC ? -l.cantidad : +l.cantidad)).toFixed(4);
+  });
+  db.movimientos = db.movimientos.filter(m=> m.refId!==doc.id);
+  const list = isC?db.compras:db.ventas;
+  const i = list.findIndex(x=>x.id===doc.id); if(i>=0) list.splice(i,1);
+  if(isC){
+    [...new Set(doc.lineas.map(l=>l.productoId))].forEach(id=>{ const p=prodById(id); if(p) recomputeUltimoCosto(p); });
+  }
+}
+function deleteDoc(tipo,id){
+  const list = tipo==="compra"?db.compras:db.ventas;
+  const d=list.find(x=>x.id===id); if(!d) return;
+  const items=d.lineas.reduce((a,l)=>a+l.cantidad,0);
+  const msg = tipo==="compra"
+    ? `¿Borrar esta compra?\n\nSe RESTAN ${qty(items)} u del stock y se elimina su asiento del kardex.\nEl último costo se recalcula con la compra anterior (si existe).`
+    : `¿Borrar esta venta?\n\nSe DEVUELVEN ${qty(items)} u al stock y se elimina su asiento del kardex.`;
+  if(!confirm(msg)) return;
+  revertDoc(d); save();
+  if(document.getElementById("scrim")) closeModal();
+  toast("Documento borrado","warn"); render();
+}
+function editDoc(tipo,id){
+  const list = tipo==="compra"?db.compras:db.ventas;
+  const d=list.find(x=>x.id===id); if(!d) return;
+  draft = {
+    tipo, editingId:id, contraparte:d.contraparte||"", fecha:d.fecha, numero:d.numero||"",
+    lineas: d.lineas.map(l=>({ key:uid(), productoId:l.productoId, sku:l.sku, nombre:l.nombre, cantidad:l.cantidad, precio:l.precio, precioVentaSugerido:0, crear:false }))
+  };
+  renderDocModal();
 }
 
 /* Ver documento existente (solo lectura) */
@@ -1191,7 +1382,11 @@ function verDoc(tipo,id){
       <thead><tr><th>Producto</th><th class="r">Cant.</th><th class="r">${isC?"Costo":"Precio"}</th><th class="r">Subtotal</th></tr></thead>
       <tbody>${rows}</tbody></table></div>
     <div class="totrow"><span style="color:var(--muted)">Total</span><span class="num">${money(d.total)}</span></div>
-  `,[{label:"Cerrar",cls:"btn",act:closeModal}]);
+  `,[
+    {label:"Borrar",cls:"btn danger",act:()=>deleteDoc(tipo,id)},
+    {label:"Editar",cls:"btn",act:()=>{ closeModal(); editDoc(tipo,id); }},
+    {label:"Cerrar",cls:"btn",act:closeModal}
+  ]);
 }
 
 /* ============================================================
@@ -1438,18 +1633,21 @@ function openFicha(id){
 
   let bal=0; const serie=[0];
   const rows = movs.map(m=>{
-    const up = m.tipo==="entrada";
-    bal += up ? m.cantidad : -m.cantidad;
+    const isAdj = m.tipo==="ajuste";
+    const signed = (m.delta!=null) ? m.delta : (m.tipo==="entrada"? m.cantidad : -m.cantidad);
+    const up = signed>=0;
+    bal += signed;
     serie.push(bal);
     const d=new Date(m.fecha);
     const fecha = d.toLocaleDateString("es-AR") + " " + d.toLocaleTimeString("es-AR",{hour:"2-digit",minute:"2-digit",hour12:false});
     const origen = (m.refTipo==="compra"||m.refTipo==="venta") && m.refId
       ? `<button class="btn ghost sm" data-fdoc="${m.refTipo}:${m.refId}">${esc(m.ref||"ver factura")}</button>`
       : `<span style="color:var(--muted)">${esc(m.ref||"—")}</span>`;
+    const pill = isAdj ? `<span class="pill adj">⇄ ajuste</span>` : `<span class="pill ${up?'in':'out'}">${up?'↑ entró':'↓ salió'}</span>`;
     return `<tr>
       <td class="num">${fecha}</td>
-      <td><span class="pill ${up?'in':'out'}">${up?'↑ entró':'↓ salió'}</span></td>
-      <td class="r delta ${up?'up':'down'}">${up?'+':'−'}${qty(m.cantidad)}</td>
+      <td>${pill}</td>
+      <td class="r delta ${isAdj?'flat':(up?'up':'down')}">${up?'+':'−'}${qty(Math.abs(signed))}</td>
       <td class="r num">${money(m.valorUnit)}</td>
       <td class="r num" style="font-weight:600">${qty(bal)}</td>
       <td>${origen}</td>
@@ -1484,6 +1682,7 @@ function openFicha(id){
     </div>`;
 
   buildModal(`${p.sku?("["+esc(p.sku)+"] "):""}${esc(p.nombre)}`, body, [
+    {label:"⇄ Ajustar stock",cls:"btn",act:()=>{ closeModal(); openAjuste(id); }},
     {label:"Editar producto",cls:"btn",act:()=>{ closeModal(); openProd(id); }},
     {label:"Cerrar",cls:"btn primary",act:closeModal}
   ], true);
@@ -1615,8 +1814,11 @@ function toggleTheme(){ applyTheme(currentTheme()==="dark" ? "light" : "dark"); 
 function paintThemeBtn(){
   const dark = currentTheme()==="dark";
   document.querySelectorAll("[data-themeicon]").forEach(el=>{
-    el.innerHTML = dark ? SUN_SVG : MOON_SVG;         // muestro a dónde voy a cambiar
-    el.title = dark ? "Tema claro" : "Tema oscuro";
+    el.innerHTML = dark ? MOON_SVG : SUN_SVG;         // ícono = modo actual; la posición indica el estado
+  });
+  document.querySelectorAll("[data-theme-toggle]").forEach(b=>{
+    const t = dark ? "Cambiar a tema claro" : "Cambiar a tema oscuro";
+    b.title = t; b.setAttribute("aria-label", t);
   });
 }
 paintThemeBtn();
