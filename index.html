@@ -8,6 +8,7 @@
 <link rel="icon" href="favicon.png" type="image/png">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
 <meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="Mayor">
 <title>Mayor de Stock</title>
@@ -215,6 +216,7 @@
   @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
 
   /* ---------- Login ---------- */
+  #login[hidden]{display:none}
   .login-scrim{
     position:fixed;inset:0;z-index:100;display:flex;align-items:center;justify-content:center;padding:20px;
     background:
@@ -251,7 +253,7 @@
       <input class="inp" id="loginPass" type="password" autocomplete="current-password"></div>
     <div id="loginErr" class="login-err"></div>
     <button class="btn primary login-btn" id="loginBtn">Entrar</button>
-    <p class="login-build">build v5</p>
+    <p class="login-build">build v7</p>
   </div>
 </div>
 <div class="app">
@@ -438,7 +440,7 @@ async function doLogin(){
     setSyncState("idle");
     hideLogin(); render(); paintSync();
     await pullNow();
-  }catch(e){ errEl.textContent="No se pudo conectar con el servidor ("+(e&&e.message||e)+")"; }
+  }catch(e){ console.error("[login] fallo:", e); errEl.textContent="No se pudo conectar con el servidor ("+(e&&e.message||e)+")"; }
   finally{ btn.disabled=false; btn.textContent="Entrar"; }
 }
 function logout(){
