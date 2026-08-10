@@ -38,6 +38,57 @@ y pusheá **los dos archivos juntos**. Si no, el navegador sigue sirviendo la ve
 - **Siempre** muestra una tabla editable + el texto crudo extraído antes de impactar stock. Revisá antes de confirmar: los formatos varían.
 - El PDF se procesa en el navegador; no se sube a ningún lado.
 
-## Datos
+## Datos y sincronización entre dispositivos
 
-Todo vive en `localStorage` de ese navegador/dispositivo. Usá **Datos → Exportar JSON** para respaldar y mover entre equipos. **Importar JSON** reemplaza todo lo actual.
+Por defecto todo vive en `localStorage` del navegador (modo **Local**, offline). Para que el stock sea **el mismo desde la PC y el celu**, hay un backend opcional en **Cloudflare Worker + D1**.
+
+### Cómo funciona
+
+- La app guarda siempre en local (seguís trabajando sin conexión) y, si hay servidor configurado, empuja/trae el estado completo.
+- Control de versión optimista con `rev`: si desde la última sincronización cambió **acá y en el servidor**, la app avisa **Conflicto** y elegís cuál conservar. Si solo cambió de un lado, sincroniza solo.
+- El indicador de estado (**Local / Sincronizado / Guardando / Sin conexión / Conflicto**) está en la barra lateral.
+
+### Backend — archivos
+
+| Archivo | Qué es |
+|---|---|
+| `worker.js` | El Worker (API `/state`, GET y PUT con control de `rev`). |
+| `schema.sql` | Tabla `estado` de D1. |
+| `wrangler.toml` | Config de deploy (poné el `database_id`). |
+
+### Deploy del backend (una vez)
+
+```bash
+npm i -g wrangler
+wrangler login
+
+# 1) Crear la base D1 y pegar el database_id en wrangler.toml
+wrangler d1 create mayor-stock
+
+# 2) Crear la tabla
+wrangler d1 execute mayor-stock --remote --file=schema.sql
+
+# 3) Definir el token de acceso (elegí uno largo y secreto)
+wrangler secret put TOKEN
+
+# 4) Publicar
+wrangler deploy
+```
+
+Te queda una URL tipo `https://mayor-stock-api.TU-USUARIO.workers.dev`.
+
+### Conectar la app
+
+En cada dispositivo, entrá a **Datos → Sincronización** y cargá:
+
+- **URL del Worker**: la de `wrangler deploy`.
+- **Token**: el mismo que pusiste en `wrangler secret put TOKEN`.
+- **Espacio**: `main` (o `us`, `europa`, etc. para tener varios inventarios separados en el mismo servidor).
+
+Tocá **Conectar / Guardar**. El primer dispositivo sube su estado; los demás lo traen. Listo.
+
+> El token viaja en el header `Authorization: Bearer`. Al ser un solo secreto compartido, tratá la URL+token como una contraseña. Si querés algo más fino (usuarios, roles) se puede, pero para uso personal esto alcanza y es simple.
+
+### Respaldo extra
+
+Aun con servidor, **Datos → Exportar JSON** te da una copia puntual. **Importar JSON** reemplaza el estado actual (y se sincroniza al servidor si estás conectado).
