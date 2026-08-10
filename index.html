@@ -213,9 +213,45 @@
     table{min-width:560px}
   }
   @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+
+  /* ---------- Login ---------- */
+  .login-scrim{
+    position:fixed;inset:0;z-index:100;display:flex;align-items:center;justify-content:center;padding:20px;
+    background:
+      radial-gradient(1100px 600px at 70% -10%, rgba(47,111,107,.25), transparent 60%),
+      radial-gradient(900px 500px at 10% 110%, rgba(124,58,180,.22), transparent 55%),
+      #05060a;
+  }
+  .login-card{
+    width:100%;max-width:360px;background:rgba(255,255,255,.03);
+    border:1px solid rgba(255,255,255,.09);border-radius:18px;padding:34px 28px 28px;text-align:center;
+    box-shadow:0 24px 70px rgba(0,0,0,.55);backdrop-filter:blur(4px);
+  }
+  .login-logo{border-radius:20px;box-shadow:0 8px 30px rgba(0,0,0,.5);margin-bottom:16px}
+  .login-card h1{color:#fff;font-size:22px;margin:0 0 6px;letter-spacing:-.3px;font-weight:680}
+  .login-sub{color:#9aa6b4;font-size:13.5px;margin:0 0 22px;line-height:1.5}
+  .login-card .field{text-align:left;margin-bottom:14px}
+  .login-card .field label{color:#8b97a6}
+  .login-card .inp{background:rgba(255,255,255,.06);border-color:rgba(255,255,255,.14);color:#fff}
+  .login-card .inp:focus{border-color:var(--accent);background:rgba(255,255,255,.09)}
+  .login-btn{width:100%;justify-content:center;padding:11px;font-size:15px;margin-top:6px}
+  .login-err{color:#ff9a9a;font-size:13px;min-height:18px;margin:2px 0 6px;text-align:left}
 </style>
 </head>
 <body>
+<div id="login" class="login-scrim" hidden>
+  <div class="login-card">
+    <img src="icon-512.png" alt="" class="login-logo" width="88" height="88">
+    <h1>Mayor de Stock</h1>
+    <p class="login-sub">Entrá con tu usuario y vas a ver tu inventario desde cualquier dispositivo.</p>
+    <div class="field"><label>Usuario</label>
+      <input class="inp" id="loginUser" autocomplete="username" autocapitalize="none" spellcheck="false"></div>
+    <div class="field"><label>Contraseña</label>
+      <input class="inp" id="loginPass" type="password" autocomplete="current-password"></div>
+    <div id="loginErr" class="login-err"></div>
+    <button class="btn primary login-btn" id="loginBtn">Entrar</button>
+  </div>
+</div>
 <div class="app">
   <aside class="side">
     <div class="brand">
@@ -231,8 +267,8 @@
       <button data-view="datos"><span class="ico">⤓</span>Datos</button>
     </nav>
     <div class="foot">
-      Último costo · sin variación<br>promedio.<br><br>
-      Compras suman stock, ventas restan. Todo queda en este navegador.
+      <div data-syncchip style="font-weight:700;font-size:12.5px;margin-bottom:10px">●</div>
+      Último costo. Compras suman stock, ventas restan.
     </div>
   </aside>
 
@@ -244,6 +280,7 @@
     <button data-view="ventas">Ventas</button>
     <button data-view="mov">Movim.</button>
     <button data-view="datos">Datos</button>
+    <span data-syncchip style="margin-left:auto;align-self:center;font-size:11.5px;font-weight:700;white-space:nowrap;padding-left:8px">●</span>
   </div>
 
   <main class="main" id="main"></main>
@@ -263,9 +300,16 @@ if (window.pdfjsLib) {
 }
 
 const KEY = "gstock_v1";
+const SKEY = "gstock_sync";       // { syncedRev, dirty }
+const SESKEY = "gstock_session";  // { user, token, space }
+
+/* URL del servidor (Cloudflare Worker). Si algún día lo redeploya en otra
+   cuenta/nombre, cambiar solo esta línea. */
+const API_URL = "https://mayor-stock-api.juanbautistacrespialomar.workers.dev";
+
 const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2,7);
 
-/* ---------- Estado ---------- */
+/* ---------- Estado local ---------- */
 let db = load();
 function load(){
   try{
@@ -274,7 +318,134 @@ function load(){
   }catch(e){ console.warn("load fail", e); }
   return { config:{ moneda:"$" }, productos:[], compras:[], ventas:[], movimientos:[] };
 }
-function save(){ localStorage.setItem(KEY, JSON.stringify(db)); }
+function persistLocal(){ localStorage.setItem(KEY, JSON.stringify(db)); }
+
+/* ---------- Sesión ---------- */
+let session = loadSession();
+function loadSession(){ try{ const r=localStorage.getItem(SESKEY); if(r) return JSON.parse(r); }catch(e){} return null; }
+function saveSession(){ if(session) localStorage.setItem(SESKEY, JSON.stringify(session)); else localStorage.removeItem(SESKEY); }
+
+/* ---------- Sincronización con el servidor ---------- */
+let syncMeta = loadSyncMeta();       // { syncedRev, dirty }
+let syncState = session ? "idle" : "off";
+let pushTimer = null;
+let conflictPayload = null;
+
+function loadSyncMeta(){ try{ const r=localStorage.getItem(SKEY); if(r) return JSON.parse(r); }catch(e){} return { syncedRev:0, dirty:false }; }
+function saveSyncMeta(){ localStorage.setItem(SKEY, JSON.stringify(syncMeta)); }
+
+function save(){
+  persistLocal();
+  if(session){ syncMeta.dirty=true; saveSyncMeta(); schedulePush(); }
+}
+
+function setSyncState(s){ syncState=s; paintSync(); }
+function apiBase(){ return API_URL.replace(/\/+$/,""); }
+function authHeaders(){ return { "Authorization":"Bearer "+(session?session.token:""), "Content-Type":"application/json" }; }
+function stateUrl(){ return apiBase()+"/state?space="+encodeURIComponent(session?session.space:"main"); }
+
+function schedulePush(){ if(!session) return; clearTimeout(pushTimer); pushTimer=setTimeout(()=>pushNow(), 800); }
+
+async function pushNow(force=false){
+  if(!session) return;
+  setSyncState("saving");
+  try{
+    const res=await fetch(stateUrl(),{ method:"PUT", headers:authHeaders(), body:JSON.stringify({ data:db, baseRev:syncMeta.syncedRev, force }) });
+    if(res.status===401){ setSyncState("offline"); toast("Sesión vencida, volvé a entrar","warn"); logout(); return; }
+    if(res.status===409){ conflictPayload=await res.json(); setSyncState("conflict"); toast("Hay una versión más nueva en el servidor","warn"); if(view==="datos") render(); return; }
+    if(!res.ok) throw new Error("HTTP "+res.status);
+    const j=await res.json();
+    syncMeta.syncedRev=j.rev; syncMeta.dirty=false; saveSyncMeta();
+    setSyncState("idle");
+  }catch(e){ console.warn("push fail", e); setSyncState("offline"); }
+}
+
+async function pullNow(){
+  if(!session) return;
+  setSyncState("saving");
+  try{
+    const res=await fetch(stateUrl(),{ method:"GET", headers:authHeaders() });
+    if(res.status===401){ setSyncState("offline"); toast("Sesión vencida, volvé a entrar","warn"); logout(); return; }
+    if(!res.ok) throw new Error("HTTP "+res.status);
+    const j=await res.json();
+    const serverRev=j.rev||0;
+    if(!j.data){ if(hasData(db)) await pushNow(true); else { syncMeta.syncedRev=0; saveSyncMeta(); setSyncState("idle"); } return; }
+    if(serverRev===syncMeta.syncedRev && !syncMeta.dirty){ setSyncState("idle"); return; }
+    if(serverRev>syncMeta.syncedRev && !syncMeta.dirty){
+      db=j.data; syncMeta.syncedRev=serverRev; syncMeta.dirty=false; saveSyncMeta(); persistLocal();
+      setSyncState("idle"); render(); toast("Datos actualizados desde el servidor"); return;
+    }
+    if(syncMeta.dirty && serverRev!==syncMeta.syncedRev){ conflictPayload=j; setSyncState("conflict"); if(view==="datos") render(); return; }
+    if(syncMeta.dirty){ await pushNow(); return; }
+    setSyncState("idle");
+  }catch(e){ console.warn("pull fail", e); setSyncState("offline"); }
+}
+
+function hasData(d){ return (d.productos&&d.productos.length)||(d.compras&&d.compras.length)||(d.ventas&&d.ventas.length); }
+
+function resolveConflict(keepLocal){
+  if(!conflictPayload) return;
+  if(keepLocal){ syncMeta.syncedRev=conflictPayload.rev; saveSyncMeta(); pushNow(true); }
+  else{
+    db=conflictPayload.data; syncMeta.syncedRev=conflictPayload.rev; syncMeta.dirty=false; saveSyncMeta(); persistLocal();
+    render(); toast("Se tomó la versión del servidor");
+  }
+  conflictPayload=null; setSyncState("idle");
+}
+
+function paintSync(){
+  const map={
+    off:["●","Desconectado","var(--muted)"],
+    idle:["●","Sincronizado","var(--up)"],
+    saving:["◐","Guardando…","var(--accent)"],
+    offline:["●","Sin conexión","var(--down)"],
+    conflict:["▲","Conflicto","var(--alert)"]
+  };
+  const [dot,txt,col]=map[syncState]||map.off;
+  document.querySelectorAll("[data-syncchip]").forEach(el=>{ el.style.color=col; el.textContent=dot+" "+txt; });
+}
+
+/* ---------- Login / Logout ---------- */
+async function doLogin(){
+  const user=(document.getElementById("loginUser").value||"").trim();
+  const pass=document.getElementById("loginPass").value||"";
+  const errEl=document.getElementById("loginErr");
+  const btn=document.getElementById("loginBtn");
+  errEl.textContent="";
+  if(!user||!pass){ errEl.textContent="Completá usuario y contraseña"; return; }
+  btn.disabled=true; btn.textContent="Entrando…";
+  try{
+    const res=await fetch(apiBase()+"/login",{ method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify({user,pass}) });
+    if(res.status===401){ errEl.textContent="Usuario o contraseña incorrectos"; return; }
+    if(!res.ok) throw new Error("HTTP "+res.status);
+    const j=await res.json();
+    const switching = !session || session.user!==j.user;
+    session={ user:j.user, token:j.token, space:j.space||"main" }; saveSession();
+    if(switching){
+      db={ config:{ moneda:(db.config&&db.config.moneda)||"$" }, productos:[], compras:[], ventas:[], movimientos:[] };
+      persistLocal(); syncMeta={ syncedRev:0, dirty:false }; saveSyncMeta();
+    }
+    setSyncState("idle");
+    hideLogin(); render(); paintSync();
+    await pullNow();
+  }catch(e){ errEl.textContent="No se pudo conectar con el servidor. Revisá tu internet."; }
+  finally{ btn.disabled=false; btn.textContent="Entrar"; }
+}
+function logout(){
+  if(!confirm("Cerrar sesión en este dispositivo. Tus datos siguen en el servidor. ¿Seguir?")) return;
+  session=null; saveSession(); setSyncState("off");
+  showLogin();
+}
+function showLogin(){
+  const l=document.getElementById("login"); if(l) l.hidden=false;
+  const a=document.querySelector(".app"); if(a) a.style.display="none";
+  const u=document.getElementById("loginUser"); if(u){ u.value=""; setTimeout(()=>u.focus(),50); }
+  const p=document.getElementById("loginPass"); if(p) p.value="";
+}
+function hideLogin(){
+  const l=document.getElementById("login"); if(l) l.hidden=true;
+  const a=document.querySelector(".app"); if(a) a.style.display="";
+}
 
 /* ---------- Formato ---------- */
 const nf0 = new Intl.NumberFormat("es-AR",{maximumFractionDigits:2});
@@ -509,19 +680,47 @@ function viewMov(){
    VISTA: Datos
    ============================================================ */
 function viewDatos(){
+  const conf = syncState==="conflict";
   return `
-  <div class="head"><div class="title"><h2>Datos</h2><p>Backup, restauración y configuración.</p></div></div>
+  <div class="head"><div class="title"><h2>Datos</h2><p>Cuenta, backup y configuración.</p></div></div>
+
+  <div class="panel">
+    <div class="phead"><h3>Cuenta</h3><span class="hint" data-syncchip>●</span></div>
+    <div class="grid-form">
+      <p style="margin:0;color:var(--muted);font-size:14px">
+        Sesión iniciada como <b>${esc(session?session.user:"—")}</b>. Tus datos viven en el servidor:
+        entrás con tu usuario desde cualquier dispositivo y ves lo mismo.
+      </p>
+      ${conf ? `<div class="banner warn">
+        <div>Cambió acá <b>y</b> en el servidor desde la última sincronización. ¿Cuál conservás?
+          <div style="margin-top:8px;display:flex;gap:8px;flex-wrap:wrap">
+            <button class="btn sm" data-confserver>Tomar la del servidor</button>
+            <button class="btn sm danger" data-conflocal>Pisar con la de este equipo</button>
+          </div>
+        </div>
+      </div>`:""}
+      <div style="display:flex;gap:10px;flex-wrap:wrap">
+        <button class="btn" data-syncnow>↻ Sincronizar ahora</button>
+        <button class="btn danger" data-logout>Cerrar sesión</button>
+      </div>
+      <p style="font-size:12px;color:var(--muted);margin:0">
+        Inventario: <b>${esc(session?session.space:"main")}</b> · versión sincronizada rev ${syncMeta.syncedRev}${syncMeta.dirty?" · con cambios locales sin subir":""}.
+      </p>
+    </div>
+  </div>
+
   <div class="panel">
     <div class="phead"><h3>Respaldo</h3></div>
     <div class="grid-form">
-      <p style="margin:0;color:var(--muted);font-size:14px">Todo se guarda en este navegador (localStorage). Exportá un JSON para no perder nada y para moverlo de dispositivo.</p>
+      <p style="margin:0;color:var(--muted);font-size:14px">Copia extra en JSON, además del servidor, para migrar o archivar.</p>
       <div style="display:flex;gap:10px;flex-wrap:wrap">
-        <button class="btn primary" data-export>⤓ Exportar JSON</button>
+        <button class="btn" data-export>⤓ Exportar JSON</button>
         <button class="btn" data-import-json>⤒ Importar JSON</button>
         <button class="btn danger" data-reset>Borrar todo</button>
       </div>
     </div>
   </div>
+
   <div class="panel">
     <div class="phead"><h3>Configuración</h3></div>
     <div class="grid-form" style="grid-template-columns:200px">
@@ -558,6 +757,14 @@ function wire(){
     db.config.moneda = (document.getElementById("cfgMon").value||"$").trim()||"$";
     save(); toast("Configuración guardada"); render();
   };
+
+  // --- cuenta / sincronización ---
+  const sNow=m.querySelector("[data-syncnow]"); if(sNow) sNow.onclick=()=> pullNow();
+  const lo=m.querySelector("[data-logout]"); if(lo) lo.onclick=()=> logout();
+  const cl=m.querySelector("[data-conflocal]"); if(cl) cl.onclick=()=>resolveConflict(true);
+  const cs=m.querySelector("[data-confserver]"); if(cs) cs.onclick=()=>resolveConflict(false);
+
+  paintSync();
 }
 
 /* ============================================================
@@ -1189,7 +1396,24 @@ function closeModal(){
 }
 
 /* ---------- Arranque ---------- */
-render();
+// Cableado del login (elementos estáticos)
+document.getElementById("loginBtn").onclick = doLogin;
+document.getElementById("loginUser").addEventListener("keydown", e=>{ if(e.key==="Enter") document.getElementById("loginPass").focus(); });
+document.getElementById("loginPass").addEventListener("keydown", e=>{ if(e.key==="Enter") doLogin(); });
+
+if(session){
+  hideLogin();
+  render();
+  paintSync();
+  pullNow();
+} else {
+  render();          // deja el DOM de la app armado por debajo
+  showLogin();
+}
+
+/* Re-sincronizar al volver la conexión o el foco */
+window.addEventListener("online", ()=>{ if(session){ syncMeta.dirty ? pushNow() : pullNow(); } });
+document.addEventListener("visibilitychange", ()=>{ if(!document.hidden && session) pullNow(); });
 
 /* ---------- Service worker (PWA offline) ---------- */
 if ("serviceWorker" in navigator) {

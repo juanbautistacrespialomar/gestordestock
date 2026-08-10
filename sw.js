@@ -1,10 +1,10 @@
 /* ============================================================
    Service Worker — Mayor de Stock
    CONVENCIÓN: cada vez que tocás index.html, subí este string
-   (mayor-stock-v1 -> mayor-stock-v2) y pusheá los dos archivos
+   (mayor-stock-v1 -> mayor-stock-v3) y pusheá los dos archivos
    juntos, o el navegador sigue sirviendo la versión cacheada.
    ============================================================ */
-const CACHE = "mayor-stock-v2";
+const CACHE = "mayor-stock-v3";
 
 const ASSETS = [
   "./",
