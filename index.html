@@ -255,7 +255,8 @@
   .delta.down{color:var(--down)}
   .stock-cell{font-family:var(--mono);font-weight:600}
   .stock-cell.low{color:var(--alert)}
-  .stock-cell.neg{color:var(--alert)}
+  .stock-cell.neg{color:var(--alert);font-weight:800}
+  .stock-cell.zero{color:var(--alert);font-weight:800}
 
   /* ---------- Headers ordenables (clic en el título ordena) ---------- */
   th.sortable{cursor:pointer;user-select:none;white-space:nowrap}
@@ -475,7 +476,7 @@
     </div>
     <div id="loginErr" class="login-err"></div>
     <button class="btn primary login-btn" id="loginBtn">Entrar</button>
-    <p class="login-build">build v16</p>
+    <p class="login-build">build v17</p>
   </div>
 </div>
 <div class="topbar" id="topbar">
@@ -777,6 +778,51 @@ function sinStock(p){ return (p.stock||0) <= 0; }
 /* Lo que hay que reponer: sin stock (cero/negativo) O por debajo del punto de repedido. */
 function necesitaPedido(p){ return sinStock(p) || bajoStock(p); }
 
+/* ============================================================
+   Numeración CORRELATIVA de facturas de VENTA
+   Formato: "FC 0001-0000001". Tomamos el mayor secuencial ya usado
+   en db.ventas (parseando el patrón) y devolvemos el siguiente, sin
+   huecos. Las compras siguen con N° libre (traen el del proveedor).
+   ------------------------------------------------------------
+   OJO: si borrás una venta que NO es la última, queda un hueco en la
+   serie (comportamiento correcto: en la práctica se anula con nota de
+   crédito, no se borra). Si borrás la última, ese número se reutiliza.
+   ============================================================ */
+const FC_PV  = "0001";   // punto de venta; cambialo acá si algún día lo necesitás
+const FC_PAD = 7;        // dígitos del secuencial -> 0000001
+function nextFacturaVenta(){
+  let max = 0;
+  (db.ventas||[]).forEach(v=>{
+    const m = /^FC\s+\d+-(\d+)$/i.exec(String(v.numero||"").trim());
+    if(m){ const n = parseInt(m[1],10); if(n>max) max=n; }
+  });
+  return `FC ${FC_PV}-${String(max+1).padStart(FC_PAD,"0")}`;
+}
+
+/* ============================================================
+   Banner de reposición: memoria de descarte por CONJUNTO
+   El banner se muestra una sola vez y se queda hasta que lo tocás.
+   Guardamos la "firma" (los IDs de todo lo que hay que reponer, ordenados).
+   Si el conjunto cambia —entra o sale CUALQUIER producto, aunque la
+   cantidad total sea la misma— la firma cambia y el banner vuelve a
+   aparecer. Cuando ya no hay nada que reponer, limpiamos la memoria para
+   que el próximo alerta (aun con los mismos productos) se muestre fresco.
+   Es preferencia LOCAL del dispositivo: no se sincroniza ni ensucia el rev.
+   ============================================================ */
+const ALERTKEY = "gstock_alert_dismissed";
+function firmaReposicion(){
+  return db.productos.filter(necesitaPedido).map(p=>p.id).sort().join("|");
+}
+function alertaDescartada(firma){
+  try{ return localStorage.getItem(ALERTKEY) === firma; }catch(e){ return false; }
+}
+function descartarAlerta(firma){
+  try{ localStorage.setItem(ALERTKEY, firma); }catch(e){}
+}
+function limpiarMemoriaAlerta(){
+  try{ localStorage.removeItem(ALERTKEY); }catch(e){}
+}
+
 /* Registrar movimiento. opts (opcional): { tipo, obs, fecha } */
 function moverStock(prod, delta, valorUnit, refTipo, refId, ref, opts){
   opts = opts || {};
@@ -967,6 +1013,9 @@ function wireFilterBar(prefix, f, onChange){
 /* Salta desde la alerta del panel al maestro filtrado por "A reponer",
    ordenado por stock ascendente (primero lo más urgente: negativos y ceros). */
 function irAPedidos(){
+  // Tocar el aviso = "ya lo vi": descartamos el banner para ESTE conjunto.
+  // Si después el conjunto cambia (entra/sale un producto), vuelve a aparecer.
+  descartarAlerta(firmaReposicion());
   Object.assign(prodFiltros, { q:"", saga:"", estado:"pedir", cmin:"", cmax:"", sortKey:"stock", sortDir:"asc" });
   setView("prod");
   toast("Filtrando productos a reponer","warn");
@@ -981,6 +1030,13 @@ function viewDash(){
     ? [ enCero.length?`${enCero.length} en cero`:"", negs.length?`${negs.length} negativo${negs.length>1?"s":""}`:"", bajoM.length?`${bajoM.length} bajo mínimo`:"" ].filter(Boolean).join(" · ")
     : "todo al día";
 
+  // Banner: se muestra si hay algo que reponer Y ese conjunto exacto todavía
+  // no fue descartado. La tarjeta "Alertas" (más abajo) SIEMPRE queda con la
+  // cuenta, así que no perdés el aviso aunque descartes el banner.
+  const firma = firmaReposicion();
+  if(!porPedir.length) limpiarMemoriaAlerta();          // sin alertas -> memoria fresca para la próxima
+  const mostrarBanner = porPedir.length && !alertaDescartada(firma);
+
   return `
   <div class="head">
     <div class="title"><h2>Panel</h2><p>Valorización de stock a último costo de compra.</p></div>
@@ -990,7 +1046,7 @@ function viewDash(){
     </div>
   </div>
 
-  ${porPedir.length ? `<div class="banner warn alerta-pedido" data-goto-pedir role="button" tabindex="0" title="Ver la lista de reposición">
+  ${mostrarBanner ? `<div class="banner warn alerta-pedido" data-goto-pedir role="button" tabindex="0" title="Ver la lista de reposición">
     <span aria-hidden="true">⚠</span>
     <span><b>${porPedir.length}</b> producto${porPedir.length>1?"s":""} para reponer${subAlerta&&subAlerta!=="todo al día"?` — ${subAlerta}`:""}. <u>Tocá para ver qué pedir.</u></span>
   </div>` : ""}
@@ -1026,7 +1082,7 @@ function renderDashRows(){
   const list=filteredDashProds();
   body.innerHTML = list.map(p=>{
     const val=(p.stock||0)*(p.ultimoCosto||0);
-    let cls="stock-cell"; if(p.stock<0) cls+=" neg"; else if(bajoStock(p)) cls+=" low";
+    let cls="stock-cell"; if(p.stock<0) cls+=" neg"; else if(p.stock===0) cls+=" zero"; else if(bajoStock(p)) cls+=" low";
     const flag = p.stock<0 ? '<span class="pill low">negativo</span>'
                : bajoStock(p) ? '<span class="pill low">reponer</span>' : "";
     return `<tr data-ficha="${p.id}" style="cursor:pointer">
@@ -1175,7 +1231,7 @@ function renderProdRows(){
   const body=document.getElementById("prodBody"); if(!body) return;
   const list=filtrarProds(prodFiltros);
   body.innerHTML = list.map(p=>{
-    let cls="stock-cell"; if(p.stock<0) cls+=" neg"; else if(bajoStock(p)) cls+=" low";
+    let cls="stock-cell"; if(p.stock<0) cls+=" neg"; else if(p.stock===0) cls+=" zero"; else if(bajoStock(p)) cls+=" low";
     const chk = selMode ? `<td class="c" data-nofic><input type="checkbox" class="selchk" data-selp="${p.id}" ${selProd.has(p.id)?"checked":""}></td>` : "";
     return `<tr data-ficha="${p.id}" style="cursor:pointer">
       ${chk}
@@ -1734,7 +1790,8 @@ let draft = null;  // { tipo, contraparte, fecha, numero, lineas:[{key,productoI
 
 function openDoc(tipo, pre){
   draft = pre || {
-    tipo, contraparte:"", fecha:new Date().toISOString().slice(0,10), numero:"",
+    tipo, contraparte:"", fecha:new Date().toISOString().slice(0,10),
+    numero: tipo==="venta" ? nextFacturaVenta() : "",   // venta = correlativo automático
     lineas:[ blankLine() ]
   };
   draft.tipo = tipo;
@@ -1752,7 +1809,7 @@ function renderDocModal(){
     <div class="grid-form" style="grid-template-columns:1fr 1fr 1fr;padding:0;margin-bottom:16px">
       <div class="field"><label>${isC?"Proveedor":"Cliente"}</label><input class="inp" id="d_cp" value="${esc(draft.contraparte)}"></div>
       <div class="field"><label>Fecha</label><input class="inp" type="date" id="d_fe" value="${esc(draft.fecha)}"></div>
-      <div class="field"><label>N° comprobante</label><input class="inp" id="d_nu" value="${esc(draft.numero)}"></div>
+      <div class="field"><label>N° comprobante${isC?"":' <span class="hint" style="font-weight:400">· correlativo automático</span>'}</label><input class="inp" id="d_nu" value="${esc(draft.numero)}"${isC?"":' readonly style="opacity:.85;cursor:not-allowed"'}></div>
     </div>
     <div id="lineHost"></div>
     <button class="btn sm" id="addLine" style="margin-top:10px">+ Agregar línea</button>
@@ -1772,7 +1829,7 @@ function renderDocModal(){
   renderLines();
   document.getElementById("d_cp").oninput=e=>draft.contraparte=e.target.value;
   document.getElementById("d_fe").oninput=e=>draft.fecha=e.target.value;
-  document.getElementById("d_nu").oninput=e=>draft.numero=e.target.value;
+  if(isC){ const nu=document.getElementById("d_nu"); if(nu) nu.oninput=e=>draft.numero=e.target.value; }
   document.getElementById("addLine").onclick=()=>{ draft.lineas.push(blankLine()); renderLines(); refreshTotal(); };
   const imp=document.getElementById("d_import"); if(imp) imp.onclick=()=> openImport();
 }
