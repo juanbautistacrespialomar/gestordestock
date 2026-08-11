@@ -35,7 +35,7 @@
     --alert-bg:#fbeaea;
     --muted:#8a909b;
     --text:#111317;
-    --radius:4px;
+    --radius:14px;
     --mono:"Spline Sans Mono",ui-monospace,"SF Mono","Menlo","Consolas",monospace;
     --sans:"Inter Tight",-apple-system,BlinkMacSystemFont,"Segoe UI","Helvetica Neue",Arial,sans-serif;
     --shadow:0 1px 2px rgba(17,19,23,.04);
@@ -139,7 +139,7 @@
   .nav button.on .ico{opacity:1}
   .side .foot{margin-top:auto;padding:0 8px;font-size:11.5px;color:var(--muted);line-height:1.6}
 
-  .main{padding:32px 44px 80px;max-width:1560px;width:100%}
+  .main{padding:32px 44px 80px;max-width:1560px;width:100%;margin-inline:auto}
   .head{display:flex;align-items:flex-end;justify-content:space-between;gap:16px;margin-bottom:26px}
   .head .title h2{font-size:26px;margin:0 0 3px;letter-spacing:-.4px;font-weight:650}
   .head .title p{margin:0;color:var(--muted);font-size:14px}
@@ -167,7 +167,7 @@
 
   /* ---------- Cards / KPIs ---------- */
   .kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:26px}
-  .kpi{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);padding:16px 18px;box-shadow:var(--shadow)}
+  .kpi{background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:16px 18px;box-shadow:var(--shadow)}
   .kpi .lbl{font-size:11.5px;text-transform:uppercase;letter-spacing:.6px;color:var(--muted);font-weight:600;margin-bottom:8px}
   .kpi .val{font-family:var(--sans);font-size:30px;font-weight:800;font-variant-numeric:tabular-nums;letter-spacing:-.5px;line-height:1.1}
   .kpi .sub{font-size:12.5px;color:var(--muted);margin-top:5px}
@@ -205,6 +205,35 @@
   .stock-cell{font-family:var(--mono);font-weight:600}
   .stock-cell.low{color:var(--alert)}
   .stock-cell.neg{color:var(--alert)}
+
+  /* ---------- Headers ordenables (clic en el título ordena) ---------- */
+  th.sortable{cursor:pointer;user-select:none;white-space:nowrap}
+  th.sortable:hover{color:var(--text)}
+  th .sarr{display:inline-block;margin-left:5px;font-size:10px;opacity:.32;transition:opacity .12s,color .12s;vertical-align:middle}
+  th.sortable:hover .sarr{opacity:.65}
+  th.sort-asc .sarr,th.sort-desc .sarr{opacity:1;color:var(--accent-ink)}
+
+  /* ---------- Combobox de producto (buscador en línea de venta/compra) ---------- */
+  .ppick{position:relative}
+  .ppick-btn{display:flex;align-items:center;justify-content:space-between;gap:8px;width:100%;text-align:left;
+    background:var(--surface);border:1px solid var(--line-strong);border-radius:7px;padding:7px 10px;font-size:13.5px;color:var(--text);min-height:34px}
+  .ppick-btn:hover{border-color:var(--muted)}
+  .ppick-btn.open{border-color:var(--accent)}
+  .ppick-btn .ppick-label{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1}
+  .ppick-btn.placeholder .ppick-label{color:var(--muted)}
+  .ppick-btn .ppick-caret{color:var(--muted);font-size:10px;flex-shrink:0}
+  .ppick-pop{position:fixed;z-index:120;background:var(--surface);border:1px solid var(--line-strong);
+    border-radius:12px;box-shadow:0 14px 44px rgba(0,0,0,.28);width:360px;max-width:94vw;
+    display:flex;flex-direction:column;overflow:hidden}
+  .ppick-pop .ppick-search{margin:9px 9px 6px;width:calc(100% - 18px)}
+  .ppick-list{max-height:280px;overflow:auto;padding:0 6px 8px}
+  .ppick-item{display:flex;align-items:center;gap:7px;width:100%;text-align:left;background:none;border:0;
+    border-radius:8px;padding:8px 10px;font-size:13.5px;color:var(--text);line-height:1.35}
+  .ppick-item:hover,.ppick-item.active{background:var(--surface-2)}
+  .ppick-item .pi-name{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .ppick-item .pi-disp{font-family:var(--mono);font-size:11.5px;color:var(--muted);flex-shrink:0}
+  .ppick-item.new{color:var(--accent);font-weight:600;border-top:1px solid var(--line);border-radius:0;margin-top:2px}
+  .ppick-empty{padding:16px 12px;color:var(--muted);font-size:13px;text-align:center}
 
   .empty{padding:48px 24px;text-align:center;color:var(--muted)}
   .empty .big{font-family:var(--mono);font-size:34px;color:var(--line-strong);margin-bottom:10px}
@@ -272,7 +301,11 @@
   .selbar{display:flex;align-items:center;gap:8px;padding:10px 14px;border-bottom:1px solid var(--line);background:var(--surface-2);font-size:13px;font-weight:600}
 
   /* ---------- Análisis / gráficos ---------- */
-  .chart-grid{display:grid;grid-template-columns:1fr 1fr;gap:20px}
+  .chart-grid{display:grid;grid-template-columns:1fr 1fr;gap:20px;align-items:start}
+  /* dentro del grid, la regla global .panel + .panel metía un margin-top de 20px
+     al panel de la derecha y lo dejaba 20px más abajo que el de la izquierda
+     (de ahí el "descentrado"). Acá lo anulamos: el gap del grid ya separa. */
+  .chart-grid .panel{margin-top:0}
   @media (max-width:860px){.chart-grid{grid-template-columns:1fr}}
   .chart{padding:16px 18px}
   .chart .ctitle{font-size:13px;font-weight:650;margin:0 0 3px}
@@ -312,7 +345,7 @@
   }
   .login-card{
     width:100%;max-width:360px;background:var(--surface);
-    border:1px solid var(--line);border-radius:6px;padding:38px 30px 30px;text-align:center;
+    border:1px solid var(--line);border-radius:16px;padding:38px 30px 30px;text-align:center;
     box-shadow:0 1px 2px rgba(17,19,23,.04),0 20px 50px rgba(17,19,23,.08);
   }
   .login-logo{border-radius:16px;box-shadow:0 8px 24px rgba(17,19,23,.18);margin-bottom:18px}
@@ -340,7 +373,7 @@
       <input class="inp" id="loginPass" type="password" autocomplete="current-password"></div>
     <div id="loginErr" class="login-err"></div>
     <button class="btn primary login-btn" id="loginBtn">Entrar</button>
-    <p class="login-build">build v9</p>
+    <p class="login-build">build v10</p>
   </div>
 </div>
 <div class="app">
@@ -665,15 +698,51 @@ let selProd = new Set();                 // productos tildados en el maestro
 let selMode = false;                     // modo selección activado (muestra los tildes)
 let prodFiltros = { q:"", saga:"", estado:"", cmin:"", cmax:"" };
 let dashFiltros = { q:"", saga:"", estado:"", cmin:"", cmax:"" };
-let docFiltros = { compra:{q:"",desde:"",hasta:"",orden:"fecha_desc"}, venta:{q:"",desde:"",hasta:"",orden:"fecha_desc"} };
+let docFiltros = { compra:{q:"",desde:"",hasta:"",sortKey:"",sortDir:""}, venta:{q:"",desde:"",hasta:"",sortKey:"",sortDir:""} };
 let movFiltros = { q:"", desde:"", hasta:"", tipo:"", saga:"", vmin:"", vmax:"" };
-/* "Saga" = línea/juego, derivada del nombre (texto antes de ":" o primeras palabras) */
+/* "Saga" = línea/juego, derivada del nombre del producto.
+   Se normaliza fuerte para que NO se dupliquen por basura de formato:
+   - se saca un SKU al principio ("PKM-JP-151 · Pokémon Card Game" -> "Pokémon Card Game")
+   - se corta en el primer separador real ( :  ·  —  |  " - " )
+   - se limpian rayas/guiones/puntos sueltos al final (lo que hacía
+     "Disney Lorcana", "Disney Lorcana -" y "Disney Lorcana —" tres sagas distintas)
+   - y al final se mapea a un nombre canónico para los juegos conocidos
+     (One Piece Card Game == One Piece TCG, Magic == MTG, etc.).            */
+
+/* Alias -> nombre canónico. El primer patrón que matchea, gana. */
+const SAGA_CANON = [
+  { canon:"Pokémon TCG",       re:/pok[eé]?mon/i },
+  { canon:"Magic",             re:/\bmagic\b|\bmtg\b|the\s+gathering/i },
+  { canon:"One Piece TCG",     re:/one\s*piece|\bop-?op\d/i },
+  { canon:"Disney Lorcana",    re:/lorcana/i },
+  { canon:"Flesh and Blood",   re:/flesh\s*(and|&|\+)?\s*blood|\bfab\b/i },
+  { canon:"Digimon",           re:/digimon/i },
+  { canon:"Dragon Ball",       re:/dragon\s*ball|\bdbs\b/i },
+  { canon:"Yu-Gi-Oh!",         re:/yu-?gi-?oh|\bygo\b/i },
+];
+
 function sagaDe(p){
-  const n = (p.nombre||"").trim();
+  let n = (p.nombre||"").trim();
   if(!n) return "—";
-  if(n.includes(":")) return n.split(":")[0].trim();
-  const w = n.split(/\s+/);
-  return w.slice(0, Math.min(3,w.length)).join(" ");
+
+  // 1) sacar SKU al inicio: TOKEN en mayúsculas/dígitos/guiones seguido de un separador
+  //    ej "FAB-HVY-BST · Flesh and Blood" / "ACC-9P-SLEEVE · 9-pocket"
+  n = n.replace(/^[A-Z0-9]{2,}(?:-[A-Z0-9]+)+\s*[·:\-—|]\s*/,"").trim();
+
+  // 2) cortar en el primer separador "fuerte" para quedarnos con la familia
+  const cut = n.split(/\s*[:·|]\s*|\s+[-—]\s+/)[0];
+  let base = (cut || n).trim();
+
+  // 3) limpiar puntuación/rayas/espacios sobrantes en las puntas
+  base = base.replace(/^[\s\-—·:|]+|[\s\-—·:|]+$/g,"").replace(/\s{2,}/g," ").trim();
+
+  // 4) si es un juego conocido, devolver el nombre canónico unificado
+  for(const s of SAGA_CANON){ if(s.re.test(base) || s.re.test(n)) return s.canon; }
+
+  // 5) fallback: si quedó muy largo, primeras 3 palabras (comportamiento previo, ya limpio)
+  if(!base) return "—";
+  const w = base.split(/\s+/);
+  return w.length>3 ? w.slice(0,3).join(" ") : base;
 }
 function sagasUnicas(){
   return [...new Set(db.productos.map(sagaDe))].filter(s=>s&&s!=="—").sort((a,b)=>a.localeCompare(b,"es"));
@@ -893,7 +962,7 @@ function viewProd(){
   <div class="head">
     <div class="title"><h2>Productos</h2><p>Maestro de artículos. El costo se actualiza con cada compra (último costo).</p></div>
     <div class="actions">
-      ${db.productos.length?`<button class="btn ${selMode?'':'ghost'}" id="btnSel">${selMode?"✕ Cancelar":"☑ Seleccionar"}</button>`:""}
+      ${db.productos.length?`<button class="btn" id="btnSel">${selMode?"✕ Cancelar":"☑ Seleccionar"}</button>`:""}
       <button class="btn primary" data-newp>+ Nuevo producto</button>
     </div>
   </div>
@@ -1001,6 +1070,7 @@ function viewDocs(tipo){
       <button class="btn ${isC?'up':'down'}" data-open="${tipo}">${isC?"+ Compra manual":"− Nueva venta"}</button>
     </div>
   </div>
+  ${list.length ? `<div class="kpis" id="docKpis">${docKpisHTML(tipo, filtrarDocs(tipo))}</div>` : ""}
   <div class="panel">
     <div class="phead"><h3>${isC?"Facturas de compra":"Facturas de venta"}</h3><span class="hint" id="docCount">${list.length} documentos</span></div>
     ${list.length ? `
@@ -1008,22 +1078,68 @@ function viewDocs(tipo){
       <input class="inp" id="dq" placeholder="${isC?'Buscar por proveedor o N°…':'Buscar por cliente o N°…'}" value="${esc(f.q)}" style="flex:2;min-width:180px">
       <label style="font-size:12px;color:var(--muted)">Desde <input class="inp" id="ddesde" type="date" value="${esc(f.desde)}" style="width:150px"></label>
       <label style="font-size:12px;color:var(--muted)">Hasta <input class="inp" id="dhasta" type="date" value="${esc(f.hasta)}" style="width:150px"></label>
-      <select class="inp" id="dorden" style="min-width:150px">
-        <option value="fecha_desc" ${f.orden==="fecha_desc"?"selected":""}>Fecha ↓ (reciente)</option>
-        <option value="fecha_asc" ${f.orden==="fecha_asc"?"selected":""}>Fecha ↑ (antigua)</option>
-        <option value="total_desc" ${f.orden==="total_desc"?"selected":""}>Total ↓ (mayor)</option>
-        <option value="total_asc" ${f.orden==="total_asc"?"selected":""}>Total ↑ (menor)</option>
-      </select>
       <button class="btn ghost sm" id="dclear">Limpiar</button>
+      <span class="hint" style="font-size:11.5px">Tocá un título para ordenar ↑ ↓</span>
     </div>
     <div class="table-scroll"><table>
-      <thead><tr><th>N°</th><th>Fecha</th><th>${isC?"Proveedor":"Cliente"}</th><th class="c">Ítems</th><th class="r">Total</th><th></th></tr></thead>
+      <thead><tr>
+        ${sortTh(f,"numero","N°","")}
+        ${sortTh(f,"fecha","Fecha","")}
+        ${sortTh(f,"contraparte",isC?"Proveedor":"Cliente","")}
+        ${sortTh(f,"items","Ítems","c")}
+        ${sortTh(f,"total","Total","r")}
+        <th></th>
+      </tr></thead>
       <tbody id="docBody"></tbody></table></div>`
       : emptyState(isC?"Sin compras cargadas":"Sin ventas cargadas",
           isC?"Importá un PDF de factura o cargala a mano. Cada línea suma stock y actualiza el costo."
              :"Armá una factura de venta: elegís productos, cantidades y precio, y el stock baja al confirmar.")}
   </div>`;
 }
+/* Encabezado ordenable: muestra ↑ (asc), ↓ (desc) o ↕ (inactivo, "sin flecha") */
+function sortTh(f, key, label, align){
+  const active = f.sortKey===key && f.sortDir;
+  let cls = "sortable";
+  if(active) cls += f.sortDir==="asc" ? " sort-asc" : " sort-desc";
+  if(align) cls += " "+align;
+  const arr = active ? (f.sortDir==="asc" ? "↑" : "↓") : "↕";
+  return `<th class="${cls}" data-sortk="${key}">${esc(label)}<span class="sarr">${arr}</span></th>`;
+}
+
+/* Panel de KPIs de la vista (se recalcula sobre lo FILTRADO, así respeta las fechas).
+   Margen = precio de venta − costo. El costo lo tomamos del snapshot de la línea
+   (l.costo, se guarda desde ahora) y si el documento es viejo y no lo tiene,
+   caemos al último costo actual del producto (aproximación honesta). */
+function docKpisHTML(tipo, list){
+  const isC = tipo==="compra";
+  let total=0, uds=0, cogs=0;
+  list.forEach(d=>{
+    (d.lineas||[]).forEach(l=>{
+      total += (l.cantidad||0)*(l.precio||0);
+      uds   += (l.cantidad||0);
+      if(!isC){
+        const c = (l.costo!=null) ? l.costo : ((prodById(l.productoId)||{}).ultimoCosto||0);
+        cogs += (l.cantidad||0)*c;
+      }
+    });
+  });
+  const n = list.length;
+  if(isC){
+    return `
+    <div class="kpi"><div class="lbl">Compras</div><div class="val">${n}</div><div class="sub">documentos en el rango</div></div>
+    <div class="kpi"><div class="lbl">Unidades compradas</div><div class="val">${qty(uds)}</div><div class="sub">ítems ingresados</div></div>
+    <div class="kpi"><div class="lbl">Total comprado</div><div class="val">${money(total)}</div><div class="sub">suma de facturas</div></div>
+    <div class="kpi"><div class="lbl">Ticket promedio</div><div class="val">${n?money(total/n):"—"}</div><div class="sub">por compra</div></div>`;
+  }
+  const margen = total - cogs;
+  const margenPct = total>0 ? (margen/total*100) : 0;
+  return `
+    <div class="kpi"><div class="lbl">Ventas</div><div class="val">${n}</div><div class="sub">documentos en el rango</div></div>
+    <div class="kpi"><div class="lbl">Unidades vendidas</div><div class="val">${qty(uds)}</div><div class="sub">ítems que salieron</div></div>
+    <div class="kpi"><div class="lbl">Total vendido</div><div class="val">${money(total)}</div><div class="sub">${n?`ticket prom. ${money(total/n)}`:"—"}</div></div>
+    <div class="kpi"><div class="lbl">Margen estimado</div><div class="val">${money(margen)}</div><div class="sub">${total>0?`${nf0.format(margenPct)}% sobre venta · a costo`:"cargá ventas para ver el margen"}</div></div>`;
+}
+
 function filtrarDocs(tipo){
   const list = tipo==="compra" ? db.compras : db.ventas;
   const f = docFiltros[tipo];
@@ -1034,9 +1150,24 @@ function filtrarDocs(tipo){
     if(f.hasta && (d.fecha||"") > f.hasta) return false;
     return true;
   });
-  const dir = f.orden.endsWith("asc") ? 1 : -1;
-  if(f.orden.startsWith("total")) out.sort((a,b)=> dir*((a.total||0)-(b.total||0)));
-  else out.sort((a,b)=> dir*(String(a.fecha||"").localeCompare(String(b.fecha||""))) || dir*0);
+  // Orden: si no hay columna activa, default = fecha ↓ (más reciente primero)
+  const key = f.sortKey || "fecha";
+  const dir = f.sortKey ? (f.sortDir==="asc" ? 1 : -1) : -1;
+  const valOf = d => {
+    switch(key){
+      case "numero":      return String(d.numero||"");
+      case "contraparte": return String(d.contraparte||"");
+      case "items":       return (d.lineas||[]).reduce((a,l)=>a+(l.cantidad||0),0);
+      case "total":       return d.total||0;
+      case "fecha":
+      default:            return String(d.fecha||"");
+    }
+  };
+  out.sort((a,b)=>{
+    const va=valOf(a), vb=valOf(b);
+    if(typeof va==="number") return dir*(va-vb);
+    return dir*va.localeCompare(vb,"es",{numeric:true});
+  });
   return out;
 }
 function renderDocRows(tipo){
@@ -1055,6 +1186,8 @@ function renderDocRows(tipo){
   }).join("") || `<tr><td colspan="6" style="text-align:center;color:var(--muted);padding:22px">Ningún documento coincide con los filtros.</td></tr>`;
   const cnt=document.getElementById("docCount");
   if(cnt) cnt.textContent = list.length===total ? `${total} documentos` : `mostrando ${list.length} de ${total}`;
+  const kp=document.getElementById("docKpis");
+  if(kp) kp.innerHTML = docKpisHTML(tipo, list);
   body.querySelectorAll("[data-vdoc]").forEach(b=> b.onclick=()=>{ const[t,id]=b.dataset.vdoc.split(":"); verDoc(t,id); });
   body.querySelectorAll("[data-editdoc]").forEach(b=> b.onclick=()=>{ const[t,id]=b.dataset.editdoc.split(":"); editDoc(t,id); });
   body.querySelectorAll("[data-deldoc]").forEach(b=> b.onclick=()=>{ const[t,id]=b.dataset.deldoc.split(":"); deleteDoc(t,id); });
@@ -1067,13 +1200,21 @@ function wireDocFiltros(){
   document.getElementById("dq").oninput=e=>upd("q",e.target);
   document.getElementById("ddesde").onchange=e=>upd("desde",e.target);
   document.getElementById("dhasta").onchange=e=>upd("hasta",e.target);
-  document.getElementById("dorden").onchange=e=>upd("orden",e.target);
   document.getElementById("dclear").onclick=()=>{
-    docFiltros[tipo]={q:"",desde:"",hasta:"",orden:"fecha_desc"};
+    docFiltros[tipo]={q:"",desde:"",hasta:"",sortKey:"",sortDir:""};
     ["dq","ddesde","dhasta"].forEach(id=>{const el=document.getElementById(id); if(el)el.value="";});
-    document.getElementById("dorden").value="fecha_desc";
-    renderDocRows(tipo);
+    render();   // re-render para resetear también las flechas de los headers
   };
+  // Orden por columna: clic cicla desc -> asc -> sin orden (default fecha ↓)
+  document.querySelectorAll("#main th[data-sortk]").forEach(th=>{
+    th.onclick=()=>{
+      const k=th.dataset.sortk;
+      if(f.sortKey!==k){ f.sortKey=k; f.sortDir="desc"; }
+      else if(f.sortDir==="desc"){ f.sortDir="asc"; }
+      else { f.sortKey=""; f.sortDir=""; }   // tercer clic: sin flecha
+      render();   // reconstruye headers (flechas) + filas + KPIs
+    };
+  });
   renderDocRows(tipo);
 }
 
@@ -1483,6 +1624,145 @@ function prodOptions(sel, soloConStock){
     : `<option value="">— elegir —</option>`;
   return vacio + opts + nuevo;
 }
+
+const round2 = n => Math.round((n||0)*100)/100;
+
+/* ============================================================
+   TASK 1 — Disponible por línea considerando TODO el documento
+   Si un producto aparece en varias líneas de la MISMA factura, el
+   tope de cada línea es: stock − lo ya comprometido en las otras líneas.
+   Así no se puede meter 20 + 20 cuando hay 20.
+   ============================================================ */
+function stockBaseVenta(prodId){
+  const p = prodById(prodId); if(!p) return 0;
+  let s = p.stock || 0;
+  // si estamos EDITando una venta, el stock "vuelve" antes de re-validar
+  if(draft && draft.editingId){
+    const old = (draft.tipo==="compra"?db.compras:db.ventas).find(x=>x.id===draft.editingId);
+    if(old) old.lineas.forEach(l=>{ if(l.productoId===prodId) s += (draft.tipo==="compra" ? -(l.cantidad||0) : (l.cantidad||0)); });
+  }
+  return s;
+}
+function comprometidoOtras(prodId, exceptIdx){
+  if(!prodId) return 0;
+  return draft.lineas.reduce((a,l,idx)=> a + ((idx!==exceptIdx && l.productoId===prodId) ? (parseNum(l.cantidad)||0) : 0), 0);
+}
+function dispRestante(prodId, exceptIdx){
+  return stockBaseVenta(prodId) - comprometidoOtras(prodId, exceptIdx);
+}
+/* Refresca los textos "disp / quedan" de todas las líneas de venta sin re-render
+   (así no se pierde el foco del input mientras se tipea la cantidad). */
+function updateDispInfos(){
+  if(!draft || draft.tipo==="compra") return;
+  document.querySelectorAll("#lineHost .disp-info").forEach(div=>{
+    const i=+div.dataset.di, l=draft.lineas[i]; if(!l) return;
+    const p=prodById(l.productoId);
+    if(!p){ div.innerHTML=""; return; }
+    const rem=dispRestante(l.productoId,i), comprom=comprometidoOtras(l.productoId,i);
+    const over=(parseNum(l.cantidad)||0)>rem;
+    div.style.color = over?"var(--alert)":"var(--muted)";
+    div.innerHTML = `disp: ${qty(p.stock)}${comprom>0?` · quedan ${qty(rem)}`:""}${over?" · <b>excede stock</b>":""}`;
+  });
+}
+
+/* ============================================================
+   TASK 2 — Combobox de producto con buscador (orden alfabético)
+   Reemplaza al <select> nativo: input de búsqueda + lista filtrable.
+   El popup se posiciona con position:fixed sobre <body> para NO quedar
+   recortado por el overflow del modal.
+   ============================================================ */
+let _pickerAnchor = null;
+function pickerLabel(l){
+  if(l.crear) return { txt:"＋ Producto nuevo", ph:false };
+  if(l.productoId){ const p=prodById(l.productoId); return p ? { txt:(p.sku?("["+p.sku+"] "):"")+p.nombre, ph:false } : { txt:"— elegir producto —", ph:true }; }
+  return { txt:"— elegir producto —", ph:true };
+}
+function pickerBtn(l, i){
+  const {txt, ph} = pickerLabel(l);
+  return `<button type="button" class="ppick-btn${ph?" placeholder":""}" data-ppick="${i}">
+    <span class="ppick-label">${esc(txt)}</span><span class="ppick-caret">▾</span></button>`;
+}
+function pickerItemsHTML(i, q){
+  const isC = draft.tipo==="compra";
+  const cur = draft.lineas[i].productoId;
+  q = (q||"").trim().toLowerCase();
+  let lista = isC ? db.productos.slice()
+                  : db.productos.filter(p=> (p.stock||0)>0 || p.id===cur);
+  // orden alfabético SIEMPRE (task 2), por nombre
+  lista.sort((a,b)=> String(a.nombre||"").localeCompare(String(b.nombre||""),"es",{numeric:true}));
+  if(q) lista = lista.filter(p=> ((p.nombre||"")+" "+(p.sku||"")).toLowerCase().includes(q));
+  let html = lista.map(p=>{
+    const sku = p.sku ? `<span class="sku">${esc(p.sku)}</span>` : "";
+    let disp = "";
+    if(!isC){ disp = `<span class="pi-disp">disp ${qty(dispRestante(p.id,i))}</span>`; }
+    const sel = p.id===cur ? " active" : "";
+    return `<button type="button" class="ppick-item${sel}" data-pick="${p.id}">${sku}<span class="pi-name">${esc(p.nombre)}</span>${disp}</button>`;
+  }).join("");
+  if(!lista.length){
+    const hayStock = db.productos.some(p=>(p.stock||0)>0);
+    html = `<div class="ppick-empty">${isC ? "No hay productos que coincidan." : (hayStock?"Ningún producto con stock coincide.":"No hay productos con stock disponible.")}</div>`;
+  }
+  if(isC) html += `<button type="button" class="ppick-item new" data-pick="__new">＋ Crear producto nuevo…</button>`;
+  return html;
+}
+function positionPicker(pop, anchor){
+  const r = anchor.getBoundingClientRect();
+  const w = pop.offsetWidth||360, h = pop.offsetHeight||300;
+  const vw = window.innerWidth, vh = window.innerHeight;
+  let left = r.left, top = r.bottom+6;
+  if(left+w > vw-8) left = Math.max(8, vw-8-w);
+  if(top+h > vh-8){ const above = r.top-6-h; top = above>8 ? above : Math.max(8, vh-8-h); }
+  pop.style.left = left+"px"; pop.style.top = top+"px";
+}
+function repositionPicker(){ const pop=document.querySelector(".ppick-pop"); if(pop && _pickerAnchor) positionPicker(pop,_pickerAnchor); }
+function onPickerOutside(e){ const pop=document.querySelector(".ppick-pop"); if(pop && !pop.contains(e.target) && (!_pickerAnchor || !_pickerAnchor.contains(e.target))) closeProductPicker(); }
+function onPickerKey(e){ if(e.key==="Escape"){ e.stopPropagation(); e.preventDefault(); closeProductPicker(); } }
+function closeProductPicker(){
+  document.querySelectorAll(".ppick-pop").forEach(el=>el.remove());
+  document.querySelectorAll(".ppick-btn.open").forEach(b=>b.classList.remove("open"));
+  window.removeEventListener("scroll", repositionPicker, true);
+  window.removeEventListener("resize", closeProductPicker);
+  document.removeEventListener("mousedown", onPickerOutside, true);
+  document.removeEventListener("keydown", onPickerKey, true);
+  _pickerAnchor=null;
+}
+function openProductPicker(i, anchor){
+  closeProductPicker();
+  _pickerAnchor = anchor; anchor.classList.add("open");
+  const pop = document.createElement("div"); pop.className="ppick-pop";
+  pop.innerHTML = `<input class="inp ppick-search" placeholder="Buscar por nombre o SKU…" autocomplete="off" spellcheck="false"><div class="ppick-list"></div>`;
+  document.body.appendChild(pop);
+  const search = pop.querySelector(".ppick-search");
+  const listEl = pop.querySelector(".ppick-list");
+  const paint = (q)=>{
+    listEl.innerHTML = pickerItemsHTML(i, q);
+    listEl.querySelectorAll("[data-pick]").forEach(it=> it.onclick=()=>{ const v=it.dataset.pick; closeProductPicker(); applyProdSelection(i, v); });
+  };
+  paint("");
+  search.oninput = ()=> paint(search.value);
+  positionPicker(pop, anchor);
+  window.addEventListener("scroll", repositionPicker, true);
+  window.addEventListener("resize", closeProductPicker);
+  setTimeout(()=>{ document.addEventListener("mousedown", onPickerOutside, true); document.addEventListener("keydown", onPickerKey, true); }, 0);
+  search.focus();
+}
+/* Aplica la selección de producto en una línea (usado por el combobox). */
+function applyProdSelection(i, value){
+  const l = draft.lineas[i]; if(!l) return;
+  const isC = draft.tipo==="compra";
+  if(value==="__new"){ l.crear=true; l.productoId=""; l.sku=""; l.nombre=""; renderLines(); return; }
+  l.crear=false; l.productoId=value;
+  const p = prodById(value);
+  if(p && isC && !l.precio){ l.precio = p.ultimoCosto; }
+  if(p && !isC){
+    l.costoRef = p.ultimoCosto||0;
+    l.margen   = l.margen||0;
+    l.precio   = round2(l.costoRef*(1+(l.margen||0)/100)) || (p.precioVenta||0);
+    const rem = dispRestante(p.id, i);           // respetar stock restante al elegir
+    if((parseNum(l.cantidad)||0) > rem) l.cantidad = Math.max(0, rem);
+  }
+  renderLines(); refreshTotal();
+}
 function renderLines(){
   const isC = draft.tipo==="compra";
   const host = document.getElementById("lineHost");
@@ -1495,8 +1775,8 @@ function renderLines(){
           <input class="inp" placeholder="Nombre del producto nuevo" value="${esc(l.nombre)}" data-k="nombre" data-i="${i}">
         </div>` : "";
       return `<tr>
-        <td style="min-width:180px">
-          <select class="inp" data-k="prod" data-i="${i}">${prodOptions(l.productoId)}</select>
+        <td style="min-width:220px">
+          <div class="ppick">${pickerBtn(l,i)}</div>
           ${newFields}
         </td>
         <td style="width:90px"><input class="inp num" data-k="cantidad" data-i="${i}" value="${l.cantidad}"></td>
@@ -1506,11 +1786,15 @@ function renderLines(){
       </tr>`;
     }
     // ---- VENTA ----
-    const disp = p ? p.stock : 0;
-    const dispInfo = p ? `<div style="font-size:11px;color:${l.cantidad>disp?'var(--alert)':'var(--muted)'};margin-top:3px">disp: ${qty(disp)}</div>` : "";
+    const rem = p ? dispRestante(l.productoId, i) : 0;
+    const comprom = p ? comprometidoOtras(l.productoId, i) : 0;
+    const over = p && (parseNum(l.cantidad)||0) > rem;
+    const dispInfo = p
+      ? `<div class="disp-info" data-di="${i}" style="font-size:11px;margin-top:4px;color:${over?'var(--alert)':'var(--muted)'}">disp: ${qty(p.stock)}${comprom>0?` · quedan ${qty(rem)}`:""}${over?" · <b>excede stock</b>":""}</div>`
+      : `<div class="disp-info" data-di="${i}" style="font-size:11px;margin-top:4px"></div>`;
     return `<tr>
-      <td style="min-width:180px">
-        <select class="inp" data-k="prod" data-i="${i}">${prodOptions(l.productoId, true)}</select>
+      <td style="min-width:220px">
+        <div class="ppick">${pickerBtn(l,i)}</div>
         ${dispInfo}
       </td>
       <td style="width:80px"><input class="inp num" data-k="cantidad" data-i="${i}" value="${l.cantidad}"></td>
@@ -1529,27 +1813,22 @@ function renderLines(){
     <thead>${thead}</thead>
     <tbody>${rows}</tbody></table></div>`;
 
-  const round2 = n=> Math.round((n||0)*100)/100;
+  // combobox de producto (task 2): abre el buscador flotante
+  host.querySelectorAll("[data-ppick]").forEach(b=> b.onclick=()=> openProductPicker(+b.dataset.ppick, b));
+
   host.querySelectorAll("[data-k]").forEach(inp=>{
     const i=+inp.dataset.i, k=inp.dataset.k;
     inp.oninput = ()=>{
       const l=draft.lineas[i];
-      if(k==="prod"){
-        if(inp.value==="__new"){ l.crear=true; l.productoId=""; renderLines(); return; }
-        l.crear=false; l.productoId=inp.value;
-        const p=prodById(inp.value);
-        if(p && isC && !l.precio){ l.precio=p.ultimoCosto; }
-        if(p && !isC){
-          l.costoRef = p.ultimoCosto||0;
-          l.margen = l.margen||0;
-          l.precio = round2(l.costoRef*(1+(l.margen||0)/100)) || (p.precioVenta||0);
-        }
-        renderLines(); refreshTotal(); return;
-      }
       if(k==="cantidad"){
         let v=parseNum(inp.value);
-        if(!isC){ const p=prodById(l.productoId); if(p && v>p.stock){ v=p.stock; inp.value=v; toast(`Máximo disponible: ${qty(p.stock)}`,"warn"); } }
+        if(!isC && l.productoId){
+          // TASK 1: tope = stock − comprometido en OTRAS líneas del mismo documento
+          const rem=dispRestante(l.productoId, i);
+          if(v>rem){ v=Math.max(0,rem); inp.value=v; toast(`Disponible para esta línea: ${qty(rem)} (ya comprometido en otras líneas)`,"warn"); }
+        }
         l.cantidad=v;
+        updateDispInfos();   // refresca "quedan" en todas las líneas del mismo producto
       }
       else if(k==="precio"){
         l.precio=parseNum(inp.value);
@@ -1601,7 +1880,10 @@ function confirmDoc(){
       p = prodById(l.productoId);
       if(!p){ toast("Hay una línea sin producto asignado","warn"); return; }
     }
-    resolved.push({ prod:p, cantidad:l.cantidad, precio:l.precio });
+    // costo snapshot para el margen: en venta usamos el costo de referencia de la línea
+    // (último costo del producto al momento de vender); en compra el costo ES el precio.
+    const costoSnap = isC ? l.precio : (l.costoRef!=null ? l.costoRef : (p.ultimoCosto||0));
+    resolved.push({ prod:p, cantidad:l.cantidad, precio:l.precio, costo:costoSnap });
   }
   if(!resolved.length){ toast("Cargá al menos una línea válida","warn"); return; }
 
@@ -1639,7 +1921,7 @@ function confirmDoc(){
   const doc = {
     id: editing ? draft.editingId : uid(), tipo:draft.tipo, contraparte:draft.contraparte.trim(),
     fecha:draft.fecha, numero:draft.numero.trim(),
-    lineas: resolved.map(r=>({ productoId:r.prod.id, sku:r.prod.sku, nombre:r.prod.nombre, cantidad:r.cantidad, precio:r.precio })),
+    lineas: resolved.map(r=>({ productoId:r.prod.id, sku:r.prod.sku, nombre:r.prod.nombre, cantidad:r.cantidad, precio:r.precio, costo:r.costo })),
     total: resolved.reduce((a,r)=>a+r.cantidad*r.precio,0)
   };
   const refTxt = (isC?"Compra":"Venta") + (doc.numero?(" "+doc.numero):"") + (doc.contraparte?(" · "+doc.contraparte):"");
@@ -2192,6 +2474,7 @@ function mkBtn(b){
 }
 function escClose(e){ if(e.key==="Escape") closeModal(); }
 function closeModal(){
+  if(typeof closeProductPicker==="function") closeProductPicker();
   document.getElementById("modalRoot").innerHTML="";
   document.removeEventListener("keydown", escClose);
 }
