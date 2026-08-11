@@ -317,11 +317,14 @@
   .pill{white-space:nowrap}
   .filtros{display:flex;flex-wrap:wrap;gap:8px;align-items:center;padding:12px 14px;border-bottom:1px solid var(--line)}
   .filtros .inp{padding:7px 9px;font-size:13px}
-  /* filtros compactos (movimientos): inputs y selects más chicos y prolijos */
-  .filtros.compact{gap:7px;padding:10px 14px}
+  /* filtros compactos (movimientos): TODO en un solo renglón; si no entra, scrollea
+     horizontal en vez de apilarse en varias filas (que quedaba enorme) */
+  .filtros.compact{gap:7px;padding:10px 14px;flex-wrap:nowrap;overflow-x:auto}
   .filtros.compact .inp{padding:6px 8px;font-size:12.5px;height:32px}
-  .filtros.compact .fdate{display:inline-flex;align-items:center;gap:5px;font-size:11.5px;color:var(--muted)}
-  .filtros.compact .fdate .inp{width:132px}
+  .filtros.compact > .inp,.filtros.compact > select,.filtros.compact > .fdate,.filtros.compact > button{flex-shrink:0}
+  .filtros.compact > #mq{flex:1 1 150px;min-width:130px}
+  .filtros.compact .fdate{display:inline-flex;align-items:center;gap:5px;font-size:11.5px;color:var(--muted);white-space:nowrap}
+  .filtros.compact .fdate .inp{width:120px}
   .selbar{display:flex;align-items:center;gap:8px;padding:10px 14px;border-bottom:1px solid var(--line);background:var(--surface-2);font-size:13px;font-weight:600}
   .selbar .sel-hint{color:var(--muted);font-weight:500}
   .selbar #selactions{display:flex;gap:8px;align-items:center}
@@ -402,7 +405,7 @@
       <input class="inp" id="loginPass" type="password" autocomplete="current-password"></div>
     <div id="loginErr" class="login-err"></div>
     <button class="btn primary login-btn" id="loginBtn">Entrar</button>
-    <p class="login-build">build v14</p>
+    <p class="login-build">build v15</p>
   </div>
 </div>
 <div class="topbar" id="topbar">
@@ -743,8 +746,8 @@ function render(){
    ============================================================ */
 let selProd = new Set();                 // productos tildados en el maestro
 let selMode = false;                     // modo selección activado (muestra los tildes)
-let prodFiltros = { q:"", saga:"", estado:"", cmin:"", cmax:"" };
-let dashFiltros = { q:"", saga:"", estado:"", cmin:"", cmax:"" };
+let prodFiltros = { q:"", saga:"", estado:"", cmin:"", cmax:"", sortKey:"", sortDir:"" };
+let dashFiltros = { q:"", saga:"", estado:"", cmin:"", cmax:"", sortKey:"", sortDir:"" };
 let docFiltros = { compra:{q:"",desde:"",hasta:"",sortKey:"",sortDir:""}, venta:{q:"",desde:"",hasta:"",sortKey:"",sortDir:""} };
 let movFiltros = { q:"", desde:"", hasta:"", tipo:"", saga:"", vmin:"", vmax:"", sortKey:"", sortDir:"" };
 /* "Saga" = línea/juego, derivada del nombre del producto.
@@ -794,12 +797,12 @@ function sagaDe(p){
 function sagasUnicas(){
   return [...new Set(db.productos.map(sagaDe))].filter(s=>s&&s!=="—").sort((a,b)=>a.localeCompare(b,"es"));
 }
-/* Filtrado genérico de productos por un objeto de filtros {q,saga,estado,cmin,cmax} */
+/* Filtrado genérico de productos por {q,saga,estado,cmin,cmax,sortKey,sortDir} */
 function filtrarProds(f){
   const q=(f.q||"").trim().toLowerCase();
   const cmin=f.cmin!==""&&f.cmin!=null?parseNum(f.cmin):null;
   const cmax=f.cmax!==""&&f.cmax!=null?parseNum(f.cmax):null;
-  return db.productos.filter(p=>{
+  const out = db.productos.filter(p=>{
     if(q){ const hay=((p.nombre||"")+" "+(p.sku||"")).toLowerCase(); if(!hay.includes(q)) return false; }
     if(f.saga && sagaDe(p)!==f.saga) return false;
     if(f.estado==="con" && !(p.stock>0)) return false;
@@ -810,7 +813,39 @@ function filtrarProds(f){
     if(cmin!==null && c<cmin) return false;
     if(cmax!==null && c>cmax) return false;
     return true;
-  }).sort((a,b)=> (b.stock*b.ultimoCosto) - (a.stock*a.ultimoCosto));
+  });
+  // Orden por columna; default (sin flecha) = valorizado ↓ (comportamiento previo)
+  const key=f.sortKey||"valor";
+  const dir=f.sortKey ? (f.sortDir==="asc"?1:-1) : -1;
+  const valOf = p => {
+    switch(key){
+      case "sku":    return String(p.sku||"");
+      case "nombre": return String(p.nombre||"");
+      case "unidad": return String(p.unidad||"u");
+      case "stock":  return p.stock||0;
+      case "costo":  return p.ultimoCosto||0;
+      case "pventa": return p.precioVenta||0;
+      case "rep":    return p.puntoRepedido||0;
+      case "valor":
+      default:       return (p.stock||0)*(p.ultimoCosto||0);
+    }
+  };
+  out.sort((a,b)=>{
+    const va=valOf(a), vb=valOf(b);
+    if(typeof va==="number") return dir*(va-vb);
+    return dir*va.localeCompare(vb,"es",{numeric:true});
+  });
+  return out;
+}
+/* cicla orden en una columna: desc -> asc -> sin flecha, y re-renderiza la vista */
+function cycleSort(f, k){
+  if(f.sortKey!==k){ f.sortKey=k; f.sortDir="desc"; }
+  else if(f.sortDir==="desc"){ f.sortDir="asc"; }
+  else { f.sortKey=""; f.sortDir=""; }
+  render();
+}
+function wireSortHeaders(f){
+  document.querySelectorAll("#main th[data-sortk]").forEach(th=> th.onclick=()=>cycleSort(f, th.dataset.sortk));
 }
 /* Barra de filtros de productos, reutilizable (prefix = prefijo de ids) */
 function filterBarHTML(prefix, f){
@@ -842,9 +877,8 @@ function wireFilterBar(prefix, f, onChange){
   document.getElementById(prefix+"cmin").oninput=e=>upd("cmin",e.target);
   document.getElementById(prefix+"cmax").oninput=e=>upd("cmax",e.target);
   document.getElementById(prefix+"clear").onclick=()=>{
-    f.q="";f.saga="";f.estado="";f.cmin="";f.cmax="";
-    [prefix+"q",prefix+"cmin",prefix+"cmax",prefix+"saga",prefix+"estado"].forEach(id=>{const el=document.getElementById(id); if(el)el.value="";});
-    onChange();
+    f.q="";f.saga="";f.estado="";f.cmin="";f.cmax="";f.sortKey="";f.sortDir="";
+    render();   // re-render para limpiar inputs Y las flechas de orden
   };
 }
 function viewDash(){
@@ -873,7 +907,13 @@ function viewDash(){
     ${db.productos.length ? `
     ${filterBarHTML("f", dashFiltros)}
     <div class="table-scroll"><table>
-      <thead><tr><th>SKU</th><th>Producto</th><th class="r">Stock</th><th class="r">Últ. costo</th><th class="r">Valorizado</th></tr></thead>
+      <thead><tr>
+        ${sortTh(dashFiltros,"sku","SKU","")}
+        ${sortTh(dashFiltros,"nombre","Producto","")}
+        ${sortTh(dashFiltros,"stock","Stock","r")}
+        ${sortTh(dashFiltros,"costo","Últ. costo","r")}
+        ${sortTh(dashFiltros,"valor","Valorizado","r")}
+      </tr></thead>
       <tbody id="dashBody"></tbody>
     </table></div>` : emptyState("Sin productos todavía","Cargá una compra (podés importar el PDF) o dá de alta un producto a mano y el stock empieza a moverse.")}
   </div>`;
@@ -903,7 +943,7 @@ function renderDashRows(){
 }
 function wireDashFiltros(){
   wireFilterBar("f", dashFiltros, renderDashRows);
-  if(document.getElementById("dashBody")) renderDashRows();
+  if(document.getElementById("dashBody")){ wireSortHeaders(dashFiltros); renderDashRows(); }
 }
 
 /* ============================================================
@@ -1026,7 +1066,7 @@ function viewProd(){
     ${db.productos.length ? `
     ${filterBarHTML("p", prodFiltros)}
     <div class="table-scroll"><table>
-      <thead><tr>${selMode?`<th class="c"><input type="checkbox" id="selall"></th>`:""}<th>SKU</th><th>Nombre</th><th class="c">Unid.</th><th class="r">Stock</th><th class="r">Últ. costo</th><th class="r">P. venta</th><th class="r">Punto rep.</th><th></th></tr></thead>
+      <thead><tr>${selMode?`<th class="c"><input type="checkbox" id="selall"></th>`:""}${sortTh(prodFiltros,"sku","SKU","")}${sortTh(prodFiltros,"nombre","Nombre","")}${sortTh(prodFiltros,"unidad","Unid.","c")}${sortTh(prodFiltros,"stock","Stock","r")}${sortTh(prodFiltros,"costo","Últ. costo","r")}${sortTh(prodFiltros,"pventa","P. venta","r")}${sortTh(prodFiltros,"rep","Punto rep.","r")}<th></th></tr></thead>
       <tbody id="prodBody"></tbody></table></div>`
       : emptyState("El maestro está vacío","Creá tu primer producto, o dejá que se generen solos al importar una compra con SKUs nuevos.")}
   </div>`;
@@ -1090,6 +1130,7 @@ function wireProd(){
   };
   const none=document.getElementById("selnone"); if(none) none.onclick=()=>{ selProd.clear(); renderProdRows(); };
   const del=document.getElementById("seldel"); if(del) del.onclick=deleteSelProd;
+  wireSortHeaders(prodFiltros);
   renderProdRows();
 }
 function deleteSelProd(){
@@ -1288,21 +1329,21 @@ function viewMov(){
     <div class="phead"><h3>Kardex</h3><span class="hint" id="movCount">${db.movimientos.length} asientos</span></div>
     ${db.movimientos.length ? `
     <div class="filtros compact">
-      <input class="inp" id="mq" placeholder="Buscar producto, SKU u origen…" value="${esc(movFiltros.q)}" style="flex:2;min-width:160px">
-      <select class="inp" id="mtipo" style="min-width:110px">
+      <input class="inp" id="mq" placeholder="Buscar producto, SKU u origen…" value="${esc(movFiltros.q)}">
+      <select class="inp" id="mtipo" style="min-width:96px">
         <option value="" ${movFiltros.tipo===""?"selected":""}>Todo tipo</option>
         <option value="entrada" ${movFiltros.tipo==="entrada"?"selected":""}>Entradas</option>
         <option value="salida" ${movFiltros.tipo==="salida"?"selected":""}>Salidas</option>
         <option value="ajuste" ${movFiltros.tipo==="ajuste"?"selected":""}>Ajustes</option>
       </select>
-      <select class="inp" id="msaga" style="min-width:120px">
+      <select class="inp" id="msaga" style="min-width:110px">
         <option value="">Todas las sagas</option>
         ${sagas.map(s=>`<option value="${esc(s)}" ${movFiltros.saga===s?"selected":""}>${esc(s)}</option>`).join("")}
       </select>
       <span class="fdate">Desde<input class="inp" id="mdesde" type="date" value="${esc(movFiltros.desde)}"></span>
       <span class="fdate">Hasta<input class="inp" id="mhasta" type="date" value="${esc(movFiltros.hasta)}"></span>
-      <input class="inp num" id="mvmin" placeholder="Valor mín." value="${esc(movFiltros.vmin)}" style="width:92px">
-      <input class="inp num" id="mvmax" placeholder="Valor máx." value="${esc(movFiltros.vmax)}" style="width:92px">
+      <input class="inp num" id="mvmin" placeholder="Valor mín." value="${esc(movFiltros.vmin)}" style="width:86px">
+      <input class="inp num" id="mvmax" placeholder="Valor máx." value="${esc(movFiltros.vmax)}" style="width:86px">
       <button class="btn ghost sm" id="mclear">Limpiar</button>
     </div>
     <div class="table-scroll"><table>
