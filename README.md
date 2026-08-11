@@ -4,22 +4,6 @@ Gestor de inventario en **vanilla HTML/CSS/JS**, sin frameworks ni build. Todo v
 
 ---
 
-## Novedades (build v17)
-
-- **Facturas de venta correlativas.** Cada venta nueva toma su número **automático y sin huecos** con formato `FC 0001-0000001`, `FC 0001-0000002`, … El campo N° queda **bloqueado** en ventas (para garantizar la correlatividad) y **editable** en compras (traen el N° del proveedor). Si borrás la *última* venta, ese número se reutiliza; si borrás una del medio queda el hueco (en la práctica se anula con nota de crédito, no se borra). El punto de venta y la cantidad de dígitos se configuran en las constantes `FC_PV` y `FC_PAD`.
-- **Stock en cero, en rojo.** Cuando un producto queda en **cero** (o negativo), su número de stock se muestra **en rojo y negrita** tanto en el Panel como en el maestro, tenga o no punto de repedido cargado.
-- **Banner de reposición que no molesta.** El aviso del Panel aparece **una sola vez y se queda hasta que lo tocás**. Al tocarlo (te lleva a la lista de reposición) se descarta. **Vuelve a aparecer solo si cambia el conjunto** de productos a reponer: no por la cantidad, sino por *quiénes* son. Si tenías 2 en cero, reponés esos 2 pero caen otros 2, el conjunto cambió → **reaparece**. La tarjeta *Alertas* siempre mantiene la cuenta, así que nunca perdés el aviso. Es memoria **local del dispositivo** (no se sincroniza ni ensucia el `rev`).
-
-## Novedades (build v16)
-
-- **Alerta de reposición.** Cuando un producto queda en **cero, negativo o por debajo del punto de repedido**, salta un banner en el Panel y la tarjeta *Alertas* se vuelve clickeable. Al tocarla, te lleva al maestro **filtrado por "A reponer"** y ordenado por stock ascendente (primero lo más urgente).
-- **Precios opcionales prolijos.** Si un producto **no tiene precio de venta**, se muestra `—` en vez de `USD 0,00`. Donde hay importe, el símbolo queda **separado del número** (`USD 92,10`).
-- **Filtros de Movimientos que no se escapan.** La barra de filtros ahora **envuelve** en vez de obligar a deslizar al costado; los selects se dimensionan a su contenido.
-- **Login renovado.** Fondo *aurora* animado, tarjeta con entrada suave, logo flotante, foco con anillo de acento y **ojito** para mostrar/ocultar la contraseña.
-- **Micro-animaciones.** Selección del menú lateral con barrita de acento, *pop* del ícono y entrada escalonada; fundido del contenido al cambiar de pestaña. Todo respeta `prefers-reduced-motion`.
-
----
-
 ## Cómo funciona
 
 | Acción | Efecto en el stock |
