@@ -267,6 +267,9 @@
   /* importes y fechas en una sola línea */
   td.num,th.num{white-space:nowrap}
   .pill{white-space:nowrap}
+  .filtros{display:flex;flex-wrap:wrap;gap:8px;align-items:center;padding:12px 14px;border-bottom:1px solid var(--line)}
+  .filtros .inp{padding:7px 9px;font-size:13px}
+  .selbar{display:flex;align-items:center;gap:8px;padding:10px 14px;border-bottom:1px solid var(--line);background:var(--surface-2);font-size:13px;font-weight:600}
 
   /* ---------- Análisis / gráficos ---------- */
   .chart-grid{display:grid;grid-template-columns:1fr 1fr;gap:20px}
@@ -655,25 +658,26 @@ function render(){
 /* ============================================================
    VISTA: Panel
    ============================================================ */
+/* ============================================================
+   VISTA: Panel (dashboard)
+   ============================================================ */
+let selProd = new Set();                 // productos tildados en el maestro
+let dashFiltros = { q:"", saga:"", estado:"", cmin:"", cmax:"" };
+/* "Saga" = línea/juego, derivada del nombre (texto antes de ":" o primeras palabras) */
+function sagaDe(p){
+  const n = (p.nombre||"").trim();
+  if(!n) return "—";
+  if(n.includes(":")) return n.split(":")[0].trim();
+  const w = n.split(/\s+/);
+  return w.slice(0, Math.min(3,w.length)).join(" ");
+}
+function sagasUnicas(){
+  return [...new Set(db.productos.map(sagaDe))].filter(s=>s&&s!=="—").sort((a,b)=>a.localeCompare(b,"es"));
+}
 function viewDash(){
   const bajos = db.productos.filter(bajoStock);
   const negs  = db.productos.filter(p=>p.stock<0);
-  const rows = [...db.productos]
-    .sort((a,b)=> (b.stock*b.ultimoCosto) - (a.stock*a.ultimoCosto))
-    .map(p=>{
-      const val = (p.stock||0)*(p.ultimoCosto||0);
-      let cls="stock-cell";
-      if(p.stock<0) cls+=" neg"; else if(bajoStock(p)) cls+=" low";
-      const flag = p.stock<0 ? '<span class="pill low">negativo</span>'
-                 : bajoStock(p) ? '<span class="pill low">reponer</span>' : "";
-      return `<tr data-ficha="${p.id}" style="cursor:pointer">
-        <td><span class="sku">${esc(p.sku||"—")}</span></td>
-        <td>${esc(p.nombre)} ${flag}</td>
-        <td class="r ${cls}">${qty(p.stock)}</td>
-        <td class="r num">${money(p.ultimoCosto)}</td>
-        <td class="r num">${money(val)}</td>
-      </tr>`;
-    }).join("");
+  const sagas = sagasUnicas();
 
   return `
   <div class="head">
@@ -692,12 +696,86 @@ function viewDash(){
   </div>
 
   <div class="panel">
-    <div class="phead"><h3>Existencias</h3><span class="hint">tocá un producto para ver su historial</span></div>
-    ${db.productos.length ? `<div class="table-scroll"><table>
+    <div class="phead"><h3>Existencias</h3><span class="hint" id="dashCount">tocá un producto para ver su historial</span></div>
+    ${db.productos.length ? `
+    <div class="filtros">
+      <input class="inp" id="fq" placeholder="Buscar por nombre o SKU…" value="${esc(dashFiltros.q)}" style="flex:2;min-width:180px">
+      <select class="inp" id="fsaga" style="flex:1;min-width:130px">
+        <option value="">Todas las sagas</option>
+        ${sagas.map(s=>`<option value="${esc(s)}" ${dashFiltros.saga===s?"selected":""}>${esc(s)}</option>`).join("")}
+      </select>
+      <select class="inp" id="festado" style="flex:1;min-width:130px">
+        <option value="" ${dashFiltros.estado===""?"selected":""}>Todo el stock</option>
+        <option value="con" ${dashFiltros.estado==="con"?"selected":""}>Con stock</option>
+        <option value="sin" ${dashFiltros.estado==="sin"?"selected":""}>Sin stock</option>
+        <option value="bajo" ${dashFiltros.estado==="bajo"?"selected":""}>Bajo mínimo</option>
+        <option value="neg" ${dashFiltros.estado==="neg"?"selected":""}>Negativos</option>
+      </select>
+      <input class="inp num" id="fcmin" placeholder="Costo mín." value="${esc(dashFiltros.cmin)}" style="width:100px">
+      <input class="inp num" id="fcmax" placeholder="Costo máx." value="${esc(dashFiltros.cmax)}" style="width:100px">
+      <button class="btn ghost sm" id="fclear" title="Limpiar filtros">Limpiar</button>
+    </div>
+    <div class="table-scroll"><table>
       <thead><tr><th>SKU</th><th>Producto</th><th class="r">Stock</th><th class="r">Últ. costo</th><th class="r">Valorizado</th></tr></thead>
-      <tbody>${rows}</tbody>
+      <tbody id="dashBody"></tbody>
     </table></div>` : emptyState("Sin productos todavía","Cargá una compra (podés importar el PDF) o dá de alta un producto a mano y el stock empieza a moverse.")}
   </div>`;
+}
+
+/* Filtrado + render de la tabla de existencias (sin re-render de toda la vista) */
+function filteredDashProds(){
+  const f = dashFiltros;
+  const q = f.q.trim().toLowerCase();
+  const cmin = f.cmin!=="" ? parseNum(f.cmin) : null;
+  const cmax = f.cmax!=="" ? parseNum(f.cmax) : null;
+  return db.productos.filter(p=>{
+    if(q){ const hay=((p.nombre||"")+" "+(p.sku||"")).toLowerCase(); if(!hay.includes(q)) return false; }
+    if(f.saga && sagaDe(p)!==f.saga) return false;
+    if(f.estado==="con" && !(p.stock>0)) return false;
+    if(f.estado==="sin" && p.stock!==0) return false;
+    if(f.estado==="bajo" && !bajoStock(p)) return false;
+    if(f.estado==="neg" && !(p.stock<0)) return false;
+    const c = p.ultimoCosto||0;
+    if(cmin!==null && c<cmin) return false;
+    if(cmax!==null && c>cmax) return false;
+    return true;
+  }).sort((a,b)=> (b.stock*b.ultimoCosto) - (a.stock*a.ultimoCosto));
+}
+function renderDashRows(){
+  const body=document.getElementById("dashBody"); if(!body) return;
+  const list=filteredDashProds();
+  body.innerHTML = list.map(p=>{
+    const val=(p.stock||0)*(p.ultimoCosto||0);
+    let cls="stock-cell"; if(p.stock<0) cls+=" neg"; else if(bajoStock(p)) cls+=" low";
+    const flag = p.stock<0 ? '<span class="pill low">negativo</span>'
+               : bajoStock(p) ? '<span class="pill low">reponer</span>' : "";
+    return `<tr data-ficha="${p.id}" style="cursor:pointer">
+      <td><span class="sku">${esc(p.sku||"—")}</span></td>
+      <td>${esc(p.nombre)} ${flag}</td>
+      <td class="r ${cls}">${qty(p.stock)}</td>
+      <td class="r num">${money(p.ultimoCosto)}</td>
+      <td class="r num">${money(val)}</td>
+    </tr>`;
+  }).join("") || `<tr><td colspan="5" style="text-align:center;color:var(--muted);padding:22px">Ningún producto coincide con los filtros.</td></tr>`;
+  const cnt=document.getElementById("dashCount");
+  if(cnt) cnt.textContent = list.length===db.productos.length ? "tocá un producto para ver su historial" : `mostrando ${list.length} de ${db.productos.length}`;
+  body.querySelectorAll("[data-ficha]").forEach(tr=> tr.onclick=()=> openFicha(tr.dataset.ficha));
+}
+function wireDashFiltros(){
+  const q=document.getElementById("fq"); if(!q) return;   // no estamos en el panel
+  const upd=(k,el)=>{ dashFiltros[k]=el.value; renderDashRows(); };
+  q.oninput=()=>upd("q",q);
+  document.getElementById("fsaga").onchange=e=>upd("saga",e.target);
+  document.getElementById("festado").onchange=e=>upd("estado",e.target);
+  document.getElementById("fcmin").oninput=e=>upd("cmin",e.target);
+  document.getElementById("fcmax").oninput=e=>upd("cmax",e.target);
+  document.getElementById("fclear").onclick=()=>{
+    dashFiltros={ q:"", saga:"", estado:"", cmin:"", cmax:"" };
+    ["fq","fcmin","fcmax"].forEach(id=>{const el=document.getElementById(id); if(el)el.value="";});
+    ["fsaga","festado"].forEach(id=>{const el=document.getElementById(id); if(el)el.value="";});
+    renderDashRows();
+  };
+  renderDashRows();
 }
 
 /* ============================================================
@@ -799,6 +877,7 @@ function viewProd(){
   const rows = db.productos.map(p=>{
     let cls="stock-cell"; if(p.stock<0) cls+=" neg"; else if(bajoStock(p)) cls+=" low";
     return `<tr data-ficha="${p.id}" style="cursor:pointer">
+      <td class="c" data-nofic><input type="checkbox" class="selchk" data-selp="${p.id}" ${selProd.has(p.id)?"checked":""}></td>
       <td><span class="sku">${esc(p.sku||"—")}</span></td>
       <td>${esc(p.nombre)}</td>
       <td class="c">${esc(p.unidad||"u")}</td>
@@ -816,11 +895,58 @@ function viewProd(){
   </div>
   <div class="panel">
     <div class="phead"><h3>Maestro</h3><span class="hint">${db.productos.length} artículos</span></div>
+    <div class="selbar" id="selbar" hidden>
+      <span id="selcount">0 seleccionados</span>
+      <div style="flex:1"></div>
+      <button class="btn ghost sm" id="selnone">Deseleccionar</button>
+      <button class="btn danger sm" id="seldel">🗑 Borrar seleccionados</button>
+    </div>
     ${db.productos.length ? `<div class="table-scroll"><table>
-      <thead><tr><th>SKU</th><th>Nombre</th><th class="c">Unid.</th><th class="r">Stock</th><th class="r">Últ. costo</th><th class="r">P. venta</th><th class="r">Punto rep.</th><th></th></tr></thead>
+      <thead><tr><th class="c"><input type="checkbox" id="selall"></th><th>SKU</th><th>Nombre</th><th class="c">Unid.</th><th class="r">Stock</th><th class="r">Últ. costo</th><th class="r">P. venta</th><th class="r">Punto rep.</th><th></th></tr></thead>
       <tbody>${rows}</tbody></table></div>`
       : emptyState("El maestro está vacío","Creá tu primer producto, o dejá que se generen solos al importar una compra con SKUs nuevos.")}
   </div>`;
+}
+/* Selección múltiple de productos en el maestro */
+function wireSelProd(){
+  const anyChk=document.querySelector(".selchk"); if(!anyChk) return;   // no estamos en Productos
+  // limpiar ids que ya no existen
+  [...selProd].forEach(id=>{ if(!prodById(id)) selProd.delete(id); });
+  const bar=document.getElementById("selbar"), count=document.getElementById("selcount"), all=document.getElementById("selall");
+  const refresh=()=>{
+    const n=selProd.size;
+    if(bar){ bar.hidden = n===0; }
+    if(count) count.textContent = n===1?"1 seleccionado":`${n} seleccionados`;
+    if(all) all.checked = n>0 && n===db.productos.length;
+  };
+  document.querySelectorAll(".selchk").forEach(cb=>{
+    cb.onclick=e=>e.stopPropagation();
+    cb.onchange=()=>{ cb.checked?selProd.add(cb.dataset.selp):selProd.delete(cb.dataset.selp); refresh(); };
+  });
+  if(all) all.onchange=()=>{
+    if(all.checked) db.productos.forEach(p=>selProd.add(p.id)); else selProd.clear();
+    document.querySelectorAll(".selchk").forEach(cb=> cb.checked=selProd.has(cb.dataset.selp));
+    refresh();
+  };
+  const none=document.getElementById("selnone"); if(none) none.onclick=()=>{ selProd.clear(); document.querySelectorAll(".selchk").forEach(cb=>cb.checked=false); refresh(); };
+  const del=document.getElementById("seldel"); if(del) del.onclick=deleteSelProd;
+  // evitar que el checkbox abra la ficha
+  document.querySelectorAll("[data-nofic]").forEach(td=> td.onclick=e=>e.stopPropagation());
+  refresh();
+}
+function deleteSelProd(){
+  const ids=[...selProd]; if(!ids.length) return;
+  const prods=ids.map(prodById).filter(Boolean);
+  const conStock=prods.filter(p=>p.stock!==0).length;
+  const conMovs=prods.filter(p=>db.movimientos.some(m=>m.productoId===p.id)).length;
+  let msg=`¿Borrar ${prods.length} producto(s) del maestro?`;
+  if(conStock) msg+=`\n\n⚠ ${conStock} tiene(n) stock distinto de 0: al borrarlos, esas unidades dejan de contar en la valorización.`;
+  if(conMovs) msg+=`\n\n⚠ ${conMovs} tiene(n) movimientos en el kardex. El historial queda (guarda nombre y SKU), pero ya no vas a poder abrir su ficha.`;
+  msg+="\n\nEsta acción no se puede deshacer.";
+  if(!confirm(msg)) return;
+  db.productos = db.productos.filter(p=>!selProd.has(p.id));
+  selProd.clear();
+  save(); toast(`${prods.length} producto(s) borrado(s)`, "warn"); render();
 }
 
 /* ============================================================
@@ -877,6 +1003,7 @@ function viewMov(){
     const pill = isAdj ? `<span class="pill adj">⇄ ajuste</span>`
                        : `<span class="pill ${up?'in':'out'}">${up?'↑ entrada':'↓ salida'}</span>`;
     const deltaCls = isAdj ? "flat" : (up?'up':'down');
+    const accion = isAdj ? `<button class="btn ghost sm" data-delaj="${m.id}" style="color:var(--alert)" title="Borrar ajuste">🗑</button>` : "";
     return `<tr>
       <td class="num">${fecha}</td>
       <td>${pill}</td>
@@ -884,6 +1011,7 @@ function viewMov(){
       <td class="r delta ${deltaCls}">${up?'+':'−'}${qty(Math.abs(signed))}</td>
       <td class="r num">${money(m.valorUnit)}</td>
       <td class="num">${esc(m.ref||"—")}</td>
+      <td class="r">${accion}</td>
     </tr>`;
   }).join("");
   return `
@@ -894,10 +1022,23 @@ function viewMov(){
   <div class="panel">
     <div class="phead"><h3>Kardex</h3><span class="hint">${db.movimientos.length} asientos${db.movimientos.length>400?" · mostrando 400":""}</span></div>
     ${db.movimientos.length ? `<div class="table-scroll"><table>
-      <thead><tr><th>Fecha</th><th>Tipo</th><th>Producto</th><th class="r">Cant.</th><th class="r">Valor unit.</th><th>Origen</th></tr></thead>
+      <thead><tr><th>Fecha</th><th>Tipo</th><th>Producto</th><th class="r">Cant.</th><th class="r">Valor unit.</th><th>Origen</th><th></th></tr></thead>
       <tbody>${rows}</tbody></table></div>`
       : emptyState("Todavía no hay movimientos","Cada compra, venta o ajuste deja su rastro acá.")}
   </div>`;
+}
+/* Borrar un ajuste manual: revierte su efecto en el stock y saca el asiento */
+function deleteAjuste(id){
+  const m=db.movimientos.find(x=>x.id===id && x.tipo==="ajuste"); if(!m) return;
+  const p=prodById(m.productoId);
+  const d=(m.delta!=null)?m.delta:0;
+  const msg = p
+    ? `¿Borrar este ajuste?\n\n${p.nombre}\nRevierte ${d>=0?'+':'−'}${qty(Math.abs(d))} u → stock ${qty(p.stock)} pasa a ${qty(+((p.stock||0)-d).toFixed(4))}.`
+    : `¿Borrar este ajuste? (el producto ya no existe en el maestro)`;
+  if(!confirm(msg)) return;
+  if(p) p.stock = +((p.stock||0) - d).toFixed(4);
+  db.movimientos = db.movimientos.filter(x=>x.id!==id);
+  save(); toast("Ajuste borrado","warn"); render();
 }
 
 /* ============================================================
@@ -969,9 +1110,12 @@ function wire(){
   m.querySelectorAll("[data-open]").forEach(b=> b.onclick=()=> openDoc(b.dataset.open));
   m.querySelectorAll("[data-newp]").forEach(b=> b.onclick=()=> openProd());
   m.querySelectorAll("[data-ficha]").forEach(tr=> tr.onclick=()=> openFicha(tr.dataset.ficha));
+  wireDashFiltros();
+  wireSelProd();
   m.querySelectorAll("[data-editp]").forEach(b=> b.onclick=(e)=>{ e.stopPropagation(); openProd(b.dataset.editp); });
   m.querySelectorAll("[data-import]").forEach(b=> b.onclick=()=> openImport());
   const adj=m.querySelector("[data-adjust]"); if(adj) adj.onclick=()=> openAjuste();
+  m.querySelectorAll("[data-delaj]").forEach(b=> b.onclick=()=> deleteAjuste(b.dataset.delaj));
   m.querySelectorAll("[data-vdoc]").forEach(b=> b.onclick=()=>{
     const [t,id]=b.dataset.vdoc.split(":"); verDoc(t,id);
   });
@@ -1058,7 +1202,7 @@ function openDoc(tipo, pre){
   draft.tipo = tipo;
   renderDocModal();
 }
-function blankLine(){ return { key:uid(), productoId:"", sku:"", nombre:"", cantidad:1, precio:0, precioVentaSugerido:0, crear:false }; }
+function blankLine(){ return { key:uid(), productoId:"", sku:"", nombre:"", cantidad:1, precio:0, precioVentaSugerido:0, crear:false, margen:0, costoRef:0 }; }
 
 function renderDocModal(){
   const isC = draft.tipo==="compra";
@@ -1166,6 +1310,7 @@ function confirmAjuste(){
   const nuevo = adjDraft.modo==="recuento" ? +adjDraft.cantidad : (p.stock||0)+(+adjDraft.cantidad);
   const delta = +(nuevo-(p.stock||0)).toFixed(4);
   if(delta===0){ toast("El ajuste no cambia el stock","warn"); return; }
+  if(nuevo < 0){ toast("El stock no puede quedar negativo","warn"); alert(`El ajuste dejaría el stock en ${qty(nuevo)}.\nEl stock no puede ser negativo.`); return; }
   if(!confirm(`Confirmás el ajuste?\n\n${p.nombre}\nStock ${qty(p.stock)} → ${qty(nuevo)} (${delta>=0?'+':'−'}${qty(Math.abs(delta))})\nMotivo: ${adjDraft.obs.trim()}`)) return;
   const ref = "Ajuste · " + adjDraft.obs.trim();
   const fechaISO = new Date(adjDraft.fecha+"T12:00:00").toISOString();
@@ -1175,37 +1320,65 @@ function confirmAjuste(){
   render();
 }
 
-function prodOptions(sel){
-  return `<option value="">— elegir —</option>` +
-    db.productos.map(p=>`<option value="${p.id}" ${p.id===sel?"selected":""}>${esc(p.sku?("["+p.sku+"] "):"")}${esc(p.nombre)}</option>`).join("") +
-    `<option value="__new">＋ Crear producto nuevo…</option>`;
+function prodOptions(sel, soloConStock){
+  const lista = soloConStock ? db.productos.filter(p=> (p.stock||0) > 0) : db.productos;
+  const opts = lista.map(p=>{
+    const disp = soloConStock ? ` (disp: ${qty(p.stock)})` : "";
+    return `<option value="${p.id}" ${p.id===sel?"selected":""}>${esc(p.sku?("["+p.sku+"] "):"")}${esc(p.nombre)}${disp}</option>`;
+  }).join("");
+  const nuevo = soloConStock ? "" : `<option value="__new">＋ Crear producto nuevo…</option>`;
+  const vacio = soloConStock && !lista.length
+    ? `<option value="">— no hay productos con stock —</option>`
+    : `<option value="">— elegir —</option>`;
+  return vacio + opts + nuevo;
 }
 function renderLines(){
   const isC = draft.tipo==="compra";
   const host = document.getElementById("lineHost");
   const rows = draft.lineas.map((l,i)=>{
     const p = prodById(l.productoId);
-    const stockInfo = (!isC && p) ? `<div style="font-size:11px;color:${p.stock< l.cantidad?'var(--alert)':'var(--muted)'};margin-top:3px">disp: ${qty(p.stock)}</div>` : "";
-    const newFields = l.crear ? `
-      <div style="display:flex;gap:6px;margin-top:6px">
-        <input class="inp" placeholder="SKU" value="${esc(l.sku)}" data-k="sku" data-i="${i}" style="max-width:110px">
-        <input class="inp" placeholder="Nombre del producto nuevo" value="${esc(l.nombre)}" data-k="nombre" data-i="${i}">
-      </div>` : "";
+    if(isC){
+      const newFields = l.crear ? `
+        <div style="display:flex;gap:6px;margin-top:6px">
+          <input class="inp" placeholder="SKU" value="${esc(l.sku)}" data-k="sku" data-i="${i}" style="max-width:110px">
+          <input class="inp" placeholder="Nombre del producto nuevo" value="${esc(l.nombre)}" data-k="nombre" data-i="${i}">
+        </div>` : "";
+      return `<tr>
+        <td style="min-width:180px">
+          <select class="inp" data-k="prod" data-i="${i}">${prodOptions(l.productoId)}</select>
+          ${newFields}
+        </td>
+        <td style="width:90px"><input class="inp num" data-k="cantidad" data-i="${i}" value="${l.cantidad}"></td>
+        <td style="width:120px"><input class="inp num" data-k="precio" data-i="${i}" value="${l.precio}"></td>
+        <td class="r num sub-cell" style="width:120px">${money(l.cantidad*l.precio)}</td>
+        <td style="width:34px"><button class="btn ghost sm" data-del="${i}" title="Quitar">✕</button></td>
+      </tr>`;
+    }
+    // ---- VENTA ----
+    const disp = p ? p.stock : 0;
+    const dispInfo = p ? `<div style="font-size:11px;color:${l.cantidad>disp?'var(--alert)':'var(--muted)'};margin-top:3px">disp: ${qty(disp)}</div>` : "";
     return `<tr>
       <td style="min-width:180px">
-        <select class="inp" data-k="prod" data-i="${i}">${prodOptions(l.productoId)}</select>
-        ${newFields}${stockInfo}
+        <select class="inp" data-k="prod" data-i="${i}">${prodOptions(l.productoId, true)}</select>
+        ${dispInfo}
       </td>
-      <td style="width:90px"><input class="inp num" data-k="cantidad" data-i="${i}" value="${l.cantidad}"></td>
-      <td style="width:120px"><input class="inp num" data-k="precio" data-i="${i}" value="${l.precio}"></td>
-      <td class="r num" style="width:120px">${money(l.cantidad*l.precio)}</td>
+      <td style="width:80px"><input class="inp num" data-k="cantidad" data-i="${i}" value="${l.cantidad}"></td>
+      <td class="r num" style="width:96px;color:var(--muted)">${p?money(l.costoRef):"—"}</td>
+      <td style="width:78px"><input class="inp num" data-k="margen" data-i="${i}" value="${l.margen||0}" placeholder="%"></td>
+      <td style="width:110px"><input class="inp num" data-k="precio" data-i="${i}" value="${l.precio}"></td>
+      <td class="r num sub-cell" style="width:110px">${money(l.cantidad*l.precio)}</td>
       <td style="width:34px"><button class="btn ghost sm" data-del="${i}" title="Quitar">✕</button></td>
     </tr>`;
   }).join("");
+
+  const thead = isC
+    ? `<tr><th>Producto</th><th class="r">Cant.</th><th class="r">Costo unit.</th><th class="r">Subtotal</th><th></th></tr>`
+    : `<tr><th>Producto</th><th class="r">Cant.</th><th class="r">Costo</th><th class="r">Margen&nbsp;%</th><th class="r">Precio unit.</th><th class="r">Subtotal</th><th></th></tr>`;
   host.innerHTML = `<div class="table-scroll"><table class="line-tbl">
-    <thead><tr><th>Producto</th><th class="r">Cant.</th><th class="r">${isC?"Costo unit.":"Precio unit."}</th><th class="r">Subtotal</th><th></th></tr></thead>
+    <thead>${thead}</thead>
     <tbody>${rows}</tbody></table></div>`;
 
+  const round2 = n=> Math.round((n||0)*100)/100;
   host.querySelectorAll("[data-k]").forEach(inp=>{
     const i=+inp.dataset.i, k=inp.dataset.k;
     inp.oninput = ()=>{
@@ -1214,14 +1387,31 @@ function renderLines(){
         if(inp.value==="__new"){ l.crear=true; l.productoId=""; renderLines(); return; }
         l.crear=false; l.productoId=inp.value;
         const p=prodById(inp.value);
-        if(p && draft.tipo==="compra" && !l.precio) { l.precio=p.ultimoCosto; }
-        if(p && draft.tipo==="venta" && !l.precio) { l.precio=p.precioVenta; }
+        if(p && isC && !l.precio){ l.precio=p.ultimoCosto; }
+        if(p && !isC){
+          l.costoRef = p.ultimoCosto||0;
+          l.margen = l.margen||0;
+          l.precio = round2(l.costoRef*(1+(l.margen||0)/100)) || (p.precioVenta||0);
+        }
         renderLines(); refreshTotal(); return;
       }
-      if(k==="cantidad") l.cantidad=parseNum(inp.value);
-      else if(k==="precio") l.precio=parseNum(inp.value);
+      if(k==="cantidad"){
+        let v=parseNum(inp.value);
+        if(!isC){ const p=prodById(l.productoId); if(p && v>p.stock){ v=p.stock; inp.value=v; toast(`Máximo disponible: ${qty(p.stock)}`,"warn"); } }
+        l.cantidad=v;
+      }
+      else if(k==="precio"){
+        l.precio=parseNum(inp.value);
+        if(!isC && l.costoRef>0){ l.margen = round2((l.precio/l.costoRef - 1)*100);
+          const mi=host.querySelector(`[data-k="margen"][data-i="${i}"]`); if(mi) mi.value=l.margen; }
+      }
+      else if(k==="margen"){
+        l.margen=parseNum(inp.value);
+        l.precio = round2((l.costoRef||0)*(1+(l.margen||0)/100));
+        const pi=host.querySelector(`[data-k="precio"][data-i="${i}"]`); if(pi) pi.value=l.precio;
+      }
       else l[k]=inp.value;
-      if(k==="cantidad"||k==="precio"){ updateSubtotals(); refreshTotal(); }
+      if(k==="cantidad"||k==="precio"||k==="margen"){ updateSubtotals(); refreshTotal(); }
     };
   });
   host.querySelectorAll("[data-del]").forEach(b=> b.onclick=()=>{
@@ -1234,7 +1424,8 @@ function updateSubtotals(){
   const host=document.getElementById("lineHost");
   host.querySelectorAll("tbody tr").forEach((tr,i)=>{
     const l=draft.lineas[i]; if(!l) return;
-    tr.children[3].textContent = money(l.cantidad*l.precio);
+    const cell=tr.querySelector(".sub-cell");
+    if(cell) cell.textContent = money(l.cantidad*l.precio);
   });
 }
 function refreshTotal(){
@@ -1277,18 +1468,20 @@ function confirmDoc(){
     }
   }
 
-  // Validación de stock en ventas (contra el stock que quedaría tras revertir el original)
+  // Validación de stock en ventas: NUNCA se permite dejar stock negativo (bloqueo duro).
   if(!isC){
-    const faltantes = resolved.filter(r=>{
-      const eff = (r.prod.stock||0) + (revertMap[r.prod.id]||0);
-      return eff < r.cantidad;
+    const pedido={};   // total pedido por producto (por si hay líneas repetidas del mismo SKU)
+    resolved.forEach(r=>{ pedido[r.prod.id]=(pedido[r.prod.id]||0)+r.cantidad; });
+    const faltantes=[];
+    Object.keys(pedido).forEach(id=>{
+      const p=prodById(id);
+      const eff=(p.stock||0)+(revertMap[id]||0);   // stock disponible (ya considerando la reversión si se edita)
+      if(pedido[id]>eff) faltantes.push(`• ${p.nombre}: disponible ${qty(eff)}, pedís ${qty(pedido[id])}`);
     });
     if(faltantes.length){
-      const det = faltantes.map(f=>{
-        const eff = (f.prod.stock||0) + (revertMap[f.prod.id]||0);
-        return `• ${f.prod.nombre}: hay ${qty(eff)}, pedís ${qty(f.cantidad)}`;
-      }).join("\n");
-      if(!confirm("Stock insuficiente:\n\n"+det+"\n\n¿Confirmar igual y dejar stock negativo?")) return;
+      toast("No hay stock suficiente","warn");
+      alert("No se puede vender más de lo que hay en stock:\n\n"+faltantes.join("\n")+"\n\nAjustá las cantidades. El stock no puede quedar en negativo.");
+      return;
     }
   }
 
@@ -1396,37 +1589,23 @@ let pdfLines = [];   // líneas de texto reconstruidas
 function openImport(){
   buildModal("Importar factura (PDF)", `
     <div class="banner">
-      Se arma una tabla editable con los renglones. Revisá cantidades, costos y a qué producto va cada uno <b>antes de confirmar</b> — la detección es orientativa.
+      Elegí o arrastrá el PDF de la factura. Lo lee la IA (Gemini) y arma una tabla editable — revisá cantidades, costos y a qué producto va cada renglón <b>antes de confirmar</b>.
     </div>
     <div class="drop" id="drop">
-      <div class="di">⤒</div>
+      <div class="di">✨</div>
       <p><span class="fn">Elegí un PDF</span> o arrastralo acá</p>
-      <p style="font-size:12px">detección local · se procesa en tu navegador, no se sube a ningún lado</p>
-      <input type="file" id="pdfInput" accept="application/pdf" hidden>
+      <p style="font-size:12px">se envía a tu servidor (Worker) y de ahí a Gemini para leerlo</p>
+      <input type="file" id="iaInput" accept="application/pdf" hidden>
     </div>
-    <div style="display:flex;align-items:center;gap:10px;margin:12px 0">
-      <div style="flex:1;height:1px;background:var(--line)"></div>
-      <span style="font-size:11.5px;color:var(--muted)">o</span>
-      <div style="flex:1;height:1px;background:var(--line)"></div>
-    </div>
-    <button class="btn" id="iaBtn" style="width:100%;justify-content:center">✨ Leer con IA (Gemini)</button>
-    <p style="font-size:11.5px;color:var(--muted);margin:8px 2px 0">
-      Para facturas de cualquier formato. El PDF se envía a tu servidor (Worker) y de ahí a Gemini; después revisás y confirmás igual que siempre.
-    </p>
-    <input type="file" id="iaInput" accept="application/pdf" hidden>
     <div id="importOut"></div>
   `,[{label:"Cancelar",cls:"btn",act:closeModal}], true);
 
-  const drop=document.getElementById("drop"), input=document.getElementById("pdfInput");
+  const drop=document.getElementById("drop"), input=document.getElementById("iaInput");
   drop.onclick=()=>input.click();
-  input.onchange=()=>{ if(input.files[0]) handlePdf(input.files[0]); };
+  input.onchange=()=>{ if(input.files[0]) handlePdfIA(input.files[0]); };
   ["dragover","dragenter"].forEach(ev=>drop.addEventListener(ev,e=>{e.preventDefault();drop.classList.add("over");}));
   ["dragleave","drop"].forEach(ev=>drop.addEventListener(ev,e=>{e.preventDefault();drop.classList.remove("over");}));
-  drop.addEventListener("drop",e=>{ const f=e.dataTransfer.files[0]; if(f) handlePdf(f); });
-
-  const iaBtn=document.getElementById("iaBtn"), iaInput=document.getElementById("iaInput");
-  iaBtn.onclick=()=> iaInput.click();
-  iaInput.onchange=()=>{ if(iaInput.files[0]) handlePdfIA(iaInput.files[0]); };
+  drop.addEventListener("drop",e=>{ const f=e.dataTransfer.files[0]; if(f) handlePdfIA(f); });
 }
 
 /* Leer factura con Gemini (vía el Worker). Reusa el mismo editor de revisión que la detección local. */
