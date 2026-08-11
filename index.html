@@ -402,7 +402,7 @@
       <input class="inp" id="loginPass" type="password" autocomplete="current-password"></div>
     <div id="loginErr" class="login-err"></div>
     <button class="btn primary login-btn" id="loginBtn">Entrar</button>
-    <p class="login-build">build v13</p>
+    <p class="login-build">build v14</p>
   </div>
 </div>
 <div class="topbar" id="topbar">
@@ -1015,10 +1015,10 @@ function viewProd(){
   </div>
   <div class="panel">
     <div class="phead"><h3>Maestro</h3><span class="hint" id="prodCount">${db.productos.length} artículos</span></div>
-    <div class="selbar" id="selbar" hidden>
+    <div class="selbar" id="selbar" style="display:none">
       <span id="selcount" class="sel-hint">Tildá los productos que quieras borrar…</span>
       <div style="flex:1"></div>
-      <div id="selactions" hidden>
+      <div id="selactions" style="display:none">
         <button class="btn ghost sm" id="selnone">Deseleccionar</button>
         <button class="btn danger sm" id="seldel">${ICO.trash}Borrar seleccionados</button>
       </div>
@@ -1065,8 +1065,11 @@ function refreshSelbar(){
   const bar=document.getElementById("selbar"), count=document.getElementById("selcount"),
         all=document.getElementById("selall"), acts=document.getElementById("selactions");
   const n=selProd.size;
-  if(bar) bar.hidden = !selMode;              // la barra aparece al entrar en modo selección
-  if(acts) acts.hidden = n===0;               // pero Deseleccionar/Borrar solo con ≥1 tildado
+  // OJO: usar style.display, NO el atributo hidden. La regla CSS .selbar{display:flex}
+  // (y .selbar #selactions{display:flex}) tiene más especificidad que [hidden] y lo pisaba,
+  // por eso los botones aparecían igual con 0 seleccionados.
+  if(bar) bar.style.display = selMode ? "flex" : "none";     // la barra aparece al entrar en modo selección
+  if(acts) acts.style.display = n===0 ? "none" : "flex";     // Deseleccionar/Borrar SOLO con ≥1 tildado
   if(count) count.textContent = n===0 ? "Tildá los productos que quieras borrar…"
                                        : (n===1?"1 seleccionado":`${n} seleccionados`);
   if(count) count.className = n===0 ? "sel-hint" : "";
