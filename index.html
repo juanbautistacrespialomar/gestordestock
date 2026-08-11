@@ -476,7 +476,7 @@
     </div>
     <div id="loginErr" class="login-err"></div>
     <button class="btn primary login-btn" id="loginBtn">Entrar</button>
-    <p class="login-build">build v17</p>
+    <p class="login-build">build v18</p>
   </div>
 </div>
 <div class="topbar" id="topbar">
@@ -616,7 +616,7 @@ async function pushNow(force=false){
   setSyncState("saving");
   try{
     const res=await fetch(stateUrl(),{ method:"PUT", headers:authHeaders(), body:JSON.stringify({ data:db, baseRev:syncMeta.syncedRev, force }) });
-    if(res.status===401){ setSyncState("offline"); toast("Sesión vencida, volvé a entrar","warn"); logout(); return; }
+    if(res.status===401){ toast("Sesión vencida, volvé a entrar","warn"); forceLogout(); return; }
     if(res.status===409){ conflictPayload=await res.json(); setSyncState("conflict"); toast("Hay una versión más nueva en el servidor","warn"); if(view==="datos") render(); return; }
     if(!res.ok) throw new Error("HTTP "+res.status);
     const j=await res.json();
@@ -630,7 +630,7 @@ async function pullNow(){
   setSyncState("saving");
   try{
     const res=await fetch(stateUrl(),{ method:"GET", headers:authHeaders() });
-    if(res.status===401){ setSyncState("offline"); toast("Sesión vencida, volvé a entrar","warn"); logout(); return; }
+    if(res.status===401){ toast("Sesión vencida, volvé a entrar","warn"); forceLogout(); return; }
     if(!res.ok) throw new Error("HTTP "+res.status);
     const j=await res.json();
     const serverRev=j.rev||0;
@@ -711,6 +711,12 @@ async function doLogin(){
 }
 function logout(){
   if(!confirm("Cerrar sesión en este dispositivo. Tus datos siguen en el servidor. ¿Seguir?")) return;
+  forceLogout();
+}
+/* Cierre forzado (token vencido / 401): sin confirmación, va derecho al login.
+   Antes se llamaba a logout() acá y el confirm() aparecía sin que el usuario
+   hubiera pedido salir; si cancelaba, quedaba con un token muerto reintentando. */
+function forceLogout(){
   session=null; saveSession(); setSyncState("off");
   showLogin();
 }
@@ -767,6 +773,16 @@ function findProdBySku(sku){
   if(!sku) return null;
   const s = sku.trim().toLowerCase();
   return db.productos.find(p => (p.sku||"").trim().toLowerCase() === s) || null;
+}
+/* ¿Ese SKU ya lo usa OTRO producto? Devuelve el producto en conflicto o null.
+   - SKU vacío nunca colisiona (muchos productos pueden no tener código).
+   - exceptId permite editar un producto sin chocar consigo mismo.
+   Evita SKUs repetidos, que romperían findProdBySku al importar facturas
+   (engancharía la compra al producto equivocado). */
+function skuEnUso(sku, exceptId){
+  const s = (sku||"").trim().toLowerCase();
+  if(!s) return null;
+  return db.productos.find(p => p.id!==exceptId && (p.sku||"").trim().toLowerCase()===s) || null;
 }
 function valorizacion(){
   return db.productos.reduce((a,p)=> a + (p.stock||0)*(p.ultimoCosto||0), 0);
@@ -1763,13 +1779,16 @@ function saveProd(id){
   const g=x=>document.getElementById(x).value;
   const nom=g("p_nom").trim();
   if(!nom){ toast("Poné un nombre","warn"); return; }
+  const sku=g("p_sku").trim();
+  const dup=skuEnUso(sku, id);   // en alta id=undefined -> chequea contra todos; en edición se excluye a sí mismo
+  if(dup){ toast(`El SKU "${sku}" ya lo usa "${dup.nombre}"`,"warn"); return; }
   if(id){
     const p=prodById(id);
-    p.sku=g("p_sku").trim(); p.unidad=g("p_uni").trim()||"u"; p.nombre=nom;
+    p.sku=sku; p.unidad=g("p_uni").trim()||"u"; p.nombre=nom;
     p.ultimoCosto=parseNum(g("p_cos")); p.precioVenta=parseNum(g("p_pv")); p.puntoRepedido=parseNum(g("p_rep"));
   } else {
     const stk=parseNum(g("p_stk"));
-    const p={ id:uid(), sku:g("p_sku").trim(), unidad:g("p_uni").trim()||"u", nombre:nom,
+    const p={ id:uid(), sku:sku, unidad:g("p_uni").trim()||"u", nombre:nom,
       stock:0, ultimoCosto:parseNum(g("p_cos")), precioVenta:parseNum(g("p_pv")), puntoRepedido:parseNum(g("p_rep")) };
     db.productos.push(p);
     if(stk) moverStock(p, stk, p.ultimoCosto, "ajuste", null, "Stock inicial");
@@ -1815,7 +1834,7 @@ function renderDocModal(){
     <button class="btn sm" id="addLine" style="margin-top:10px">+ Agregar línea</button>
     <div id="docWarn"></div>
   `;
-  const total = draft.lineas.reduce((a,l)=> a + l.cantidad*l.precio, 0);
+  const total = totalLineas(draft.lineas);
   const editing = !!draft.editingId;
   buildModal(
     isC?(editing?"Editar compra":"Cargar compra"):(editing?"Editar venta":"Nueva venta"), body,
@@ -1929,6 +1948,11 @@ function prodOptions(sel, soloConStock){
 }
 
 const round2 = n => Math.round((n||0)*100)/100;
+/* Total de un documento = suma de subtotales YA redondeados a 2 decimales.
+   Redondear por renglón y después sumar hace que el total guardado coincida
+   exactamente con lo que se ve línea por línea (money() muestra 2 decimales),
+   y evita el ruido de punto flotante tipo 92.10000000000001 al reconciliar. */
+function totalLineas(arr){ return round2((arr||[]).reduce((a,x)=> a + round2((x.cantidad||0)*(x.precio||0)), 0)); }
 
 /* ============================================================
    TASK 1 — Disponible por línea considerando TODO el documento
@@ -2162,7 +2186,7 @@ function updateSubtotals(){
   });
 }
 function refreshTotal(){
-  const total = draft.lineas.reduce((a,l)=> a + l.cantidad*l.precio, 0);
+  const total = totalLineas(draft.lineas);
   const foot=document.querySelector(".modal .mextra .num");
   if(foot) foot.textContent = money(total);
 }
@@ -2176,6 +2200,8 @@ function confirmDoc(){
     let p=null;
     if(l.crear){
       if(!l.nombre.trim()){ toast("Falta el nombre de un producto nuevo","warn"); return; }
+      const dup = skuEnUso(l.sku, null);   // si ese SKU ya existe, mejor enganchar al producto existente que duplicarlo
+      if(dup){ toast(`El SKU "${(l.sku||"").trim()}" ya es de "${dup.nombre}". Elegí ese producto en la línea en vez de crear uno nuevo.`,"warn"); return; }
       p = { id:uid(), sku:(l.sku||"").trim(), unidad:"u", nombre:l.nombre.trim(),
             stock:0, ultimoCosto:0, precioVenta: isC?(l.precioVentaSugerido||0):l.precio, puntoRepedido:0 };
       db.productos.push(p);
@@ -2225,7 +2251,7 @@ function confirmDoc(){
     id: editing ? draft.editingId : uid(), tipo:draft.tipo, contraparte:draft.contraparte.trim(),
     fecha:draft.fecha, numero:draft.numero.trim(),
     lineas: resolved.map(r=>({ productoId:r.prod.id, sku:r.prod.sku, nombre:r.prod.nombre, cantidad:r.cantidad, precio:r.precio, costo:r.costo })),
-    total: resolved.reduce((a,r)=>a+r.cantidad*r.precio,0)
+    total: totalLineas(resolved)
   };
   const refTxt = (isC?"Compra":"Venta") + (doc.numero?(" "+doc.numero):"") + (doc.contraparte?(" · "+doc.contraparte):"");
 
