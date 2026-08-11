@@ -662,7 +662,11 @@ function render(){
    VISTA: Panel (dashboard)
    ============================================================ */
 let selProd = new Set();                 // productos tildados en el maestro
+let selMode = false;                     // modo selección activado (muestra los tildes)
+let prodFiltros = { q:"", saga:"", estado:"", cmin:"", cmax:"" };
 let dashFiltros = { q:"", saga:"", estado:"", cmin:"", cmax:"" };
+let docFiltros = { compra:{q:"",desde:"",hasta:"",orden:"fecha_desc"}, venta:{q:"",desde:"",hasta:"",orden:"fecha_desc"} };
+let movFiltros = { q:"", desde:"", hasta:"", tipo:"", saga:"", vmin:"", vmax:"" };
 /* "Saga" = línea/juego, derivada del nombre (texto antes de ":" o primeras palabras) */
 function sagaDe(p){
   const n = (p.nombre||"").trim();
@@ -673,6 +677,59 @@ function sagaDe(p){
 }
 function sagasUnicas(){
   return [...new Set(db.productos.map(sagaDe))].filter(s=>s&&s!=="—").sort((a,b)=>a.localeCompare(b,"es"));
+}
+/* Filtrado genérico de productos por un objeto de filtros {q,saga,estado,cmin,cmax} */
+function filtrarProds(f){
+  const q=(f.q||"").trim().toLowerCase();
+  const cmin=f.cmin!==""&&f.cmin!=null?parseNum(f.cmin):null;
+  const cmax=f.cmax!==""&&f.cmax!=null?parseNum(f.cmax):null;
+  return db.productos.filter(p=>{
+    if(q){ const hay=((p.nombre||"")+" "+(p.sku||"")).toLowerCase(); if(!hay.includes(q)) return false; }
+    if(f.saga && sagaDe(p)!==f.saga) return false;
+    if(f.estado==="con" && !(p.stock>0)) return false;
+    if(f.estado==="sin" && p.stock!==0) return false;
+    if(f.estado==="bajo" && !bajoStock(p)) return false;
+    if(f.estado==="neg" && !(p.stock<0)) return false;
+    const c=p.ultimoCosto||0;
+    if(cmin!==null && c<cmin) return false;
+    if(cmax!==null && c>cmax) return false;
+    return true;
+  }).sort((a,b)=> (b.stock*b.ultimoCosto) - (a.stock*a.ultimoCosto));
+}
+/* Barra de filtros de productos, reutilizable (prefix = prefijo de ids) */
+function filterBarHTML(prefix, f){
+  const sagas=sagasUnicas();
+  return `<div class="filtros">
+    <input class="inp" id="${prefix}q" placeholder="Buscar por nombre o SKU…" value="${esc(f.q)}" style="flex:2;min-width:180px">
+    <select class="inp" id="${prefix}saga" style="flex:1;min-width:130px">
+      <option value="">Todas las sagas</option>
+      ${sagas.map(s=>`<option value="${esc(s)}" ${f.saga===s?"selected":""}>${esc(s)}</option>`).join("")}
+    </select>
+    <select class="inp" id="${prefix}estado" style="flex:1;min-width:130px">
+      <option value="" ${f.estado===""?"selected":""}>Todo el stock</option>
+      <option value="con" ${f.estado==="con"?"selected":""}>Con stock</option>
+      <option value="sin" ${f.estado==="sin"?"selected":""}>Sin stock</option>
+      <option value="bajo" ${f.estado==="bajo"?"selected":""}>Bajo mínimo</option>
+      <option value="neg" ${f.estado==="neg"?"selected":""}>Negativos</option>
+    </select>
+    <input class="inp num" id="${prefix}cmin" placeholder="Costo mín." value="${esc(f.cmin)}" style="width:100px">
+    <input class="inp num" id="${prefix}cmax" placeholder="Costo máx." value="${esc(f.cmax)}" style="width:100px">
+    <button class="btn ghost sm" id="${prefix}clear" title="Limpiar filtros">Limpiar</button>
+  </div>`;
+}
+function wireFilterBar(prefix, f, onChange){
+  const q=document.getElementById(prefix+"q"); if(!q) return;
+  const upd=(k,el)=>{ f[k]=el.value; onChange(); };
+  q.oninput=()=>upd("q",q);
+  document.getElementById(prefix+"saga").onchange=e=>upd("saga",e.target);
+  document.getElementById(prefix+"estado").onchange=e=>upd("estado",e.target);
+  document.getElementById(prefix+"cmin").oninput=e=>upd("cmin",e.target);
+  document.getElementById(prefix+"cmax").oninput=e=>upd("cmax",e.target);
+  document.getElementById(prefix+"clear").onclick=()=>{
+    f.q="";f.saga="";f.estado="";f.cmin="";f.cmax="";
+    [prefix+"q",prefix+"cmin",prefix+"cmax",prefix+"saga",prefix+"estado"].forEach(id=>{const el=document.getElementById(id); if(el)el.value="";});
+    onChange();
+  };
 }
 function viewDash(){
   const bajos = db.productos.filter(bajoStock);
@@ -698,23 +755,7 @@ function viewDash(){
   <div class="panel">
     <div class="phead"><h3>Existencias</h3><span class="hint" id="dashCount">tocá un producto para ver su historial</span></div>
     ${db.productos.length ? `
-    <div class="filtros">
-      <input class="inp" id="fq" placeholder="Buscar por nombre o SKU…" value="${esc(dashFiltros.q)}" style="flex:2;min-width:180px">
-      <select class="inp" id="fsaga" style="flex:1;min-width:130px">
-        <option value="">Todas las sagas</option>
-        ${sagas.map(s=>`<option value="${esc(s)}" ${dashFiltros.saga===s?"selected":""}>${esc(s)}</option>`).join("")}
-      </select>
-      <select class="inp" id="festado" style="flex:1;min-width:130px">
-        <option value="" ${dashFiltros.estado===""?"selected":""}>Todo el stock</option>
-        <option value="con" ${dashFiltros.estado==="con"?"selected":""}>Con stock</option>
-        <option value="sin" ${dashFiltros.estado==="sin"?"selected":""}>Sin stock</option>
-        <option value="bajo" ${dashFiltros.estado==="bajo"?"selected":""}>Bajo mínimo</option>
-        <option value="neg" ${dashFiltros.estado==="neg"?"selected":""}>Negativos</option>
-      </select>
-      <input class="inp num" id="fcmin" placeholder="Costo mín." value="${esc(dashFiltros.cmin)}" style="width:100px">
-      <input class="inp num" id="fcmax" placeholder="Costo máx." value="${esc(dashFiltros.cmax)}" style="width:100px">
-      <button class="btn ghost sm" id="fclear" title="Limpiar filtros">Limpiar</button>
-    </div>
+    ${filterBarHTML("f", dashFiltros)}
     <div class="table-scroll"><table>
       <thead><tr><th>SKU</th><th>Producto</th><th class="r">Stock</th><th class="r">Últ. costo</th><th class="r">Valorizado</th></tr></thead>
       <tbody id="dashBody"></tbody>
@@ -723,24 +764,7 @@ function viewDash(){
 }
 
 /* Filtrado + render de la tabla de existencias (sin re-render de toda la vista) */
-function filteredDashProds(){
-  const f = dashFiltros;
-  const q = f.q.trim().toLowerCase();
-  const cmin = f.cmin!=="" ? parseNum(f.cmin) : null;
-  const cmax = f.cmax!=="" ? parseNum(f.cmax) : null;
-  return db.productos.filter(p=>{
-    if(q){ const hay=((p.nombre||"")+" "+(p.sku||"")).toLowerCase(); if(!hay.includes(q)) return false; }
-    if(f.saga && sagaDe(p)!==f.saga) return false;
-    if(f.estado==="con" && !(p.stock>0)) return false;
-    if(f.estado==="sin" && p.stock!==0) return false;
-    if(f.estado==="bajo" && !bajoStock(p)) return false;
-    if(f.estado==="neg" && !(p.stock<0)) return false;
-    const c = p.ultimoCosto||0;
-    if(cmin!==null && c<cmin) return false;
-    if(cmax!==null && c>cmax) return false;
-    return true;
-  }).sort((a,b)=> (b.stock*b.ultimoCosto) - (a.stock*a.ultimoCosto));
-}
+function filteredDashProds(){ return filtrarProds(dashFiltros); }
 function renderDashRows(){
   const body=document.getElementById("dashBody"); if(!body) return;
   const list=filteredDashProds();
@@ -762,20 +786,8 @@ function renderDashRows(){
   body.querySelectorAll("[data-ficha]").forEach(tr=> tr.onclick=()=> openFicha(tr.dataset.ficha));
 }
 function wireDashFiltros(){
-  const q=document.getElementById("fq"); if(!q) return;   // no estamos en el panel
-  const upd=(k,el)=>{ dashFiltros[k]=el.value; renderDashRows(); };
-  q.oninput=()=>upd("q",q);
-  document.getElementById("fsaga").onchange=e=>upd("saga",e.target);
-  document.getElementById("festado").onchange=e=>upd("estado",e.target);
-  document.getElementById("fcmin").oninput=e=>upd("cmin",e.target);
-  document.getElementById("fcmax").oninput=e=>upd("cmax",e.target);
-  document.getElementById("fclear").onclick=()=>{
-    dashFiltros={ q:"", saga:"", estado:"", cmin:"", cmax:"" };
-    ["fq","fcmin","fcmax"].forEach(id=>{const el=document.getElementById(id); if(el)el.value="";});
-    ["fsaga","festado"].forEach(id=>{const el=document.getElementById(id); if(el)el.value="";});
-    renderDashRows();
-  };
-  renderDashRows();
+  wireFilterBar("f", dashFiltros, renderDashRows);
+  if(document.getElementById("dashBody")) renderDashRows();
 }
 
 /* ============================================================
@@ -819,16 +831,18 @@ function viewAnalisis(){
     .map(p=>({label:p.nombre, sku:p.sku, value:(p.stock||0)}))
     .sort((a,b)=>b.value-a.value).slice(0,8);
 
-  // entradas vs salidas (monto = cantidad × valor unit.)
-  let entMonto=0, salMonto=0, entU=0, salU=0;
+  // Flujo por origen: compras / ventas / ajustes (monto = cantidad × valor unit.)
+  let compMonto=0, ventMonto=0, ajMonto=0, compU=0, ventU=0, ajU=0;
   db.movimientos.forEach(m=>{
     const monto=(m.cantidad||0)*(m.valorUnit||0);
-    if(m.tipo==="entrada"){ entMonto+=monto; entU+=(m.cantidad||0); }
-    else { salMonto+=monto; salU+=(m.cantidad||0); }
+    if(m.tipo==="ajuste"){ ajMonto+=monto; ajU+=(m.cantidad||0); }
+    else if(m.refTipo==="compra"){ compMonto+=monto; compU+=(m.cantidad||0); }
+    else if(m.refTipo==="venta"){ ventMonto+=monto; ventU+=(m.cantidad||0); }
   });
   const flujo = [
-    {label:"Entradas", value:entMonto, color:"var(--up)"},
-    {label:"Salidas",  value:salMonto, color:"var(--down)"}
+    {label:"Compras", value:compMonto, color:"var(--up)"},
+    {label:"Ventas",  value:ventMonto, color:"var(--down)"},
+    {label:"Ajustes", value:ajMonto,   color:"#d99a2b"}
   ];
 
   const kpis = `
@@ -852,10 +866,10 @@ function viewAnalisis(){
       ${prods.length ? hbars(topUn, qty, "var(--muted)") : `<div class="cempty">Cargá productos para ver el análisis.</div>`}
     </div>
     <div class="panel chart">
-      <p class="ctitle">Flujo: entradas vs salidas</p>
-      <p class="csub">Monto acumulado de compras y ventas (cantidad × valor unitario).</p>
+      <p class="ctitle">Flujo: compras · ventas · ajustes</p>
+      <p class="csub">Monto acumulado por origen (cantidad × valor unitario).</p>
       ${db.movimientos.length ? hbars(flujo, money, "var(--up)") : `<div class="cempty">Todavía no hay movimientos.</div>`}
-      <div class="clegend"><span><b style="background:var(--up)"></b>Entradas ${qty(entU)} u.</span><span><b style="background:var(--down)"></b>Salidas ${qty(salU)} u.</span></div>
+      <div class="clegend"><span><b style="background:var(--up)"></b>Compras ${qty(compU)} u.</span><span><b style="background:var(--down)"></b>Ventas ${qty(ventU)} u.</span><span><b style="background:#d99a2b"></b>Ajustes ${qty(ajU)} u.</span></div>
     </div>
     <div class="panel chart">
       <p class="ctitle">Concentración de inventario</p>
@@ -874,10 +888,39 @@ function viewAnalisis(){
    VISTA: Productos
    ============================================================ */
 function viewProd(){
-  const rows = db.productos.map(p=>{
+  const colspan = selMode ? 9 : 8;
+  return `
+  <div class="head">
+    <div class="title"><h2>Productos</h2><p>Maestro de artículos. El costo se actualiza con cada compra (último costo).</p></div>
+    <div class="actions">
+      ${db.productos.length?`<button class="btn ${selMode?'':'ghost'}" id="btnSel">${selMode?"✕ Cancelar":"☑ Seleccionar"}</button>`:""}
+      <button class="btn primary" data-newp>+ Nuevo producto</button>
+    </div>
+  </div>
+  <div class="panel">
+    <div class="phead"><h3>Maestro</h3><span class="hint" id="prodCount">${db.productos.length} artículos</span></div>
+    <div class="selbar" id="selbar" hidden>
+      <span id="selcount">0 seleccionados</span>
+      <div style="flex:1"></div>
+      <button class="btn ghost sm" id="selnone">Deseleccionar</button>
+      <button class="btn danger sm" id="seldel">🗑 Borrar seleccionados</button>
+    </div>
+    ${db.productos.length ? `
+    ${filterBarHTML("p", prodFiltros)}
+    <div class="table-scroll"><table>
+      <thead><tr>${selMode?`<th class="c"><input type="checkbox" id="selall"></th>`:""}<th>SKU</th><th>Nombre</th><th class="c">Unid.</th><th class="r">Stock</th><th class="r">Últ. costo</th><th class="r">P. venta</th><th class="r">Punto rep.</th><th></th></tr></thead>
+      <tbody id="prodBody"></tbody></table></div>`
+      : emptyState("El maestro está vacío","Creá tu primer producto, o dejá que se generen solos al importar una compra con SKUs nuevos.")}
+  </div>`;
+}
+function renderProdRows(){
+  const body=document.getElementById("prodBody"); if(!body) return;
+  const list=filtrarProds(prodFiltros);
+  body.innerHTML = list.map(p=>{
     let cls="stock-cell"; if(p.stock<0) cls+=" neg"; else if(bajoStock(p)) cls+=" low";
+    const chk = selMode ? `<td class="c" data-nofic><input type="checkbox" class="selchk" data-selp="${p.id}" ${selProd.has(p.id)?"checked":""}></td>` : "";
     return `<tr data-ficha="${p.id}" style="cursor:pointer">
-      <td class="c" data-nofic><input type="checkbox" class="selchk" data-selp="${p.id}" ${selProd.has(p.id)?"checked":""}></td>
+      ${chk}
       <td><span class="sku">${esc(p.sku||"—")}</span></td>
       <td>${esc(p.nombre)}</td>
       <td class="c">${esc(p.unidad||"u")}</td>
@@ -887,52 +930,42 @@ function viewProd(){
       <td class="r num">${p.puntoRepedido>0?qty(p.puntoRepedido):"—"}</td>
       <td class="r"><button class="btn ghost sm" data-editp="${p.id}">Editar</button></td>
     </tr>`;
-  }).join("");
-  return `
-  <div class="head">
-    <div class="title"><h2>Productos</h2><p>Maestro de artículos. El costo se actualiza con cada compra (último costo).</p></div>
-    <div class="actions"><button class="btn primary" data-newp>+ Nuevo producto</button></div>
-  </div>
-  <div class="panel">
-    <div class="phead"><h3>Maestro</h3><span class="hint">${db.productos.length} artículos</span></div>
-    <div class="selbar" id="selbar" hidden>
-      <span id="selcount">0 seleccionados</span>
-      <div style="flex:1"></div>
-      <button class="btn ghost sm" id="selnone">Deseleccionar</button>
-      <button class="btn danger sm" id="seldel">🗑 Borrar seleccionados</button>
-    </div>
-    ${db.productos.length ? `<div class="table-scroll"><table>
-      <thead><tr><th class="c"><input type="checkbox" id="selall"></th><th>SKU</th><th>Nombre</th><th class="c">Unid.</th><th class="r">Stock</th><th class="r">Últ. costo</th><th class="r">P. venta</th><th class="r">Punto rep.</th><th></th></tr></thead>
-      <tbody>${rows}</tbody></table></div>`
-      : emptyState("El maestro está vacío","Creá tu primer producto, o dejá que se generen solos al importar una compra con SKUs nuevos.")}
-  </div>`;
-}
-/* Selección múltiple de productos en el maestro */
-function wireSelProd(){
-  const anyChk=document.querySelector(".selchk"); if(!anyChk) return;   // no estamos en Productos
-  // limpiar ids que ya no existen
-  [...selProd].forEach(id=>{ if(!prodById(id)) selProd.delete(id); });
-  const bar=document.getElementById("selbar"), count=document.getElementById("selcount"), all=document.getElementById("selall");
-  const refresh=()=>{
-    const n=selProd.size;
-    if(bar){ bar.hidden = n===0; }
-    if(count) count.textContent = n===1?"1 seleccionado":`${n} seleccionados`;
-    if(all) all.checked = n>0 && n===db.productos.length;
-  };
-  document.querySelectorAll(".selchk").forEach(cb=>{
+  }).join("") || `<tr><td colspan="${selMode?9:8}" style="text-align:center;color:var(--muted);padding:22px">Ningún producto coincide con los filtros.</td></tr>`;
+  const cnt=document.getElementById("prodCount");
+  if(cnt) cnt.textContent = list.length===db.productos.length ? `${db.productos.length} artículos` : `mostrando ${list.length} de ${db.productos.length}`;
+  // re-enganchar acciones de fila
+  body.querySelectorAll("[data-ficha]").forEach(tr=> tr.onclick=()=> openFicha(tr.dataset.ficha));
+  body.querySelectorAll("[data-editp]").forEach(b=> b.onclick=(e)=>{ e.stopPropagation(); openProd(b.dataset.editp); });
+  body.querySelectorAll("[data-nofic]").forEach(td=> td.onclick=e=>e.stopPropagation());
+  body.querySelectorAll(".selchk").forEach(cb=>{
     cb.onclick=e=>e.stopPropagation();
-    cb.onchange=()=>{ cb.checked?selProd.add(cb.dataset.selp):selProd.delete(cb.dataset.selp); refresh(); };
+    cb.onchange=()=>{ cb.checked?selProd.add(cb.dataset.selp):selProd.delete(cb.dataset.selp); refreshSelbar(); };
   });
+  refreshSelbar();
+}
+function refreshSelbar(){
+  const bar=document.getElementById("selbar"), count=document.getElementById("selcount"), all=document.getElementById("selall");
+  const n=selProd.size;
+  if(bar) bar.hidden = !selMode || n===0;
+  if(count) count.textContent = n===1?"1 seleccionado":`${n} seleccionados`;
+  if(all){ const vis=filtrarProds(prodFiltros); all.checked = vis.length>0 && vis.every(p=>selProd.has(p.id)); }
+}
+/* Selección múltiple + filtros del maestro */
+function wireProd(){
+  const btn=document.getElementById("btnSel");
+  if(btn) btn.onclick=()=>{ selMode=!selMode; if(!selMode) selProd.clear(); render(); };
+  if(!document.getElementById("prodBody")) return;   // no estamos en Productos
+  [...selProd].forEach(id=>{ if(!prodById(id)) selProd.delete(id); });
+  wireFilterBar("p", prodFiltros, renderProdRows);
+  const all=document.getElementById("selall");
   if(all) all.onchange=()=>{
-    if(all.checked) db.productos.forEach(p=>selProd.add(p.id)); else selProd.clear();
-    document.querySelectorAll(".selchk").forEach(cb=> cb.checked=selProd.has(cb.dataset.selp));
-    refresh();
+    const vis=filtrarProds(prodFiltros);
+    if(all.checked) vis.forEach(p=>selProd.add(p.id)); else vis.forEach(p=>selProd.delete(p.id));
+    renderProdRows();
   };
-  const none=document.getElementById("selnone"); if(none) none.onclick=()=>{ selProd.clear(); document.querySelectorAll(".selchk").forEach(cb=>cb.checked=false); refresh(); };
+  const none=document.getElementById("selnone"); if(none) none.onclick=()=>{ selProd.clear(); renderProdRows(); };
   const del=document.getElementById("seldel"); if(del) del.onclick=deleteSelProd;
-  // evitar que el checkbox abra la ficha
-  document.querySelectorAll("[data-nofic]").forEach(td=> td.onclick=e=>e.stopPropagation());
-  refresh();
+  renderProdRows();
 }
 function deleteSelProd(){
   const ids=[...selProd]; if(!ids.length) return;
@@ -945,7 +978,7 @@ function deleteSelProd(){
   msg+="\n\nEsta acción no se puede deshacer.";
   if(!confirm(msg)) return;
   db.productos = db.productos.filter(p=>!selProd.has(p.id));
-  selProd.clear();
+  selProd.clear(); selMode=false;
   save(); toast(`${prods.length} producto(s) borrado(s)`, "warn"); render();
 }
 
@@ -955,18 +988,7 @@ function deleteSelProd(){
 function viewDocs(tipo){
   const list = tipo==="compra" ? db.compras : db.ventas;
   const isC = tipo==="compra";
-  const rows = [...list].reverse().map(d=>{
-    const items = d.lineas.reduce((a,l)=>a+l.cantidad,0);
-    return `<tr>
-      <td class="num">${esc(d.numero||"—")}</td>
-      <td>${esc(d.fecha)}</td>
-      <td>${esc(d.contraparte||"—")}</td>
-      <td class="c num">${qty(items)}</td>
-      <td class="r num">${money(d.total)}</td>
-      <td class="r" style="white-space:nowrap"><button class="btn ghost sm" data-vdoc="${tipo}:${d.id}">Ver</button><button class="btn ghost sm" data-editdoc="${tipo}:${d.id}">Editar</button><button class="btn ghost sm" data-deldoc="${tipo}:${d.id}" style="color:var(--alert)">Borrar</button></td>
-    </tr>`;
-  }).join("");
-
+  const f = docFiltros[tipo];
   return `
   <div class="head">
     <div class="title">
@@ -980,30 +1002,148 @@ function viewDocs(tipo){
     </div>
   </div>
   <div class="panel">
-    <div class="phead"><h3>${isC?"Facturas de compra":"Facturas de venta"}</h3><span class="hint">${list.length} documentos</span></div>
-    ${list.length ? `<div class="table-scroll"><table>
+    <div class="phead"><h3>${isC?"Facturas de compra":"Facturas de venta"}</h3><span class="hint" id="docCount">${list.length} documentos</span></div>
+    ${list.length ? `
+    <div class="filtros">
+      <input class="inp" id="dq" placeholder="${isC?'Buscar por proveedor o N°…':'Buscar por cliente o N°…'}" value="${esc(f.q)}" style="flex:2;min-width:180px">
+      <label style="font-size:12px;color:var(--muted)">Desde <input class="inp" id="ddesde" type="date" value="${esc(f.desde)}" style="width:150px"></label>
+      <label style="font-size:12px;color:var(--muted)">Hasta <input class="inp" id="dhasta" type="date" value="${esc(f.hasta)}" style="width:150px"></label>
+      <select class="inp" id="dorden" style="min-width:150px">
+        <option value="fecha_desc" ${f.orden==="fecha_desc"?"selected":""}>Fecha ↓ (reciente)</option>
+        <option value="fecha_asc" ${f.orden==="fecha_asc"?"selected":""}>Fecha ↑ (antigua)</option>
+        <option value="total_desc" ${f.orden==="total_desc"?"selected":""}>Total ↓ (mayor)</option>
+        <option value="total_asc" ${f.orden==="total_asc"?"selected":""}>Total ↑ (menor)</option>
+      </select>
+      <button class="btn ghost sm" id="dclear">Limpiar</button>
+    </div>
+    <div class="table-scroll"><table>
       <thead><tr><th>N°</th><th>Fecha</th><th>${isC?"Proveedor":"Cliente"}</th><th class="c">Ítems</th><th class="r">Total</th><th></th></tr></thead>
-      <tbody>${rows}</tbody></table></div>`
+      <tbody id="docBody"></tbody></table></div>`
       : emptyState(isC?"Sin compras cargadas":"Sin ventas cargadas",
           isC?"Importá un PDF de factura o cargala a mano. Cada línea suma stock y actualiza el costo."
              :"Armá una factura de venta: elegís productos, cantidades y precio, y el stock baja al confirmar.")}
   </div>`;
+}
+function filtrarDocs(tipo){
+  const list = tipo==="compra" ? db.compras : db.ventas;
+  const f = docFiltros[tipo];
+  const q=(f.q||"").trim().toLowerCase();
+  let out = list.filter(d=>{
+    if(q){ const hay=((d.contraparte||"")+" "+(d.numero||"")).toLowerCase(); if(!hay.includes(q)) return false; }
+    if(f.desde && (d.fecha||"") < f.desde) return false;
+    if(f.hasta && (d.fecha||"") > f.hasta) return false;
+    return true;
+  });
+  const dir = f.orden.endsWith("asc") ? 1 : -1;
+  if(f.orden.startsWith("total")) out.sort((a,b)=> dir*((a.total||0)-(b.total||0)));
+  else out.sort((a,b)=> dir*(String(a.fecha||"").localeCompare(String(b.fecha||""))) || dir*0);
+  return out;
+}
+function renderDocRows(tipo){
+  const body=document.getElementById("docBody"); if(!body) return;
+  const list=filtrarDocs(tipo), total=(tipo==="compra"?db.compras:db.ventas).length;
+  body.innerHTML = list.map(d=>{
+    const items=d.lineas.reduce((a,l)=>a+l.cantidad,0);
+    return `<tr>
+      <td class="num">${esc(d.numero||"—")}</td>
+      <td>${esc(d.fecha)}</td>
+      <td>${esc(d.contraparte||"—")}</td>
+      <td class="c num">${qty(items)}</td>
+      <td class="r num">${money(d.total)}</td>
+      <td class="r" style="white-space:nowrap"><button class="btn ghost sm" data-vdoc="${tipo}:${d.id}">Ver</button><button class="btn ghost sm" data-editdoc="${tipo}:${d.id}">Editar</button><button class="btn ghost sm" data-deldoc="${tipo}:${d.id}" style="color:var(--alert)">Borrar</button></td>
+    </tr>`;
+  }).join("") || `<tr><td colspan="6" style="text-align:center;color:var(--muted);padding:22px">Ningún documento coincide con los filtros.</td></tr>`;
+  const cnt=document.getElementById("docCount");
+  if(cnt) cnt.textContent = list.length===total ? `${total} documentos` : `mostrando ${list.length} de ${total}`;
+  body.querySelectorAll("[data-vdoc]").forEach(b=> b.onclick=()=>{ const[t,id]=b.dataset.vdoc.split(":"); verDoc(t,id); });
+  body.querySelectorAll("[data-editdoc]").forEach(b=> b.onclick=()=>{ const[t,id]=b.dataset.editdoc.split(":"); editDoc(t,id); });
+  body.querySelectorAll("[data-deldoc]").forEach(b=> b.onclick=()=>{ const[t,id]=b.dataset.deldoc.split(":"); deleteDoc(t,id); });
+}
+function wireDocFiltros(){
+  if(!document.getElementById("docBody")) return;
+  const tipo = view==="compras" ? "compra" : "venta";
+  const f=docFiltros[tipo];
+  const upd=(k,el)=>{ f[k]=el.value; renderDocRows(tipo); };
+  document.getElementById("dq").oninput=e=>upd("q",e.target);
+  document.getElementById("ddesde").onchange=e=>upd("desde",e.target);
+  document.getElementById("dhasta").onchange=e=>upd("hasta",e.target);
+  document.getElementById("dorden").onchange=e=>upd("orden",e.target);
+  document.getElementById("dclear").onclick=()=>{
+    docFiltros[tipo]={q:"",desde:"",hasta:"",orden:"fecha_desc"};
+    ["dq","ddesde","dhasta"].forEach(id=>{const el=document.getElementById(id); if(el)el.value="";});
+    document.getElementById("dorden").value="fecha_desc";
+    renderDocRows(tipo);
+  };
+  renderDocRows(tipo);
 }
 
 /* ============================================================
    VISTA: Movimientos
    ============================================================ */
 function viewMov(){
-  const rows = [...db.movimientos].reverse().slice(0,400).map(m=>{
-    const isAdj = m.tipo==="ajuste";
-    const signed = (m.delta!=null) ? m.delta : (m.tipo==="entrada"? m.cantidad : -m.cantidad);
-    const up = signed>=0;
-    const d = new Date(m.fecha);
-    const fecha = d.toLocaleDateString("es-AR") + " " + d.toLocaleTimeString("es-AR",{hour:"2-digit",minute:"2-digit",hour12:false});
-    const pill = isAdj ? `<span class="pill adj">⇄ ajuste</span>`
-                       : `<span class="pill ${up?'in':'out'}">${up?'↑ entrada':'↓ salida'}</span>`;
-    const deltaCls = isAdj ? "flat" : (up?'up':'down');
-    const accion = isAdj ? `<button class="btn ghost sm" data-delaj="${m.id}" style="color:var(--alert)" title="Borrar ajuste">🗑</button>` : "";
+  const sagas = sagasUnicas();
+  return `
+  <div class="head">
+    <div class="title"><h2>Movimientos</h2><p>Trazabilidad de cada entrada, salida y ajuste, con su documento de origen.</p></div>
+    <div class="actions"><button class="btn" data-adjust>⇄ Ajuste de inventario</button></div>
+  </div>
+  <div class="panel">
+    <div class="phead"><h3>Kardex</h3><span class="hint" id="movCount">${db.movimientos.length} asientos</span></div>
+    ${db.movimientos.length ? `
+    <div class="filtros">
+      <input class="inp" id="mq" placeholder="Buscar producto, SKU u origen…" value="${esc(movFiltros.q)}" style="flex:2;min-width:170px">
+      <select class="inp" id="mtipo" style="min-width:120px">
+        <option value="" ${movFiltros.tipo===""?"selected":""}>Todo tipo</option>
+        <option value="entrada" ${movFiltros.tipo==="entrada"?"selected":""}>Entradas</option>
+        <option value="salida" ${movFiltros.tipo==="salida"?"selected":""}>Salidas</option>
+        <option value="ajuste" ${movFiltros.tipo==="ajuste"?"selected":""}>Ajustes</option>
+      </select>
+      <select class="inp" id="msaga" style="min-width:130px">
+        <option value="">Todas las sagas</option>
+        ${sagas.map(s=>`<option value="${esc(s)}" ${movFiltros.saga===s?"selected":""}>${esc(s)}</option>`).join("")}
+      </select>
+      <label style="font-size:12px;color:var(--muted)">Desde <input class="inp" id="mdesde" type="date" value="${esc(movFiltros.desde)}" style="width:150px"></label>
+      <label style="font-size:12px;color:var(--muted)">Hasta <input class="inp" id="mhasta" type="date" value="${esc(movFiltros.hasta)}" style="width:150px"></label>
+      <input class="inp num" id="mvmin" placeholder="Valor mín." value="${esc(movFiltros.vmin)}" style="width:100px">
+      <input class="inp num" id="mvmax" placeholder="Valor máx." value="${esc(movFiltros.vmax)}" style="width:100px">
+      <button class="btn ghost sm" id="mclear">Limpiar</button>
+    </div>
+    <div class="table-scroll"><table>
+      <thead><tr><th>Fecha</th><th>Tipo</th><th>Producto</th><th class="r">Cant.</th><th class="r">Valor unit.</th><th>Origen</th><th></th></tr></thead>
+      <tbody id="movBody"></tbody></table></div>`
+      : emptyState("Todavía no hay movimientos","Cada compra, venta o ajuste deja su rastro acá.")}
+  </div>`;
+}
+function filtrarMovs(){
+  const f=movFiltros;
+  const q=(f.q||"").trim().toLowerCase();
+  const vmin=f.vmin!==""?parseNum(f.vmin):null, vmax=f.vmax!==""?parseNum(f.vmax):null;
+  return db.movimientos.filter(m=>{
+    if(f.tipo && m.tipo!==f.tipo) return false;
+    if(q){ const hay=((m.nombre||"")+" "+(m.sku||"")+" "+(m.ref||"")).toLowerCase(); if(!hay.includes(q)) return false; }
+    if(f.saga && sagaDe({nombre:m.nombre})!==f.saga) return false;
+    const fch=(m.fecha||"").slice(0,10);
+    if(f.desde && fch < f.desde) return false;
+    if(f.hasta && fch > f.hasta) return false;
+    const v=m.valorUnit||0;
+    if(vmin!==null && v<vmin) return false;
+    if(vmax!==null && v>vmax) return false;
+    return true;
+  });
+}
+function renderMovRows(){
+  const body=document.getElementById("movBody"); if(!body) return;
+  const all=filtrarMovs();
+  const list=[...all].reverse().slice(0,400);
+  body.innerHTML = list.map(m=>{
+    const isAdj=m.tipo==="ajuste";
+    const signed=(m.delta!=null)?m.delta:(m.tipo==="entrada"?m.cantidad:-m.cantidad);
+    const up=signed>=0;
+    const d=new Date(m.fecha);
+    const fecha=d.toLocaleDateString("es-AR")+" "+d.toLocaleTimeString("es-AR",{hour:"2-digit",minute:"2-digit",hour12:false});
+    const pill=isAdj?`<span class="pill adj">⇄ ajuste</span>`:`<span class="pill ${up?'in':'out'}">${up?'↑ entrada':'↓ salida'}</span>`;
+    const deltaCls=isAdj?"flat":(up?'up':'down');
+    const accion=isAdj?`<button class="btn ghost sm" data-delaj="${m.id}" style="color:var(--alert)" title="Borrar ajuste">🗑</button>`:"";
     return `<tr>
       <td class="num">${fecha}</td>
       <td>${pill}</td>
@@ -1013,19 +1153,28 @@ function viewMov(){
       <td class="num">${esc(m.ref||"—")}</td>
       <td class="r">${accion}</td>
     </tr>`;
-  }).join("");
-  return `
-  <div class="head">
-    <div class="title"><h2>Movimientos</h2><p>Trazabilidad de cada entrada, salida y ajuste, con su documento de origen.</p></div>
-    <div class="actions"><button class="btn" data-adjust>⇄ Ajuste de inventario</button></div>
-  </div>
-  <div class="panel">
-    <div class="phead"><h3>Kardex</h3><span class="hint">${db.movimientos.length} asientos${db.movimientos.length>400?" · mostrando 400":""}</span></div>
-    ${db.movimientos.length ? `<div class="table-scroll"><table>
-      <thead><tr><th>Fecha</th><th>Tipo</th><th>Producto</th><th class="r">Cant.</th><th class="r">Valor unit.</th><th>Origen</th><th></th></tr></thead>
-      <tbody>${rows}</tbody></table></div>`
-      : emptyState("Todavía no hay movimientos","Cada compra, venta o ajuste deja su rastro acá.")}
-  </div>`;
+  }).join("") || `<tr><td colspan="7" style="text-align:center;color:var(--muted);padding:22px">Ningún movimiento coincide con los filtros.</td></tr>`;
+  const cnt=document.getElementById("movCount");
+  if(cnt) cnt.textContent = (all.length===db.movimientos.length?`${db.movimientos.length} asientos`:`${all.length} de ${db.movimientos.length}`)+(list.length<all.length?` · mostrando 400`:"");
+  body.querySelectorAll("[data-delaj]").forEach(b=> b.onclick=()=> deleteAjuste(b.dataset.delaj));
+}
+function wireMovFiltros(){
+  if(!document.getElementById("movBody")) return;
+  const upd=(k,el)=>{ movFiltros[k]=el.value; renderMovRows(); };
+  document.getElementById("mq").oninput=e=>upd("q",e.target);
+  document.getElementById("mtipo").onchange=e=>upd("tipo",e.target);
+  document.getElementById("msaga").onchange=e=>upd("saga",e.target);
+  document.getElementById("mdesde").onchange=e=>upd("desde",e.target);
+  document.getElementById("mhasta").onchange=e=>upd("hasta",e.target);
+  document.getElementById("mvmin").oninput=e=>upd("vmin",e.target);
+  document.getElementById("mvmax").oninput=e=>upd("vmax",e.target);
+  document.getElementById("mclear").onclick=()=>{
+    movFiltros={ q:"", desde:"", hasta:"", tipo:"", saga:"", vmin:"", vmax:"" };
+    ["mq","mdesde","mhasta","mvmin","mvmax"].forEach(id=>{const el=document.getElementById(id); if(el)el.value="";});
+    ["mtipo","msaga"].forEach(id=>{const el=document.getElementById(id); if(el)el.value="";});
+    renderMovRows();
+  };
+  renderMovRows();
 }
 /* Borrar un ajuste manual: revierte su efecto en el stock y saca el asiento */
 function deleteAjuste(id){
@@ -1111,7 +1260,9 @@ function wire(){
   m.querySelectorAll("[data-newp]").forEach(b=> b.onclick=()=> openProd());
   m.querySelectorAll("[data-ficha]").forEach(tr=> tr.onclick=()=> openFicha(tr.dataset.ficha));
   wireDashFiltros();
-  wireSelProd();
+  wireProd();
+  wireDocFiltros();
+  wireMovFiltros();
   m.querySelectorAll("[data-editp]").forEach(b=> b.onclick=(e)=>{ e.stopPropagation(); openProd(b.dataset.editp); });
   m.querySelectorAll("[data-import]").forEach(b=> b.onclick=()=> openImport());
   const adj=m.querySelector("[data-adjust]"); if(adj) adj.onclick=()=> openAjuste();
@@ -1502,6 +1653,7 @@ function confirmDoc(){
       r.prod.ultimoCosto = r.precio;      // <-- último costo
     } else {
       moverStock(r.prod, -r.cantidad, r.precio, "venta", doc.id, refTxt);
+      r.prod.precioVenta = r.precio;      // <-- último precio de venta
     }
   });
 
