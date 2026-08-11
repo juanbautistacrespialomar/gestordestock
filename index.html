@@ -1396,14 +1396,24 @@ let pdfLines = [];   // líneas de texto reconstruidas
 function openImport(){
   buildModal("Importar factura (PDF)", `
     <div class="banner">
-      Se extrae el texto del PDF y se arma una tabla editable. Revisá cantidades, costos y a qué producto va cada renglón <b>antes de confirmar</b> — los formatos de factura varían y la detección es orientativa.
+      Se arma una tabla editable con los renglones. Revisá cantidades, costos y a qué producto va cada uno <b>antes de confirmar</b> — la detección es orientativa.
     </div>
     <div class="drop" id="drop">
       <div class="di">⤒</div>
       <p><span class="fn">Elegí un PDF</span> o arrastralo acá</p>
-      <p style="font-size:12px">se procesa en tu navegador, no se sube a ningún lado</p>
+      <p style="font-size:12px">detección local · se procesa en tu navegador, no se sube a ningún lado</p>
       <input type="file" id="pdfInput" accept="application/pdf" hidden>
     </div>
+    <div style="display:flex;align-items:center;gap:10px;margin:12px 0">
+      <div style="flex:1;height:1px;background:var(--line)"></div>
+      <span style="font-size:11.5px;color:var(--muted)">o</span>
+      <div style="flex:1;height:1px;background:var(--line)"></div>
+    </div>
+    <button class="btn" id="iaBtn" style="width:100%;justify-content:center">✨ Leer con IA (Gemini)</button>
+    <p style="font-size:11.5px;color:var(--muted);margin:8px 2px 0">
+      Para facturas de cualquier formato. El PDF se envía a tu servidor (Worker) y de ahí a Gemini; después revisás y confirmás igual que siempre.
+    </p>
+    <input type="file" id="iaInput" accept="application/pdf" hidden>
     <div id="importOut"></div>
   `,[{label:"Cancelar",cls:"btn",act:closeModal}], true);
 
@@ -1413,6 +1423,72 @@ function openImport(){
   ["dragover","dragenter"].forEach(ev=>drop.addEventListener(ev,e=>{e.preventDefault();drop.classList.add("over");}));
   ["dragleave","drop"].forEach(ev=>drop.addEventListener(ev,e=>{e.preventDefault();drop.classList.remove("over");}));
   drop.addEventListener("drop",e=>{ const f=e.dataTransfer.files[0]; if(f) handlePdf(f); });
+
+  const iaBtn=document.getElementById("iaBtn"), iaInput=document.getElementById("iaInput");
+  iaBtn.onclick=()=> iaInput.click();
+  iaInput.onchange=()=>{ if(iaInput.files[0]) handlePdfIA(iaInput.files[0]); };
+}
+
+/* Leer factura con Gemini (vía el Worker). Reusa el mismo editor de revisión que la detección local. */
+function fileToBase64(file){
+  return new Promise((res,rej)=>{
+    const r=new FileReader();
+    r.onload=()=>res(String(r.result).split(",")[1]||"");
+    r.onerror=()=>rej(new Error("no se pudo leer el archivo"));
+    r.readAsDataURL(file);
+  });
+}
+async function handlePdfIA(file){
+  const out=document.getElementById("importOut");
+  if(!session){ out.innerHTML=`<div class="banner warn">Necesitás estar logueado para usar la lectura con IA.</div>`; return; }
+  out.innerHTML=`<p style="color:var(--muted);padding:14px 0">✨ Leyendo <b>${esc(file.name)}</b> con IA… (puede tardar unos segundos)</p>`;
+  try{
+    const b64=await fileToBase64(file);
+    const res=await fetch(apiBase()+"/parse-invoice",{
+      method:"POST", headers:authHeaders(),
+      body:JSON.stringify({ pdf:b64, mime:file.type||"application/pdf" })
+    });
+    const j=await res.json();
+    if(!res.ok || !j.ok){
+      const det = j && (j.detalle||j.error||j.raw) ? esc(j.detalle||j.error||j.raw) : ("HTTP "+res.status);
+      out.innerHTML=`<div class="banner warn">No se pudo leer con IA: ${det}.<br>Probá con la detección local o cargá a mano.</div>`;
+      return;
+    }
+    const d=j.data||{};
+    const lineas=Array.isArray(d.lineas)?d.lineas:[];
+    if(!lineas.length){
+      out.innerHTML=`<div class="banner warn">La IA no encontró renglones de productos en ese PDF. Revisá el archivo o cargá a mano.</div>`;
+      return;
+    }
+    // adaptar a la estructura que consume showImportEditor
+    const parsed={
+      meta:{ numero:d.numero||"", fecha:normFechaIA(d.fecha), proveedor:d.proveedor||"", flete:0, moneda:d.moneda||"" },
+      items:lineas.map(l=>({
+        sku:(l.sku||"").toString().trim(),
+        desc:(l.nombre||"").toString().trim(),
+        cantidad:parseNum(l.cantidad),
+        costo:parseNum(l.precio),
+        msrp:0,
+        ext:parseNum(l.cantidad)*parseNum(l.precio),
+        raw:"leído con IA"+(j.model?(" · "+j.model):"")
+      })).filter(it=>it.desc),
+      mode:"ia"
+    };
+    pdfLines=["(documento leído con IA — sin volcado de texto crudo)"];
+    showImportEditor(file.name, parsed);
+  }catch(e){
+    console.error(e);
+    out.innerHTML=`<div class="banner warn">Falló la lectura con IA (${esc(e.message||"error")}). Probá con la detección local o cargá a mano.</div>`;
+  }
+}
+/* Normaliza fecha devuelta por la IA a YYYY-MM-DD si viene en otro formato reconocible */
+function normFechaIA(f){
+  if(!f) return "";
+  f=String(f).trim();
+  if(/^\d{4}-\d{2}-\d{2}$/.test(f)) return f;
+  const m=f.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{2,4})$/);
+  if(m){ let[,d,mo,y]=m; if(y.length===2)y="20"+y; return `${y}-${mo.padStart(2,"0")}-${d.padStart(2,"0")}`; }
+  return f;
 }
 
 async function handlePdf(file){
@@ -1578,7 +1654,7 @@ function showImportEditor(fname, parsed){
 
   out.innerHTML=`
     <div class="banner ok">
-      Detecté <b>${items.length}</b> renglón(es) en <b>${esc(fname)}</b> ${mode==="estructurado"?"(formato reconocido)":"(detección genérica — revisá bien)"}.
+      Detecté <b>${items.length}</b> renglón(es) en <b>${esc(fname)}</b> ${mode==="estructurado"?"(formato reconocido)":mode==="ia"?"(leído con IA — revisá igual)":"(detección genérica — revisá bien)"}.
       ${metaBits?`<br><span style="font-weight:400">${metaBits}</span>`:""}
     </div>
     ${meta.flete? `<div class="banner">Detecté un cargo de <b>flete/handling</b> por ${money(meta.flete)} que <b>no</b> se agrega como stock. Si querés prorratearlo al costo, avisame y lo sumamos.</div>`:""}
