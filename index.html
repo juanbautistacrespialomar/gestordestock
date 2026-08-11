@@ -148,14 +148,37 @@
   .brand-m-logo{border-radius:6px;align-self:center;margin-right:6px}
   .nav{display:flex;flex-direction:column;gap:2px}
   .nav button{
-    display:flex;align-items:center;gap:11px;width:100%;text-align:left;
-    background:none;border:0;color:var(--nav-ink);padding:10px 12px;border-radius:6px;
-    font-size:14px;font-weight:500;transition:background .12s,color .12s;
+    position:relative;display:flex;align-items:center;gap:11px;width:100%;text-align:left;
+    background:none;border:0;color:var(--nav-ink);padding:10px 12px;border-radius:8px;
+    font-size:14px;font-weight:500;
+    transition:background .18s ease,color .18s ease,transform .16s cubic-bezier(.34,1.56,.64,1);
+    animation:navIn .34s ease both;
   }
-  .nav button .ico{width:18px;text-align:center;font-family:var(--mono);font-size:14px;opacity:.7}
+  /* barrita de acento a la izquierda: crece al pasar el mouse sobre un ítem inactivo */
+  .nav button::before{
+    content:"";position:absolute;left:2px;top:50%;height:0;width:3px;border-radius:3px;
+    background:var(--accent);transform:translateY(-50%);transition:height .2s cubic-bezier(.34,1.56,.64,1);
+  }
+  .nav button .ico{width:18px;text-align:center;font-family:var(--mono);font-size:14px;opacity:.7;transition:transform .18s ease,opacity .18s ease}
   .nav button:hover{background:var(--side-hover);color:var(--text)}
-  .nav button.on{background:var(--accent);color:#fff}
-  .nav button.on .ico{opacity:1}
+  .nav button:hover .ico{transform:scale(1.14)}
+  .nav button:not(.on):hover{transform:translateX(3px)}
+  .nav button:not(.on):hover::before{height:16px}
+  .nav button.on{background:var(--accent);color:#fff;box-shadow:0 4px 12px rgba(29,78,216,.24)}
+  .nav button.on .ico{opacity:1;animation:navPop .32s cubic-bezier(.34,1.56,.64,1)}
+  /* stagger de entrada: cada botón entra un toque después que el anterior */
+  .nav button:nth-child(1){animation-delay:.02s}
+  .nav button:nth-child(2){animation-delay:.06s}
+  .nav button:nth-child(3){animation-delay:.10s}
+  .nav button:nth-child(4){animation-delay:.14s}
+  .nav button:nth-child(5){animation-delay:.18s}
+  .nav button:nth-child(6){animation-delay:.22s}
+  .nav button:nth-child(7){animation-delay:.26s}
+  @keyframes navIn{from{opacity:0;transform:translateX(-8px)}to{opacity:1;transform:translateX(0)}}
+  @keyframes navPop{0%{transform:scale(.82)}55%{transform:scale(1.18)}100%{transform:scale(1.05)}}
+  /* fundido de entrada del contenido al cambiar de pestaña */
+  #main.view-anim{animation:viewIn .26s ease}
+  @keyframes viewIn{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
   .side .foot{margin-top:auto;padding:0 8px;font-size:11.5px;color:var(--muted);line-height:1.6}
 
   .main{padding:32px 44px 80px;max-width:1560px;width:100%;margin-inline:auto}
@@ -191,6 +214,15 @@
   .kpi .val{font-family:var(--sans);font-size:30px;font-weight:800;font-variant-numeric:tabular-nums;letter-spacing:-.5px;line-height:1.1}
   .kpi .sub{font-size:12.5px;color:var(--muted);margin-top:5px}
   .kpi.warn .val{color:var(--alert)}
+  /* Tarjeta de alerta clickeable: se levanta un toque al pasar el mouse */
+  .kpi-click{transition:transform .14s ease,box-shadow .14s ease,border-color .14s ease}
+  .kpi-click:hover{transform:translateY(-2px);border-color:var(--alert);box-shadow:0 6px 18px rgba(220,38,38,.16)}
+  .kpi-click:active{transform:translateY(0)}
+  /* Banner de reposición: pulso suave para que "salte" al entrar al panel */
+  .banner.alerta-pedido{cursor:pointer;align-items:center;transition:transform .14s ease,box-shadow .14s ease;animation:alertaPulse 1.8s ease-in-out 2}
+  .banner.alerta-pedido:hover{transform:translateY(-1px);box-shadow:0 6px 18px rgba(220,38,38,.18)}
+  .banner.alerta-pedido u{text-underline-offset:2px}
+  @keyframes alertaPulse{0%,100%{box-shadow:0 0 0 0 rgba(220,38,38,0)}50%{box-shadow:0 0 0 4px rgba(220,38,38,.14)}}
 
   .panel{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow);overflow:hidden}
   .panel + .panel{margin-top:20px}
@@ -317,12 +349,14 @@
   .pill{white-space:nowrap}
   .filtros{display:flex;flex-wrap:wrap;gap:8px;align-items:center;padding:12px 14px;border-bottom:1px solid var(--line)}
   .filtros .inp{padding:7px 9px;font-size:13px}
-  /* filtros compactos (movimientos): TODO en un solo renglón; si no entra, scrollea
-     horizontal en vez de apilarse en varias filas (que quedaba enorme) */
-  .filtros.compact{gap:7px;padding:10px 14px;flex-wrap:nowrap;overflow-x:auto}
+  /* filtros compactos (movimientos): entran en el ancho disponible y ENVUELVEN a una
+     segunda fila si no caben, en vez de obligar a deslizar al costado. El buscador
+     estira; los selects se dimensionan a su contenido (nada de min-widths arbitrarios). */
+  .filtros.compact{gap:8px;padding:10px 14px;flex-wrap:wrap}
   .filtros.compact .inp{padding:6px 8px;font-size:12.5px;height:32px}
-  .filtros.compact > .inp,.filtros.compact > select,.filtros.compact > .fdate,.filtros.compact > button{flex-shrink:0}
-  .filtros.compact > #mq{flex:1 1 150px;min-width:130px}
+  .filtros.compact > .inp,.filtros.compact > select,.filtros.compact > .fdate,.filtros.compact > button{flex:0 0 auto}
+  .filtros.compact > #mq{flex:1 1 200px;min-width:160px}
+  .filtros.compact select{width:auto;min-width:112px;max-width:190px}
   .filtros.compact .fdate{display:inline-flex;align-items:center;gap:5px;font-size:11.5px;color:var(--muted);white-space:nowrap}
   .filtros.compact .fdate .inp{width:120px}
   .selbar{display:flex;align-items:center;gap:8px;padding:10px 14px;border-bottom:1px solid var(--line);background:var(--surface-2);font-size:13px;font-weight:600}
@@ -373,39 +407,75 @@
   #login[hidden]{display:none}
   .login-scrim{
     position:fixed;inset:0;z-index:100;display:flex;align-items:center;justify-content:center;padding:20px;
-    background:var(--login-bg);
+    background:var(--login-bg);overflow:hidden;
   }
+  /* Aurora de fondo: tres manchas de color que respiran muy suave detrás de la tarjeta */
+  .login-aurora{position:absolute;inset:0;overflow:hidden;pointer-events:none}
+  .login-aurora span{position:absolute;display:block;border-radius:50%;filter:blur(64px);opacity:.5}
+  .login-aurora span:nth-child(1){width:420px;height:420px;left:-90px;top:-120px;background:radial-gradient(circle at 30% 30%,var(--accent),transparent 70%);animation:aurora1 17s ease-in-out infinite}
+  .login-aurora span:nth-child(2){width:380px;height:380px;right:-100px;top:18%;background:radial-gradient(circle at 60% 40%,#6ea8fe,transparent 70%);animation:aurora2 21s ease-in-out infinite}
+  .login-aurora span:nth-child(3){width:340px;height:340px;left:28%;bottom:-150px;background:radial-gradient(circle at 50% 50%,#9db8ff,transparent 70%);animation:aurora3 19s ease-in-out infinite}
+  :root[data-theme="dark"] .login-aurora span{opacity:.26}
+  @keyframes aurora1{0%,100%{transform:translate(0,0) scale(1)}50%{transform:translate(40px,30px) scale(1.12)}}
+  @keyframes aurora2{0%,100%{transform:translate(0,0) scale(1)}50%{transform:translate(-30px,40px) scale(1.08)}}
+  @keyframes aurora3{0%,100%{transform:translate(0,0) scale(1)}50%{transform:translate(20px,-30px) scale(1.15)}}
   .login-card{
-    width:100%;max-width:360px;background:var(--surface);
-    border:1px solid var(--line);border-radius:16px;padding:38px 30px 30px;text-align:center;
-    box-shadow:0 1px 2px rgba(17,19,23,.04),0 20px 50px rgba(17,19,23,.08);
+    position:relative;z-index:1;
+    width:100%;max-width:372px;background:var(--surface);
+    border:1px solid var(--line);border-radius:20px;padding:40px 32px 26px;text-align:center;
+    box-shadow:0 1px 2px rgba(17,19,23,.04),0 30px 70px rgba(17,19,23,.14);
+    animation:cardIn .5s cubic-bezier(.22,1,.36,1) both;
   }
-  .login-logo{border-radius:16px;box-shadow:0 8px 24px rgba(17,19,23,.18);margin-bottom:18px}
-  .login-card h1{color:var(--text);font-size:24px;margin:0 0 6px;letter-spacing:-.6px;font-weight:900}
+  :root[data-theme="dark"] .login-card{box-shadow:0 1px 2px rgba(0,0,0,.4),0 30px 70px rgba(0,0,0,.5)}
+  @keyframes cardIn{from{opacity:0;transform:translateY(16px) scale(.97)}to{opacity:1;transform:translateY(0) scale(1)}}
+  .login-logo-wrap{display:inline-flex;margin-bottom:16px;animation:logoFloat 5s ease-in-out infinite}
+  @keyframes logoFloat{0%,100%{transform:translateY(0)}50%{transform:translateY(-6px)}}
+  .login-logo{border-radius:18px;box-shadow:0 10px 30px rgba(29,78,216,.28);display:block}
+  .login-card h1{color:var(--text);font-size:23px;margin:0 0 6px;letter-spacing:-.6px;font-weight:900}
   .login-sub{color:var(--muted);font-size:13.5px;margin:0 0 24px;line-height:1.5}
   .login-card .field{text-align:left;margin-bottom:14px}
-  .login-card .field label{color:var(--muted)}
-  .login-card .inp{background:var(--surface);border-color:var(--line-strong);color:var(--text)}
-  .login-card .inp:focus{border-color:var(--accent)}
-  .login-btn{width:100%;justify-content:center;padding:11px;font-size:15px;margin-top:6px}
+  .login-card .field label{color:var(--muted);font-size:12.5px;font-weight:600}
+  .login-card .inp{background:var(--surface);border-color:var(--line-strong);color:var(--text);padding:11px 12px;border-radius:10px;transition:border-color .15s,box-shadow .15s}
+  .login-card .inp:focus{border-color:var(--accent);outline:none;box-shadow:0 0 0 3px color-mix(in srgb,var(--accent) 18%,transparent)}
+  @supports not (background:color-mix(in srgb,red,blue)){.login-card .inp:focus{box-shadow:0 0 0 3px rgba(29,78,216,.18)}}
+  /* contraseña con "ojito" para mostrar/ocultar */
+  .pass-wrap{position:relative}
+  .pass-wrap .inp{padding-right:42px}
+  .pass-toggle{position:absolute;right:6px;top:50%;transform:translateY(-50%);width:32px;height:32px;display:flex;align-items:center;justify-content:center;background:none;border:0;border-radius:8px;color:var(--muted);transition:color .15s,background .15s}
+  .pass-toggle:hover{color:var(--text);background:var(--side-hover)}
+  .pass-toggle svg{width:18px;height:18px}
+  .pass-toggle .eye-off{display:none}
+  .pass-toggle.show .eye-on{display:none}
+  .pass-toggle.show .eye-off{display:block}
+  .login-btn{width:100%;justify-content:center;padding:12px;font-size:15px;margin-top:6px;border-radius:10px;transition:transform .12s ease,filter .15s ease,background .15s}
+  .login-btn:hover{filter:brightness(1.04)}
+  .login-btn:active{transform:scale(.985)}
   .login-err{color:var(--down);font-size:13px;min-height:18px;margin:2px 0 6px;text-align:left}
-  .login-build{color:#b3b8c2;font-size:11px;margin:16px 0 0;letter-spacing:.4px}
+  .login-build{color:var(--muted);opacity:.6;font-size:11px;margin:16px 0 0;letter-spacing:.4px}
 </style>
 </head>
 </head>
 <body>
 <div id="login" class="login-scrim" hidden>
+  <div class="login-aurora" aria-hidden="true"><span></span><span></span><span></span></div>
   <div class="login-card">
-    <img src="icon-512.png" alt="" class="login-logo" width="88" height="88">
+    <div class="login-logo-wrap"><img src="icon-512.png" alt="" class="login-logo" width="84" height="84"></div>
     <h1>Gestor de Stock</h1>
-    <p class="login-sub">Entrá con tu usuario y vas a ver tu inventario desde cualquier dispositivo.</p>
-    <div class="field"><label>Usuario</label>
-      <input class="inp" id="loginUser" autocomplete="username" autocapitalize="none" spellcheck="false"></div>
-    <div class="field"><label>Contraseña</label>
-      <input class="inp" id="loginPass" type="password" autocomplete="current-password"></div>
+    <p class="login-sub">Tu inventario, sincronizado en todos tus dispositivos.</p>
+    <div class="field"><label for="loginUser">Usuario</label>
+      <input class="inp" id="loginUser" autocomplete="username" autocapitalize="none" spellcheck="false" placeholder="tu usuario"></div>
+    <div class="field"><label for="loginPass">Contraseña</label>
+      <div class="pass-wrap">
+        <input class="inp" id="loginPass" type="password" autocomplete="current-password" placeholder="••••••••">
+        <button type="button" class="pass-toggle" id="loginPassToggle" aria-label="Mostrar contraseña" title="Mostrar contraseña" tabindex="-1">
+          <svg class="eye-on" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7z"/><circle cx="12" cy="12" r="3"/></svg>
+          <svg class="eye-off" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
+        </button>
+      </div>
+    </div>
     <div id="loginErr" class="login-err"></div>
     <button class="btn primary login-btn" id="loginBtn">Entrar</button>
-    <p class="login-build">build v15</p>
+    <p class="login-build">build v16</p>
   </div>
 </div>
 <div class="topbar" id="topbar">
@@ -659,6 +729,10 @@ const nf0 = new Intl.NumberFormat("es-AR",{maximumFractionDigits:2});
 const nf2 = new Intl.NumberFormat("es-AR",{minimumFractionDigits:2,maximumFractionDigits:2});
 const money = n => db.config.moneda + "\u00A0" + nf2.format(n||0);
 const qty = n => nf0.format(n||0);
+/* money() pero con guión cuando el valor es 0 / nulo. Lo usamos en precios de
+   venta opcionales: si no hay precio cargado mostramos "—" en vez de "USD 0,00".
+   El \u00A0 (espacio duro) ya deja el símbolo separado del número: "USD 92,10". */
+const moneyOpt = (n, dash="—") => ((n||0) > 0 ? money(n) : dash);
 
 /* Parseo tolerante de números en formato AR (1.234,56) o US (1,234.56) */
 function parseNum(s){
@@ -698,6 +772,10 @@ function valorizacion(){
 }
 function unidadesTotales(){ return db.productos.reduce((a,p)=> a + (p.stock||0), 0); }
 function bajoStock(p){ return p.puntoRepedido>0 && p.stock <= p.puntoRepedido; }
+/* "Sin stock" = en cero o negativo: no hay nada para vender, hay que pedir sí o sí. */
+function sinStock(p){ return (p.stock||0) <= 0; }
+/* Lo que hay que reponer: sin stock (cero/negativo) O por debajo del punto de repedido. */
+function necesitaPedido(p){ return sinStock(p) || bajoStock(p); }
 
 /* Registrar movimiento. opts (opcional): { tipo, obs, fecha } */
 function moverStock(prod, delta, valorUnit, refTipo, refId, ref, opts){
@@ -725,6 +803,9 @@ function setView(v){
     b.classList.toggle("on", b.dataset.view===v);
   });
   render();
+  // Transición de entrada SOLO al cambiar de pestaña (no en cada re-render por orden/filtro).
+  const mm=document.getElementById("main");
+  if(mm){ mm.classList.remove("view-anim"); void mm.offsetWidth; mm.classList.add("view-anim"); }
 }
 function render(){
   const m = document.getElementById("main");
@@ -805,6 +886,7 @@ function filtrarProds(f){
   const out = db.productos.filter(p=>{
     if(q){ const hay=((p.nombre||"")+" "+(p.sku||"")).toLowerCase(); if(!hay.includes(q)) return false; }
     if(f.saga && sagaDe(p)!==f.saga) return false;
+    if(f.estado==="pedir" && !necesitaPedido(p)) return false;
     if(f.estado==="con" && !(p.stock>0)) return false;
     if(f.estado==="sin" && p.stock!==0) return false;
     if(f.estado==="bajo" && !bajoStock(p)) return false;
@@ -858,6 +940,7 @@ function filterBarHTML(prefix, f){
     </select>
     <select class="inp" id="${prefix}estado" style="flex:1;min-width:130px">
       <option value="" ${f.estado===""?"selected":""}>Todo el stock</option>
+      <option value="pedir" ${f.estado==="pedir"?"selected":""}>A reponer</option>
       <option value="con" ${f.estado==="con"?"selected":""}>Con stock</option>
       <option value="sin" ${f.estado==="sin"?"selected":""}>Sin stock</option>
       <option value="bajo" ${f.estado==="bajo"?"selected":""}>Bajo mínimo</option>
@@ -881,10 +964,22 @@ function wireFilterBar(prefix, f, onChange){
     render();   // re-render para limpiar inputs Y las flechas de orden
   };
 }
+/* Salta desde la alerta del panel al maestro filtrado por "A reponer",
+   ordenado por stock ascendente (primero lo más urgente: negativos y ceros). */
+function irAPedidos(){
+  Object.assign(prodFiltros, { q:"", saga:"", estado:"pedir", cmin:"", cmax:"", sortKey:"stock", sortDir:"asc" });
+  setView("prod");
+  toast("Filtrando productos a reponer","warn");
+}
 function viewDash(){
-  const bajos = db.productos.filter(bajoStock);
-  const negs  = db.productos.filter(p=>p.stock<0);
-  const sagas = sagasUnicas();
+  // Buckets de alerta (disjuntos, para que las cuentas del sub no se pisen):
+  const negs   = db.productos.filter(p=> p.stock<0);                       // negativos (error de datos)
+  const enCero = db.productos.filter(p=> p.stock===0);                     // en cero (sin nada para vender)
+  const bajoM  = db.productos.filter(p=> p.stock>0 && bajoStock(p));       // bajo el punto de repedido pero con stock
+  const porPedir = db.productos.filter(necesitaPedido);                    // unión = todo lo que hay que reponer
+  const subAlerta = porPedir.length
+    ? [ enCero.length?`${enCero.length} en cero`:"", negs.length?`${negs.length} negativo${negs.length>1?"s":""}`:"", bajoM.length?`${bajoM.length} bajo mínimo`:"" ].filter(Boolean).join(" · ")
+    : "todo al día";
 
   return `
   <div class="head">
@@ -895,11 +990,16 @@ function viewDash(){
     </div>
   </div>
 
+  ${porPedir.length ? `<div class="banner warn alerta-pedido" data-goto-pedir role="button" tabindex="0" title="Ver la lista de reposición">
+    <span aria-hidden="true">⚠</span>
+    <span><b>${porPedir.length}</b> producto${porPedir.length>1?"s":""} para reponer${subAlerta&&subAlerta!=="todo al día"?` — ${subAlerta}`:""}. <u>Tocá para ver qué pedir.</u></span>
+  </div>` : ""}
+
   <div class="kpis">
     <div class="kpi"><div class="lbl">Productos</div><div class="val">${db.productos.length}</div><div class="sub">SKUs en el maestro</div></div>
     <div class="kpi"><div class="lbl">Unidades en stock</div><div class="val">${qty(unidadesTotales())}</div><div class="sub">suma de existencias</div></div>
     <div class="kpi"><div class="lbl">Valorización</div><div class="val">${money(valorizacion())}</div><div class="sub">stock × último costo</div></div>
-    <div class="kpi ${(bajos.length||negs.length)?'warn':''}"><div class="lbl">Alertas</div><div class="val">${bajos.length+negs.length}</div><div class="sub">${negs.length} negativos · ${bajos.length} a reponer</div></div>
+    <div class="kpi ${porPedir.length?'warn kpi-click':''}" ${porPedir.length?'data-goto-pedir role="button" tabindex="0" title="Ver la lista de reposición"':''}><div class="lbl">Alertas</div><div class="val">${porPedir.length}</div><div class="sub">${subAlerta}</div></div>
   </div>
 
   <div class="panel">
@@ -1084,7 +1184,7 @@ function renderProdRows(){
       <td class="c">${esc(p.unidad||"u")}</td>
       <td class="r ${cls}">${qty(p.stock)}</td>
       <td class="r num">${money(p.ultimoCosto)}</td>
-      <td class="r num">${money(p.precioVenta)}</td>
+      <td class="r num">${moneyOpt(p.precioVenta)}</td>
       <td class="r num">${p.puntoRepedido>0?qty(p.puntoRepedido):"—"}</td>
       <td class="r"><button class="btn ghost sm" data-editp="${p.id}">Editar</button></td>
     </tr>`;
@@ -1330,13 +1430,13 @@ function viewMov(){
     ${db.movimientos.length ? `
     <div class="filtros compact">
       <input class="inp" id="mq" placeholder="Buscar producto, SKU u origen…" value="${esc(movFiltros.q)}">
-      <select class="inp" id="mtipo" style="min-width:96px">
+      <select class="inp" id="mtipo">
         <option value="" ${movFiltros.tipo===""?"selected":""}>Todo tipo</option>
         <option value="entrada" ${movFiltros.tipo==="entrada"?"selected":""}>Entradas</option>
         <option value="salida" ${movFiltros.tipo==="salida"?"selected":""}>Salidas</option>
         <option value="ajuste" ${movFiltros.tipo==="ajuste"?"selected":""}>Ajustes</option>
       </select>
-      <select class="inp" id="msaga" style="min-width:110px">
+      <select class="inp" id="msaga">
         <option value="">Todas las sagas</option>
         ${sagas.map(s=>`<option value="${esc(s)}" ${movFiltros.saga===s?"selected":""}>${esc(s)}</option>`).join("")}
       </select>
@@ -1544,6 +1644,12 @@ function wire(){
   wireProd();
   wireDocFiltros();
   wireMovFiltros();
+  // Alerta de reposición (banner + tarjeta): click / Enter / Espacio -> maestro filtrado
+  m.querySelectorAll("[data-goto-pedir]").forEach(el=>{
+    el.style.cursor="pointer";
+    el.onclick=irAPedidos;
+    el.onkeydown=e=>{ if(e.key==="Enter"||e.key===" "){ e.preventDefault(); irAPedidos(); } };
+  });
   m.querySelectorAll("[data-editp]").forEach(b=> b.onclick=(e)=>{ e.stopPropagation(); openProd(b.dataset.editp); });
   m.querySelectorAll("[data-import]").forEach(b=> b.onclick=()=> openImport());
   const adj=m.querySelector("[data-adjust]"); if(adj) adj.onclick=()=> openAjuste();
@@ -2492,8 +2598,8 @@ function openFicha(id){
   const body = `
     <div class="kpis" style="grid-template-columns:repeat(4,1fr);margin-bottom:18px">
       <div class="kpi"><div class="lbl">Stock actual</div><div class="val" style="color:${p.stock<0?'var(--alert)':'inherit'}">${qty(p.stock)}</div><div class="sub">${esc(p.unidad||"u")}</div></div>
-      <div class="kpi"><div class="lbl">Últ. costo</div><div class="val">${db.config.moneda}${nf0.format(p.ultimoCosto)}</div><div class="sub">valorizado ${money(val)}</div></div>
-      <div class="kpi"><div class="lbl">Precio venta</div><div class="val">${db.config.moneda}${nf0.format(p.precioVenta)}</div><div class="sub">${p.precioVenta>0?`margen ${nf0.format(margenPct)}%`:'sin precio'}</div></div>
+      <div class="kpi"><div class="lbl">Últ. costo</div><div class="val">${money(p.ultimoCosto)}</div><div class="sub">valorizado ${money(val)}</div></div>
+      <div class="kpi"><div class="lbl">Precio venta</div><div class="val">${moneyOpt(p.precioVenta)}</div><div class="sub">${p.precioVenta>0?`margen ${nf0.format(margenPct)}%`:'sin precio'}</div></div>
       <div class="kpi"><div class="lbl">Comprado / Vendido</div><div class="val" style="font-size:20px"><span class="delta up">${qty(totComp)}</span> / <span class="delta down">${qty(totVend)}</span></div><div class="sub">acumulado histórico</div></div>
     </div>
 
@@ -2624,6 +2730,17 @@ function closeModal(){
 document.getElementById("loginBtn").onclick = doLogin;
 document.getElementById("loginUser").addEventListener("keydown", e=>{ if(e.key==="Enter") document.getElementById("loginPass").focus(); });
 document.getElementById("loginPass").addEventListener("keydown", e=>{ if(e.key==="Enter") doLogin(); });
+// Ojito: mostrar / ocultar contraseña
+const _pt=document.getElementById("loginPassToggle");
+if(_pt) _pt.onclick=()=>{
+  const p=document.getElementById("loginPass"); if(!p) return;
+  const mostrar = p.type==="password";
+  p.type = mostrar ? "text" : "password";
+  _pt.classList.toggle("show", mostrar);
+  const lbl = mostrar ? "Ocultar contraseña" : "Mostrar contraseña";
+  _pt.setAttribute("aria-label", lbl); _pt.title=lbl;
+  p.focus();
+};
 // Botones estáticos del sidebar (tema / cerrar sesión / sincronizar)
 const _slo=document.querySelector("[data-logout-side]"); if(_slo) _slo.onclick=logout;
 const _ssy=document.querySelector("[data-syncside]"); if(_ssy) _ssy.onclick=()=> pullNow();

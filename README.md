@@ -1,60 +1,112 @@
-# Mayor de Stock
+# Gestor de Stock
 
-Gestor de stock en vanilla HTML/CSS/JS, sin frameworks ni dependencias de build. Las **compras suman** stock y fijan el **último costo**; las **ventas restan** con validación de existencias. Importa facturas en **PDF** (parser cliente con pdf.js) y deja trazabilidad de cada movimiento. Datos en `localStorage`, backup por JSON.
+Gestor de inventario en **vanilla HTML/CSS/JS**, sin frameworks ni build. Todo vive en un único `index.html`. Las **compras suman** stock y fijan el **último costo**; las **ventas restan** con validación de existencias; los **ajustes** corrigen a mano. Cada movimiento queda trazado en un **kardex**. Importa facturas en **PDF** (parser en el navegador con pdf.js) y sincroniza entre dispositivos contra un backend opcional en **Cloudflare Worker + D1**. Es una **PWA** instalable y usable offline.
+
+---
+
+## Novedades (build v16)
+
+- **Alerta de reposición.** Cuando un producto queda en **cero, negativo o por debajo del punto de repedido**, salta un banner en el Panel y la tarjeta *Alertas* se vuelve clickeable. Al tocarla, te lleva al maestro **filtrado por "A reponer"** y ordenado por stock ascendente (primero lo más urgente).
+- **Precios opcionales prolijos.** Si un producto **no tiene precio de venta**, se muestra `—` en vez de `USD 0,00`. Donde hay importe, el símbolo queda **separado del número** (`USD 92,10`).
+- **Filtros de Movimientos que no se escapan.** La barra de filtros ahora **envuelve** en vez de obligar a deslizar al costado; los selects se dimensionan a su contenido.
+- **Login renovado.** Fondo *aurora* animado, tarjeta con entrada suave, logo flotante, foco con anillo de acento y **ojito** para mostrar/ocultar la contraseña.
+- **Micro-animaciones.** Selección del menú lateral con barrita de acento, *pop* del ícono y entrada escalonada; fundido del contenido al cambiar de pestaña. Todo respeta `prefers-reduced-motion`.
+
+---
+
+## Cómo funciona
+
+| Acción | Efecto en el stock |
+|---|---|
+| **Compra** | Suma unidades y actualiza el **último costo** del producto. Puede importarse desde PDF. |
+| **Venta** | Resta unidades (valida que haya existencias) y registra el margen contra el costo del momento. |
+| **Ajuste** | Corrección manual (mermas, recuentos, cargas iniciales). Reversible desde el kardex. |
+
+- **Kardex:** cada entrada/salida/ajuste queda con fecha, cantidad, valor unitario, saldo y documento de origen. La ficha de cada producto muestra su kardex individual y una evolución del stock.
+- **Sagas:** el sistema deriva la "línea/juego" desde el nombre del producto y la normaliza (unifica alias tipo *One Piece TCG* == *One Piece Card Game*) para filtrar sin duplicados.
+- **Alertas:** un producto entra en la lista de reposición si está en **cero/negativo** o por debajo de su **punto de repedido**.
+
+---
 
 ## Archivos
 
 | Archivo | Qué es |
 |---|---|
-| `index.html` | La app entera (UI + lógica). Es lo único imprescindible para que funcione. |
+| `index.html` | La app entera (UI + lógica). Es lo único imprescindible para que corra. |
 | `manifest.json` | Metadatos PWA para instalación. |
 | `sw.js` | Service worker: cachea la app y pdf.js para uso offline. |
-| `icon-192.png`, `icon-512.png` | Íconos de la PWA. |
+| `worker.js` | Backend opcional (Cloudflare Worker): login + API de estado con control de `rev`. |
+| `icon-192.png`, `icon-512.png`, `icon-maskable-512.png` | Íconos de la PWA. |
 | `apple-touch-icon.png` | Ícono para "Agregar a inicio" en iOS. |
-| `favicon.png` | Favicon. |
+| `favicon.png`, `favicon-32.png` | Favicons. |
 
-> Si solo querés probarla, con abrir `index.html` alcanza. Los demás archivos son para que sea **instalable y offline**.
+> Para probarla sola, con abrir `index.html` alcanza (modo Local, sin sincronización). Los demás archivos son para que sea **instalable, offline y multi-dispositivo**.
 
-## Deploy en GitHub Pages
+---
+
+## Deploy de la app (GitHub Pages)
 
 1. Subí todos los archivos a la raíz del repo (o a `/docs`).
-2. Settings → Pages → Branch `main` (carpeta raíz o `/docs`).
-3. Entrá a la URL publicada. En el celular: **Compartir → Agregar a inicio** y queda como app.
+2. **Settings → Pages → Branch `main`** (carpeta raíz o `/docs`).
+3. Entrá a la URL publicada. En el celu: **Compartir → Agregar a inicio** y queda como app nativa.
 
-## Convención de versionado del service worker
+---
 
-Cada vez que modificás `index.html`, subí el string de versión en `sw.js`:
+## Versionado del service worker
+
+Cada vez que tocás `index.html`, **subí el string de versión** en `sw.js` y pusheá los dos juntos:
 
 ```js
-const CACHE = "mayor-stock-v1";  // -> "mayor-stock-v2", etc.
+const CACHE = "mayor-stock-v22";  // -> "mayor-stock-v23", etc.
 ```
 
-y pusheá **los dos archivos juntos**. Si no, el navegador sigue sirviendo la versión cacheada y no ves los cambios.
+Si no, `index.html` es *network-first* (trae la última si hay internet), pero conviene bumpear igual por prolijidad y para invalidar el cache de estáticos. También está el `build vNN` en la pantalla de login como referencia visual rápida de qué versión estás corriendo.
+
+---
 
 ## Import de PDF
 
 - Reconoce el formato tipo **Coqui Hobby** (`SKU: descripción … QTY UOM MSRP NET EXT`): toma **NET PRICE** como costo y **MSRP** como precio de venta sugerido, y excluye el flete del stock.
 - Si el layout no matchea, cae a una detección genérica línea por línea.
-- **Siempre** muestra una tabla editable + el texto crudo extraído antes de impactar stock. Revisá antes de confirmar: los formatos varían.
-- El PDF se procesa en el navegador; no se sube a ningún lado.
+- **Siempre** muestra una tabla editable + el texto crudo extraído **antes** de impactar stock. Revisá antes de confirmar: los formatos varían.
+- Se procesa 100% en el navegador; el PDF no se sube a ningún lado.
 
-## Datos y sincronización entre dispositivos
+---
 
-Por defecto todo vive en `localStorage` del navegador (modo **Local**, offline). Para que el stock sea **el mismo desde la PC y el celu**, hay un backend opcional en **Cloudflare Worker + D1**.
+## Backend opcional (Cloudflare Worker + D1)
 
-### Cómo funciona
+Por defecto todo vive en `localStorage` (modo **Local**, offline). Para tener **el mismo stock desde la PC y el celu**, el `worker.js` expone una API mínima con **login por usuario/contraseña** y control de versión optimista.
 
-- La app guarda siempre en local (seguís trabajando sin conexión) y, si hay servidor configurado, empuja/trae el estado completo.
-- Control de versión optimista con `rev`: si desde la última sincronización cambió **acá y en el servidor**, la app avisa **Conflicto** y elegís cuál conservar. Si solo cambió de un lado, sincroniza solo.
-- El indicador de estado (**Local / Sincronizado / Guardando / Sin conexión / Conflicto**) está en la barra lateral.
+### Endpoints
 
-### Backend — archivos
+| Método | Ruta | Qué hace |
+|---|---|---|
+| `POST` | `/login` `{user, pass}` | Valida contra `ADMIN_USER`/`ADMIN_PASS` y devuelve `{token, space}`. |
+| `GET` | `/state?space=…` | Lee el estado (requiere `Authorization: Bearer <token>`). |
+| `PUT` | `/state?space=…` | Guarda con control de `rev`; si cambió en el servidor, responde **409 Conflicto**. |
 
-| Archivo | Qué es |
+### Secrets necesarios
+
+| Secret | Para qué |
 |---|---|
-| `worker.js` | El Worker (API `/state`, GET y PUT con control de `rev`). |
-| `schema.sql` | Tabla `estado` de D1. |
-| `wrangler.toml` | Config de deploy (poné el `database_id`). |
+| `ADMIN_USER` | Usuario del login. |
+| `ADMIN_PASS` | Contraseña del login. |
+| `TOKEN` | Bearer interno que la app usa para leer/escribir el estado. |
+
+### `wrangler.toml` mínimo
+
+El Worker **crea la tabla solo** (`CREATE TABLE IF NOT EXISTS estado …`), así que no hace falta correr un `schema.sql`. Solo necesitás el binding D1 llamado `DB`:
+
+```toml
+name = "mayor-stock-api"
+main = "worker.js"
+compatibility_date = "2024-01-01"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "mayor-stock"
+database_id = "PEGÁ-ACÁ-EL-ID"
+```
 
 ### Deploy del backend (una vez)
 
@@ -65,30 +117,45 @@ wrangler login
 # 1) Crear la base D1 y pegar el database_id en wrangler.toml
 wrangler d1 create mayor-stock
 
-# 2) Crear la tabla
-wrangler d1 execute mayor-stock --remote --file=schema.sql
-
-# 3) Definir el token de acceso (elegí uno largo y secreto)
+# 2) Definir los secrets (uno por comando, te los pide interactivo)
 wrangler secret put TOKEN
+wrangler secret put ADMIN_USER
+wrangler secret put ADMIN_PASS
 
-# 4) Publicar
+# 3) Publicar
 wrangler deploy
 ```
 
-Te queda una URL tipo `https://mayor-stock-api.TU-USUARIO.workers.dev`.
+Te queda una URL tipo `https://mayor-stock-api.TU-USUARIO.workers.dev`. Esa URL va en la constante `API_URL` del `index.html`:
 
-### Conectar la app
+```js
+const API_URL = "https://mayor-stock-api.TU-USUARIO.workers.dev";
+```
 
-En cada dispositivo, entrá a **Datos → Sincronización** y cargá:
+### Entrar
 
-- **URL del Worker**: la de `wrangler deploy`.
-- **Token**: el mismo que pusiste en `wrangler secret put TOKEN`.
-- **Espacio**: `main` (o `us`, `europa`, etc. para tener varios inventarios separados en el mismo servidor).
+Abrís la app, cargás **usuario y contraseña** (los `ADMIN_USER`/`ADMIN_PASS`) y listo: el primer dispositivo sube su estado, los demás lo traen. La sesión (usuario, token y espacio) queda guardada en `localStorage`.
 
-Tocá **Conectar / Guardar**. El primer dispositivo sube su estado; los demás lo traen. Listo.
+---
 
-> El token viaja en el header `Authorization: Bearer`. Al ser un solo secreto compartido, tratá la URL+token como una contraseña. Si querés algo más fino (usuarios, roles) se puede, pero para uso personal esto alcanza y es simple.
+## Datos, sincronización y conflictos
+
+- La app **siempre guarda en local** primero (seguís trabajando sin conexión) y, si hay sesión, empuja/trae el estado completo.
+- Control de versión optimista con `rev`: si desde la última sync cambió **acá y en el servidor**, la app avisa **Conflicto** y elegís cuál conservar. Si solo cambió de un lado, sincroniza sola.
+- Con `space` podés tener **inventarios separados** en el mismo servidor (`main`, `us`, `europa`, etc.).
+- El indicador de estado (**Local / Sincronizado / Guardando / Sin conexión / Conflicto**) está en la barra superior y lateral.
+
+> El `token` viaja en el header `Authorization: Bearer`. Al ser un secreto compartido, tratá la URL + credenciales como una contraseña.
 
 ### Respaldo extra
 
-Aun con servidor, **Datos → Exportar JSON** te da una copia puntual. **Importar JSON** reemplaza el estado actual (y se sincroniza al servidor si estás conectado).
+Aun con servidor, **Datos → Exportar JSON** te da una copia puntual. **Importar JSON** reemplaza el estado actual (y se sincroniza si estás conectado).
+
+---
+
+## Stack y decisiones
+
+- **Sin dependencias de build.** Un solo HTML, service worker y (opcional) un Worker. Fácil de auditar y de deployar en Pages.
+- **`localStorage` como fuente local** + backend como espejo sincronizado, no al revés: la app nunca depende de estar online.
+- **pdf.js** por CDN (cacheado por el SW) solo para el import de facturas.
+- **Temas claro/oscuro** con `prefers-color-scheme` y override manual persistido.
