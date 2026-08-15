@@ -1,6 +1,6 @@
 {
-  "name": "Gestor de Stock",
-  "short_name": "Gestor",
+  "name": "Stock Manager",
+  "short_name": "Stock",
   "description": "Gestor de stock: las compras suman, las ventas restan. Importá facturas en PDF y seguí cada movimiento, sincronizado entre dispositivos.",
   "start_url": "./index.html",
   "scope": "./",
