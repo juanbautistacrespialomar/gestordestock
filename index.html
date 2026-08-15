@@ -1733,15 +1733,19 @@ function viewDatos(){
     <div class="grid-form" style="grid-template-columns:1fr 1fr">
       <div class="field"><label>Símbolo de moneda</label><input class="inp" id="cfgMon" value="${esc(db.config.moneda)}" maxlength="4"></div>
       <div class="field"><label>N° de invoice inicial</label><input class="inp num" id="cfgFac" value="${esc(String(db.config.facturaInicio||101))}"></div>
+      <button class="btn" data-savecfg style="justify-self:start;margin-top:4px">Guardar</button>
     </div>
-    <div class="phead" style="margin:14px 0 6px;padding:0"><h3 style="font-size:13px">Datos del emisor (aparecen en el invoice PDF)</h3></div>
+  </div>
+
+  <div class="panel">
+    <div class="phead"><h3>Datos del emisor</h3><span class="hint">aparecen en el invoice PDF</span></div>
     <div class="grid-form" style="grid-template-columns:1fr 1fr">
       <div class="field" style="grid-column:1/3"><label>Nombre / empresa</label><input class="inp" id="cfgEmNom" value="${esc((db.config.emisor||{}).nombre||"")}"></div>
       <div class="field" style="grid-column:1/3"><label>Dirección</label><input class="inp" id="cfgEmDir" value="${esc((db.config.emisor||{}).direccion||"")}"></div>
       <div class="field"><label>Email</label><input class="inp" id="cfgEmMail" value="${esc((db.config.emisor||{}).email||"")}"></div>
       <div class="field"><label>Teléfono</label><input class="inp" id="cfgEmTel" value="${esc((db.config.emisor||{}).tel||"")}"></div>
+      <button class="btn" data-savecfg style="justify-self:start;margin-top:4px">Guardar</button>
     </div>
-    <button class="btn" data-savecfg style="justify-self:start;margin-top:12px">Guardar</button>
   </div>`;
 }
 
@@ -1789,7 +1793,7 @@ function wire(){
   const exp=m.querySelector("[data-export]"); if(exp) exp.onclick=exportJSON;
   const imp=m.querySelector("[data-import-json]"); if(imp) imp.onclick=importJSON;
   const rst=m.querySelector("[data-reset]"); if(rst) rst.onclick=resetAll;
-  const cfg=m.querySelector("[data-savecfg]"); if(cfg) cfg.onclick=()=>{
+  m.querySelectorAll("[data-savecfg]").forEach(cfg=> cfg.onclick=()=>{
     db.config.moneda = (document.getElementById("cfgMon").value||"$").trim()||"$";
     const fi=parseInt(document.getElementById("cfgFac").value,10); if(!isNaN(fi)&&fi>0) db.config.facturaInicio=fi;
     db.config.emisor = {
@@ -1799,7 +1803,7 @@ function wire(){
       tel:(document.getElementById("cfgEmTel").value||"").trim()
     };
     save(); toast("Configuración guardada"); render();
-  };
+  });
 
   // --- cuenta / sincronización ---
   const sNow=m.querySelector("[data-syncnow]"); if(sNow) sNow.onclick=()=> pullNow();
