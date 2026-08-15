@@ -7,7 +7,7 @@
    - pdf.js (CDN): cache-first para importar offline.
    Igual conviene subir este string al cambiar la app, por prolijidad.
    ============================================================ */
-const CACHE = "mayor-stock-v27";   // PDF import: freight + MSRP via Gemini
+const CACHE = "mayor-stock-v28";   // EN i18n, dates, SKU auto-match, per-store filtering, income statement, customers view, invoice PDF, warm light theme, interactive analysis
 
 const ASSETS = [
   "./",

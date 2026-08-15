@@ -18,32 +18,32 @@
 <script>try{var _t=localStorage.getItem("gstock_theme");if(_t==="dark"||(!_t&&window.matchMedia&&matchMedia("(prefers-color-scheme:dark)").matches)){document.documentElement.setAttribute("data-theme","dark");}else if(_t==="light"){document.documentElement.setAttribute("data-theme","light");}}catch(e){}</script>
 <style>
   :root{
-    --ink:#111317;
-    --ink-soft:#2b2f36;
-    --paper:#ffffff;
+    --ink:#1a1a1a;
+    --ink-soft:#3a362f;
+    --paper:#faf9f7;
     --surface:#ffffff;
-    --surface-2:#fafbfc;
-    --line:#eaecef;
-    --line-strong:#dde0e5;
-    --accent:#1d4ed8;
-    --accent-ink:#1d4ed8;
-    --up:#1d4ed8;
-    --up-bg:#eef2fb;
+    --surface-2:#f5f3ef;
+    --line:#eae7e1;
+    --line-strong:#dad6ce;
+    --accent:#2563eb;
+    --accent-ink:#2563eb;
+    --up:#2563eb;
+    --up-bg:#eaf0fc;
     --down:#dc2626;
-    --down-bg:#fbeaea;
+    --down-bg:#fbecec;
     --alert:#dc2626;
-    --alert-bg:#fbeaea;
-    --muted:#8a909b;
-    --text:#111317;
+    --alert-bg:#fbecec;
+    --muted:#7a756c;
+    --text:#1a1a1a;
     --radius:14px;
     --mono:"Spline Sans Mono",ui-monospace,"SF Mono","Menlo","Consolas",monospace;
     --sans:"Inter Tight",-apple-system,BlinkMacSystemFont,"Segoe UI","Helvetica Neue",Arial,sans-serif;
-    --shadow:0 1px 2px rgba(17,19,23,.04);
-    --side-bg:#f6f7f9;
-    --side-hover:#eceef2;
-    --nav-ink:#4b5563;
+    --shadow:0 1px 2px rgba(26,26,26,.05);
+    --side-bg:#f3f1ed;
+    --side-hover:#e9e6df;
+    --nav-ink:#5a554c;
     --topbar-bg:#ffffff;
-    --login-bg:#f4f5f7;
+    --login-bg:#f0eee9;
   }
   :root[data-theme="dark"]{
     --ink:#0b0e13;
@@ -286,6 +286,18 @@
   .ppick-item .pi-disp{font-family:var(--mono);font-size:11.5px;color:var(--muted);flex-shrink:0}
   .ppick-item.new{color:var(--accent);font-weight:600;border-top:1px solid var(--line);border-radius:0;margin-top:2px}
   .ppick-empty{padding:16px 12px;color:var(--muted);font-size:13px;text-align:center}
+  /* Punto 20: segmented toggle USD/Units */
+  .seg{display:inline-flex;border:1px solid var(--line-strong);border-radius:9px;overflow:hidden;background:var(--surface)}
+  .seg-btn{border:0;background:none;color:var(--muted);font-weight:700;font-size:12.5px;padding:7px 14px;cursor:pointer;font-family:var(--sans)}
+  .seg-btn.on{background:var(--accent);color:#fff}
+  .crow[data-saga]:hover .cl{color:var(--accent)}
+  .crow[data-saga]:hover .cf{filter:brightness(1.08)}
+  /* Punto 6: que el SKU+nombre largo NO rompa el ancho de la fila (ellipsis) */
+  .line-tbl td:first-child{max-width:300px}
+  .ppick{min-width:0;max-width:100%}
+  .ppick-btn{max-width:100%;min-width:0}
+  .imp-desc{font-size:12.5px;max-width:260px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .ppick-item .sku{max-width:130px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex-shrink:0}
 
   .empty{padding:48px 24px;text-align:center;color:var(--muted)}
   .empty .big{font-family:var(--mono);font-size:34px;color:var(--line-strong);margin-bottom:10px}
@@ -338,11 +350,17 @@
   .chip-btn{border:1px solid var(--line);background:var(--card);color:var(--text);border-radius:999px;padding:6px 14px;font-size:13px;font-weight:600;cursor:pointer;transition:.12s;white-space:nowrap}
   .chip-btn:hover{border-color:var(--accent)}
   .chip-btn.on{background:var(--accent);color:#fff;border-color:var(--accent)}
-  .slicers{display:flex;gap:8px;flex-wrap:wrap;margin:0 0 14px;align-items:center}
-  .slicer{display:flex;flex-direction:column;gap:3px}
+  .slicers{display:flex;gap:10px;flex-wrap:wrap;margin:0 0 16px;align-items:flex-end}
+  .slicer{display:flex;flex-direction:column;gap:5px}
   .slicer > span{font-size:10.5px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:var(--muted)}
-  .slicer select{border:1px solid var(--line);background:var(--card);color:var(--text);border-radius:8px;padding:6px 10px;font-size:13px;font-weight:600;cursor:pointer}
-  .slicer-reset{align-self:flex-end;font-size:12px;color:var(--accent);background:none;border:none;cursor:pointer;font-weight:600;padding:8px 4px}
+  /* Punto 16: mismo estilo y MISMA altura para selects e inputs date del filtro */
+  .slicer select,.slicer input{height:36px;box-sizing:border-box;border:1px solid var(--line);background:var(--card);
+    color:var(--text);border-radius:8px;padding:0 10px;font-size:13px;font-weight:600;cursor:pointer;
+    font-family:var(--sans);line-height:34px}
+  .slicer input[type="date"]{min-width:150px;cursor:text}
+  .slicer input::-webkit-calendar-picker-indicator{opacity:.6;cursor:pointer}
+  .slicer select:focus,.slicer input:focus{outline:none;border-color:var(--accent)}
+  .slicer-reset{height:36px;font-size:12px;color:var(--accent);background:none;border:none;cursor:pointer;font-weight:700;padding:0 6px}
   .pill.blocked{background:#7c4a03;color:#ffd9a0}
   .pill.inv{background:#3a2a6b;color:#d7c9ff}
   .banner{padding:11px 14px;border-radius:8px;font-size:13.5px;margin-bottom:14px;display:flex;gap:9px;align-items:flex-start}
@@ -381,7 +399,8 @@
   .btn.sm svg.i{width:14px;height:14px}
 
   /* ---------- Análisis / gráficos ---------- */
-  .chart-grid{display:grid;grid-template-columns:1fr 1fr;gap:20px;align-items:start}
+  .chart-grid{display:grid;grid-template-columns:1fr 1fr;gap:20px;align-items:stretch}
+  .chart-grid .panel.chart{display:flex;flex-direction:column;min-height:240px}
   /* dentro del grid, la regla global .panel + .panel metía un margin-top de 20px
      al panel de la derecha y lo dejaba 20px más abajo que el de la izquierda
      (de ahí el "descentrado"). Acá lo anulamos: el gap del grid ya separa. */
@@ -522,6 +541,7 @@
       <button data-view="prod"><span class="ico">▦</span>Products</button>
       <button data-view="compras"><span class="ico">+</span>Purchases</button>
       <button data-view="ventas"><span class="ico">−</span>Sales</button>
+      <button data-view="clientes"><span class="ico">☺</span>Customers</button>
       <button data-view="mov"><span class="ico">↕</span>Movements</button>
       <button data-view="inv" data-admin-only><span class="ico">◈</span>Investments</button>
       <button data-view="datos"><span class="ico">⤓</span>Data</button>
@@ -550,6 +570,7 @@
     <button data-view="prod">Products</button>
     <button data-view="compras">Purchases</button>
     <button data-view="ventas">Sales</button>
+    <button data-view="clientes">Cust.</button>
     <button data-view="mov">Movem.</button>
     <button data-view="inv" data-admin-only>Investments</button>
     <button data-view="datos">Data</button>
@@ -704,10 +725,22 @@ function migrate(d){
     p.stock = STORE_IDS.reduce((a,s)=> a + (p.stockPorTienda[s]||0), 0);
   });
   d.clientes.forEach(c=>{ if(c.pais==null) c.pais = ""; });   // country of buyer (point 7 slicer)
+  // Punto 11: normalizar fechas viejas mezcladas (ISO vs "01-Jul-2026") a YYYY-MM-DD
+  [...(d.compras||[]), ...(d.ventas||[])].forEach(doc=>{ if(doc.fecha) doc.fecha = normISO(doc.fecha) || doc.fecha; });
   return d;
 }
 /* ---- per-store helpers ---- */
 function stockDe(p, store){ return (p.stockPorTienda && p.stockPorTienda[store]) || 0; }
+/* Puntos 7/9/15: ¿este producto PERTENECE a este local?
+   Sí cuando: tiene stock ahí, tiene capas FIFO ahí, o alguna vez tuvo
+   una compra/venta en ese local. Un producto que sólo vive en Silver NO
+   debe aparecer (ni en cero, ni como opción de venta) cuando mirás Akira. */
+function perteneceAStore(p, store){
+  if(stockDe(p, store) !== 0) return true;
+  if(p.lotes && Array.isArray(p.lotes[store]) && p.lotes[store].length) return true;
+  const docs = (db.compras||[]).concat(db.ventas||[]);
+  return docs.some(d => d.store===store && (d.lineas||[]).some(l=>l.productoId===p.id));
+}
 function stockEnFoco(p){ return effectiveStores().reduce((a,s)=> a + stockDe(p,s), 0); }
 function stockTotalP(p){ return STORE_IDS.reduce((a,s)=> a + stockDe(p,s), 0); }
 function recalcStockMirror(p){ p.stock = stockTotalP(p); }
@@ -877,6 +910,38 @@ const qty = n => nf0.format(n||0);
    venta opcionales: si no hay precio cargado mostramos "—" en vez de "USD 0,00".
    El \u00A0 (espacio duro) ya deja el símbolo separado del número: "USD 92,10". */
 const moneyOpt = (n, dash="—") => ((n||0) > 0 ? money(n) : dash);
+
+/* ---------- Fechas unificadas (puntos 2 y 11) ----------
+   normISO: cualquier formato (ISO datetime, dd/mm/yyyy, 01-Jul-2026) -> "YYYY-MM-DD".
+            Es lo ÚNICO que acepta <input type="date">, por eso al editar la fc
+            aparecía vacía cuando la fecha venía en otro formato.
+   fmtDate: muestra SIEMPRE igual en toda la app -> "01-Jul-2026". */
+const _MONTHS3 = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+function normISO(s){
+  if(!s) return "";
+  s = String(s).trim();
+  // ya viene ISO (con o sin hora)
+  let m = s.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if(m) return `${m[1]}-${m[2]}-${m[3]}`;
+  // 01-Jul-2026 / 01/07/2026 con mes en texto
+  m = s.match(/^(\d{1,2})[-\/]([A-Za-z]{3,})[-\/](\d{2,4})$/);
+  if(m){
+    const map={jan:1,feb:2,mar:3,apr:4,may:5,jun:6,jul:7,aug:8,sep:9,oct:10,nov:11,dec:12,ene:1,abr:4,ago:8,dic:12};
+    const mo=map[m[2].slice(0,3).toLowerCase()]; if(!mo) return "";
+    const y=m[3].length===2?"20"+m[3]:m[3];
+    return `${y}-${String(mo).padStart(2,"0")}-${m[1].padStart(2,"0")}`;
+  }
+  // dd/mm/yyyy o dd-mm-yyyy numérico
+  m = s.match(/^(\d{1,2})[-\/](\d{1,2})[-\/](\d{2,4})$/);
+  if(m){ const y=m[3].length===2?"20"+m[3]:m[3]; return `${y}-${m[2].padStart(2,"0")}-${m[1].padStart(2,"0")}`; }
+  return "";
+}
+function fmtDate(s){
+  const iso = normISO(s);
+  if(!iso) return s || "—";
+  const [y,mo,d] = iso.split("-");
+  return `${d}-${_MONTHS3[(+mo)-1]||mo}-${y}`;
+}
 
 /* Parseo tolerante de números en formato AR (1.234,56) o US (1,234.56) */
 function parseNum(s){
@@ -1116,6 +1181,7 @@ function render(){
   else if(view==="prod") m.innerHTML = bar+viewProd();
   else if(view==="compras") m.innerHTML = bar+viewDocs("compra");
   else if(view==="ventas") m.innerHTML = bar+viewDocs("venta");
+  else if(view==="clientes") m.innerHTML = viewClientes();
   else if(view==="mov") m.innerHTML = bar+viewMov();
   else if(view==="inv") m.innerHTML = isAdmin()? viewInversiones() : viewDash();
   else if(view==="datos") m.innerHTML = viewDatos();
@@ -1190,6 +1256,8 @@ function filtrarProds(f){
   const cmax=f.cmax!==""&&f.cmax!=null?parseNum(f.cmax):null;
   const out = db.productos.filter(p=>{
     if(esInversion(p)) return false;             // vault lives in its own panel
+    // Punto 9: en vista de UN local, sólo productos que pertenecen a ese local
+    if(activeStore!=="all" && !perteneceAStore(p, activeStore)) return false;
     const sf = stockEnFoco(p);                   // stock under the active store focus
     if(q){ const hay=((p.nombre||"")+" "+(p.sku||"")).toLowerCase(); if(!hay.includes(q)) return false; }
     if(f.saga && sagaDe(p)!==f.saga) return false;
@@ -1381,14 +1449,15 @@ function wireDashFiltros(){
 /* Barras horizontales: items=[{label, sku, value}], fmt=formateador, color=CSS var */
 function hbars(items, fmt, color){
   const vals = items.filter(i=> i.value>0);
-  if(!vals.length) return `<div class="cempty">Sin datos para graficar.</div>`;
+  if(!vals.length) return `<div class="cempty">No data to chart.</div>`;
   const max = Math.max(...vals.map(i=>i.value)) || 1;
   return vals.map(i=>{
     const pct = Math.max(2, (i.value/max)*100);
     const c = i.color || color;
     const chip = i.sku ? `<span class="sku">${esc(i.sku)}</span> ` : "";
     const full = (i.sku?("["+i.sku+"] "):"") + i.label;
-    return `<div class="crow">
+    const attr = i.saga ? ` data-saga="${esc(i.saga)}"` : "";
+    return `<div class="crow"${attr}>
       <div class="cl" title="${esc(full)}">${chip}${esc(i.label)}</div>
       <div class="ct"><div class="cf" style="width:${pct.toFixed(1)}%;background:${c}"></div></div>
       <div class="cv">${fmt(i.value)}</div>
@@ -1398,6 +1467,7 @@ function hbars(items, fmt, color){
 
 /* Analysis slicers (point 7). Store comes from the global switcher (activeStore). */
 let anFiltros = { saga:"", idioma:"", pais:"", desde:"", hasta:"" };
+let anMetric = "usd";   // "usd" | "units"  (punto 20: toggle de métrica en los gráficos)
 /* Distinct customer countries seen in sales (for the country slicer). */
 function paisesVentas(){
   const set=new Set();
@@ -1422,7 +1492,7 @@ function ventasFiltradas(){
       if(anFiltros.saga && (p? sagaDe(p): "")!==anFiltros.saga) return;
       if(anFiltros.idioma && (p? (p.idioma||""):"" )!==anFiltros.idioma) return;
       const cogs = l.cogs!=null ? l.cogs : (l.costo||0)*l.cantidad;
-      rows.push({ store:v.store, productoId:l.productoId, nombre:l.nombre, sku:l.sku,
+      rows.push({ fecha:normISO(v.fecha)||v.fecha, store:v.store, productoId:l.productoId, nombre:l.nombre, sku:l.sku,
         cantidad:l.cantidad, revenue:round2((l.precio||0)*l.cantidad), cogs:round2(cogs),
         pais:(v.cliente&&v.cliente.pais)||"", saga:p?sagaDe(p):"", idioma:p?(p.idioma||""):"" });
     });
@@ -1447,6 +1517,16 @@ function viewAnalisis(){
   const byStore = by(r=>storeName(r.store));
   const byPais = by(r=>r.pais);
   const byLang = by(r=>langLabel(r.idioma));
+
+  // Punto 20: métrica activa (USD o unidades) para los gráficos comparativos
+  const mval = anMetric==="units" ? (v=>v.units) : (v=>v.revenue);
+  const mfmt = anMetric==="units" ? qty : money;
+
+  // Tendencia mensual (dimensión tiempo que faltaba): revenue por mes en la selección
+  const byMonth = {};
+  rows.forEach(r=>{ const k=(r.fecha||"").slice(0,7); if(!k) return; (byMonth[k]=byMonth[k]||{revenue:0,units:0}); byMonth[k].revenue+=r.revenue; byMonth[k].units+=r.cantidad; });
+  const monthsSorted = Object.keys(byMonth).sort();
+  const trend = monthsSorted.map(k=>{ const [y,m]=k.split("-"); return { label:`${_MONTHS3[(+m)-1]} ${y.slice(2)}`, value: anMetric==="units"?byMonth[k].units:byMonth[k].revenue }; });
 
   // --- point 4: same product marked up differently across stores ---
   const cmp = {};   // prodId -> { nombre, akira:{rev,units}, silver:{rev,units} }
@@ -1477,10 +1557,15 @@ function viewAnalisis(){
 
   const charts = `
   <div class="chart-grid">
+    <div class="panel chart" style="grid-column:1/-1">
+      <p class="ctitle">Monthly trend</p>
+      <p class="csub">${anMetric==="units"?"Units":"Revenue"} per month in the current selection.</p>
+      ${trend.length ? hbars(trend, mfmt, "var(--accent)") : `<div class="cempty">No sales in this selection.</div>`}
+    </div>
     <div class="panel chart">
-      <p class="ctitle">Top 10 products by revenue</p>
+      <p class="ctitle">Top 10 products by ${anMetric==="units"?"units":"revenue"}</p>
       <p class="csub">Where the money comes from. Tap a bar to filter its line.</p>
-      ${rows.length ? hbars(topRev.map(t=>({label:t.label,value:t.value,pid:t.label})), money, "var(--accent)") : `<div class="cempty">No sales in this selection.</div>`}
+      ${rows.length ? hbars(top(byProd, mval).map(t=>({label:t.label,value:t.value,saga:sagaOfName(t.label)})), mfmt, "var(--accent)") : `<div class="cempty">No sales in this selection.</div>`}
     </div>
     <div class="panel chart">
       <p class="ctitle">Top 10 products by gross margin</p>
@@ -1490,17 +1575,17 @@ function viewAnalisis(){
     <div class="panel chart">
       <p class="ctitle">Revenue by store</p>
       <p class="csub">Akira vs Silver in the current selection.</p>
-      ${rows.length ? hbars(top(byStore,v=>v.revenue), money, "var(--accent-ink)") : `<div class="cempty">No sales.</div>`}
+      ${rows.length ? hbars(top(byStore,mval), mfmt, "var(--accent-ink)") : `<div class="cempty">No sales.</div>`}
     </div>
     <div class="panel chart">
       <p class="ctitle">Revenue by country</p>
       <p class="csub">Buyer country on each sale.</p>
-      ${Object.keys(byPais).length ? hbars(top(byPais,v=>v.revenue), money, "#2b8fd9") : `<div class="cempty">No country data — add it on the customer.</div>`}
+      ${Object.keys(byPais).length ? hbars(top(byPais,mval), mfmt, "#2b8fd9") : `<div class="cempty">No country data — add it on the customer.</div>`}
     </div>
     <div class="panel chart">
       <p class="ctitle">Revenue by language</p>
       <p class="csub">JP vs SP/ESP.</p>
-      ${Object.keys(byLang).length ? hbars(top(byLang,v=>v.revenue), money, "#8a5cf6") : `<div class="cempty">No language data.</div>`}
+      ${Object.keys(byLang).length ? hbars(top(byLang,mval), mfmt, "#8a5cf6") : `<div class="cempty">No language data.</div>`}
     </div>
     <div class="panel chart">
       <p class="ctitle">⚠ Same product, different price by store</p>
@@ -1514,7 +1599,10 @@ function viewAnalisis(){
 
   return `
   <div class="head"><div class="title"><h2>Analysis</h2><p>Sales, FIFO margin and store comparison. Filter with the slicers.</p></div>
-    ${isAdmin()?`<div class="actions"><button class="btn primary" id="an_pnl">⤓ Export P&amp;L (Excel)</button></div>`:""}
+    <div class="actions" style="gap:8px">
+      <div class="seg"><button class="seg-btn ${anMetric==="usd"?"on":""}" data-metric="usd">USD</button><button class="seg-btn ${anMetric==="units"?"on":""}" data-metric="units">Units</button></div>
+      ${isAdmin()?`<button class="btn primary" id="an_pnl">⤓ Export P&amp;L (Excel)</button>`:""}
+    </div>
   </div>
   ${slicers}
   ${kpis}
@@ -1530,8 +1618,18 @@ function wireAnalisis(){
   document.getElementById("an_hasta").onchange=e=>upd("hasta",e.target);
   document.getElementById("an_clear").onclick=()=>{ anFiltros={saga:"",idioma:"",pais:"",desde:"",hasta:""}; render(); };
   const pnl=document.getElementById("an_pnl"); if(pnl) pnl.onclick=openPnLExport;
-  // clickable revenue bars -> filter that line
-  document.querySelectorAll("#main .crow [data-pid]").forEach(el=>{});
+  // Punto 20: toggle USD/Units
+  document.querySelectorAll("[data-metric]").forEach(b=> b.onclick=()=>{ anMetric=b.dataset.metric; render(); });
+  // Punto 20: barras de producto clickeables -> filtran su línea (saga)
+  document.querySelectorAll('#main .crow[data-saga]').forEach(el=>{
+    el.style.cursor="pointer"; el.title="Filter this line";
+    el.onclick=()=>{ const sg=el.dataset.saga; anFiltros.saga = (anFiltros.saga===sg?"":sg); render(); };
+  });
+}
+/* saga (línea/juego) a partir del nombre de producto mostrado en un gráfico */
+function sagaOfName(nombre){
+  const p = db.productos.find(x=> String(x.nombre||"")===String(nombre));
+  return p ? sagaDe(p) : "";
 }
 
 /* ============================================================
@@ -1760,8 +1858,11 @@ function docKpisHTML(tipo, list){
   const isC = tipo==="compra";
   let total=0, uds=0, cogs=0;
   list.forEach(d=>{
+    // Punto 8: usar el TOTAL guardado del documento (incluye flete/handling y
+    // el redondeo por renglón), así el KPI cuadra exacto con la columna Total
+    // de la tabla de facturas. Fallback al cálculo por líneas para docs viejos.
+    total += (d.total!=null) ? d.total : round2((d.lineas||[]).reduce((a,l)=>a+round2((l.cantidad||0)*(l.precio||0)),0) + (isC?((d.handling||0)+(d.flete||0)):0));
     (d.lineas||[]).forEach(l=>{
-      total += (l.cantidad||0)*(l.precio||0);
       uds   += (l.cantidad||0);
       if(!isC){
         const c = (l.cogs!=null) ? l.cogs : (l.cantidad||0)*((l.costo!=null)?l.costo:((prodById(l.productoId)||{}).ultimoCosto||0));
@@ -1827,7 +1928,7 @@ function renderDocRows(tipo){
     const items=d.lineas.reduce((a,l)=>a+l.cantidad,0);
     return `<tr>
       <td class="num">${esc(d.numero||"—")}</td>
-      <td>${esc(d.fecha)}</td>
+      <td>${esc(fmtDate(d.fecha))}</td>
       ${showStore?`<td>${esc(storeName(d.store))}</td>`:""}
       <td>${esc(d.contraparte||"—")}</td>
       <td class="c num">${qty(items)}</td>
@@ -2119,6 +2220,7 @@ function wire(){
   wireAnalisis();
   wireDocFiltros();
   wireMovFiltros();
+  wireClientes();
   // Alerta de reposición (banner + tarjeta): click / Enter / Espacio -> maestro filtrado
   m.querySelectorAll("[data-goto-pedir]").forEach(el=>{
     el.style.cursor="pointer";
@@ -2310,7 +2412,7 @@ function saveProd(id){
 }
 function delProd(id){
   const p=prodById(id);
-  if(!confirm(`¿Eliminar "${p.nombre}"? No se borran sus movimientos históricos.`)) return;
+  if(!confirm(`Delete "${p.nombre}"? Its historical movements are kept.`)) return;
   db.productos = db.productos.filter(x=>x.id!==id);
   save(); closeModal(); toast("Producto eliminado","warn"); render();
 }
@@ -2346,14 +2448,16 @@ function renderDocModal(){
   const cli = clienteById(draft.clienteId);
   const clienteRow = isC ? "" : `
     <div class="field" style="grid-column:1/3">
-      <label>Cliente <span class="hint" style="font-weight:400">· requerido</span></label>
+      <label>Customer <span class="hint" style="font-weight:400">· required</span></label>
       <button type="button" class="ppick-btn${cli?"":" placeholder"}" id="d_cli">
         <span class="ppick-label">${cli?esc(clienteLinea(cli)):"— pick customer —"}</span><span class="ppick-caret">▾</span>
       </button>
       ${cli?`<div class="hint" style="font-size:11px;margin-top:4px">${esc(clienteDireccion(cli)||cli.email||"")}</div>`:""}
     </div>`;
   const allowSt = allowedStores();
-  const lockStore = !!draft.editingId;   // don't move a document between stores while editing
+  // Punto 10: sí permitimos mover el documento de local al editar; confirmDoc
+  // revierte el stock en el local original y lo aplica en el nuevo (circuito completo).
+  const lockStore = false;
   const storeSel = (allowSt.length>1 && !lockStore)
     ? `<div class="field" style="grid-column:1/3"><label>Store</label>
          <select class="inp" id="d_store">${allowSt.map(s=>`<option value="${s}" ${s===draft.store?"selected":""}>${esc(storeName(s))}</option>`).join("")}</select></div>`
@@ -2366,38 +2470,38 @@ function renderDocModal(){
       <button class="btn sm" id="d_import" style="white-space:nowrap">⤒ Import PDF</button>
     </div>`:""}
     <div class="grid-form" style="grid-template-columns:1fr 1fr;padding:0;margin-bottom:12px">
-      ${isC?`<div class="field" style="grid-column:1/3"><label>Proveedor</label><input class="inp" id="d_cp" value="${esc(draft.contraparte)}"></div>`:clienteRow}
-      <div class="field"><label>Fecha</label><input class="inp" type="date" id="d_fe" value="${esc(draft.fecha)}"></div>
-      <div class="field"><label>${isC?"N° comprobante":'N° invoice <span class="hint" style="font-weight:400">· sugerido, editable</span>'}</label><input class="inp" id="d_nu" value="${esc(draft.numero)}"></div>
+      ${isC?`<div class="field" style="grid-column:1/3"><label>Supplier</label><input class="inp" id="d_cp" value="${esc(draft.contraparte)}"></div>`:clienteRow}
+      <div class="field"><label>Date</label><input class="inp" type="date" id="d_fe" value="${esc(draft.fecha)}"></div>
+      <div class="field"><label>${isC?"Doc N°":'N° invoice <span class="hint" style="font-weight:400">· sugerido, editable</span>'}</label><input class="inp" id="d_nu" value="${esc(draft.numero)}"></div>
     </div>
     <div id="lineHost"></div>
-    <button class="btn sm" id="addLine" style="margin-top:10px">+ Agregar línea</button>
+    <button class="btn sm" id="addLine" style="margin-top:10px">+ Add line</button>
     ${isC?`
-    <div class="phead" style="margin:16px 0 6px;padding:0"><h3 style="font-size:13px">Costos adicionales (se prorratean por unidad)</h3></div>
+    <div class="phead" style="margin:16px 0 6px;padding:0"><h3 style="font-size:13px">Additional costs (spread across units)</h3></div>
     <div class="grid-form" style="grid-template-columns:1fr 1fr;padding:0">
       <div class="field"><label>Handling total</label><input class="inp num" id="d_hand" value="${draft.handling||0}"></div>
       <div class="field"><label>Flete total</label><input class="inp num" id="d_flete" value="${draft.flete||0}"></div>
     </div>
     <p class="hint" id="d_proHint" style="font-size:12px;margin:6px 0 0"></p>
     `:`
-    <div class="phead" style="margin:16px 0 6px;padding:0"><h3 style="font-size:13px">Envío al cliente</h3></div>
+    <div class="phead" style="margin:16px 0 6px;padding:0"><h3 style="font-size:13px">Customer shipping</h3></div>
     <div class="grid-form" style="grid-template-columns:auto 1fr;padding:0;align-items:end">
-      <div class="field"><label>Tipo</label>
+      <div class="field"><label>Type</label>
         <select class="inp" id="d_envtipo">
           <option value="free" ${draft.envio.tipo==="free"?"selected":""}>Free shipping</option>
-          <option value="monto" ${draft.envio.tipo==="monto"?"selected":""}>Monto</option>
+          <option value="monto" ${draft.envio.tipo==="monto"?"selected":""}>Flat amount</option>
         </select>
       </div>
-      <div class="field"><label>Costo de envío</label><input class="inp num" id="d_envmonto" value="${draft.envio.monto||0}" ${draft.envio.tipo==="free"?"disabled":""}></div>
+      <div class="field"><label>Shipping cost</label><input class="inp num" id="d_envmonto" value="${draft.envio.monto||0}" ${draft.envio.tipo==="free"?"disabled":""}></div>
     </div>`}
     <div id="docWarn"></div>
   `;
   const editing = !!draft.editingId;
   buildModal(
-    isC?(editing?"Editar compra":"Cargar compra"):(editing?"Editar venta":"Nueva venta"), body,
+    isC?(editing?"Edit purchase":"New purchase"):(editing?"Edit sale":"New sale"), body,
     [
-      {label:"Cancelar",cls:"btn",act:()=>{ draft.editingId=null; closeModal(); }},
-      {label: editing?"Guardar cambios" : (isC?"Confirmar compra (+stock)":"Confirmar venta (−stock)"),cls:isC?"btn up":"btn down",act:confirmDoc}
+      {label:"Cancel",cls:"btn",act:()=>{ draft.editingId=null; closeModal(); }},
+      {label: editing?"Save changes" : (isC?"Confirm purchase (+stock)":"Confirm sale (−stock)"),cls:isC?"btn up":"btn down",act:confirmDoc}
     ],
     true,
     `<div class="totrow"><span style="color:var(--muted)">Document total</span><span class="num" id="docTotal">${money(docTotal())}</span></div>`
@@ -2534,10 +2638,10 @@ function prodOptions(sel, soloConStock){
     const disp = soloConStock ? ` (disp: ${qty(p.stock)})` : "";
     return `<option value="${p.id}" ${p.id===sel?"selected":""}>${esc(p.sku?("["+p.sku+"] "):"")}${esc(p.nombre)}${disp}</option>`;
   }).join("");
-  const nuevo = soloConStock ? "" : `<option value="__new">＋ Crear producto nuevo…</option>`;
+  const nuevo = soloConStock ? "" : `<option value="__new">＋ Create new product…</option>`;
   const vacio = soloConStock && !lista.length
-    ? `<option value="">— no hay productos con stock —</option>`
-    : `<option value="">— elegir —</option>`;
+    ? `<option value="">— no products with stock —</option>`
+    : `<option value="">— choose —</option>`;
   return vacio + opts + nuevo;
 }
 
@@ -2556,7 +2660,8 @@ function totalLineas(arr){ return round2((arr||[]).reduce((a,x)=> a + round2((x.
    ============================================================ */
 function stockBaseVenta(prodId){
   const p = prodById(prodId); if(!p) return 0;
-  let s = p.stock || 0;
+  // Punto 15: la venta descuenta del LOCAL del documento, no del consolidado
+  let s = stockDe(p, (draft && draft.store) || STORE_IDS[0]) || 0;
   // si estamos EDITando una venta, el stock "vuelve" antes de re-validar
   if(draft && draft.editingId){
     const old = (draft.tipo==="compra"?db.compras:db.ventas).find(x=>x.id===draft.editingId);
@@ -2582,7 +2687,7 @@ function updateDispInfos(){
     const rem=dispRestante(l.productoId,i), comprom=comprometidoOtras(l.productoId,i);
     const over=(parseNum(l.cantidad)||0)>rem;
     div.style.color = over?"var(--alert)":"var(--muted)";
-    div.innerHTML = `disp: ${qty(p.stock)}${comprom>0?` · quedan ${qty(rem)}`:""}${over?" · <b>excede stock</b>":""}`;
+    div.innerHTML = `avail: ${qty(stockBaseVenta(l.productoId))}${comprom>0?` · left ${qty(rem)}`:""}${over?" · <b>over stock</b>":""}`;
   });
 }
 
@@ -2594,7 +2699,7 @@ function updateDispInfos(){
    ============================================================ */
 let _pickerAnchor = null;
 function pickerLabel(l){
-  if(l.crear) return { txt:"＋ Producto nuevo", ph:false };
+  if(l.crear) return { txt:"＋ New product", ph:false };
   if(l.productoId){ const p=prodById(l.productoId); return p ? { txt:(p.sku?("["+p.sku+"] "):"")+p.nombre, ph:false } : { txt:"— pick product —", ph:true }; }
   return { txt:"— pick product —", ph:true };
 }
@@ -2607,8 +2712,9 @@ function pickerItemsHTML(i, q){
   const isC = draft.tipo==="compra";
   const cur = draft.lineas[i].productoId;
   q = (q||"").trim().toLowerCase();
+  const vstore = (draft && draft.store) || STORE_IDS[0];
   let lista = isC ? db.productos.slice()
-                  : db.productos.filter(p=> (p.stock||0)>0 || p.id===cur);
+                  : db.productos.filter(p=> stockDe(p, vstore)>0 || p.id===cur);
   // orden alfabético SIEMPRE (task 2), por nombre
   lista.sort((a,b)=> String(a.nombre||"").localeCompare(String(b.nombre||""),"es",{numeric:true}));
   if(q) lista = lista.filter(p=> ((p.nombre||"")+" "+(p.sku||"")).toLowerCase().includes(q));
@@ -2620,10 +2726,10 @@ function pickerItemsHTML(i, q){
     return `<button type="button" class="ppick-item${sel}" data-pick="${p.id}">${sku}<span class="pi-name">${esc(p.nombre)}</span>${disp}</button>`;
   }).join("");
   if(!lista.length){
-    const hayStock = db.productos.some(p=>(p.stock||0)>0);
-    html = `<div class="ppick-empty">${isC ? "No hay productos que coincidan." : (hayStock?"No product with stock matches.":"No hay productos con stock disponible.")}</div>`;
+    const hayStock = db.productos.some(p=>stockDe(p, vstore)>0);
+    html = `<div class="ppick-empty">${isC ? "No products match." : (hayStock?"No product with stock matches.":`No stock available in ${esc(storeName(vstore))}.`)}</div>`;
   }
-  if(isC) html += `<button type="button" class="ppick-item new" data-pick="__new">＋ Crear producto nuevo…</button>`;
+  if(isC) html += `<button type="button" class="ppick-item new" data-pick="__new">＋ Create new product…</button>`;
   return html;
 }
 function positionPicker(pop, anchor){
@@ -2651,7 +2757,7 @@ function openProductPicker(i, anchor){
   closeProductPicker();
   _pickerAnchor = anchor; anchor.classList.add("open");
   const pop = document.createElement("div"); pop.className="ppick-pop";
-  pop.innerHTML = `<input class="inp ppick-search" placeholder="Buscar por nombre o SKU…" autocomplete="off" spellcheck="false"><div class="ppick-list"></div>`;
+  pop.innerHTML = `<input class="inp ppick-search" placeholder="Search by name or SKU…" autocomplete="off" spellcheck="false"><div class="ppick-list"></div>`;
   document.body.appendChild(pop);
   const search = pop.querySelector(".ppick-search");
   const listEl = pop.querySelector(".ppick-list");
@@ -2696,7 +2802,7 @@ function openClientePicker(anchor){
   closeProductPicker();
   _pickerAnchor = anchor; anchor.classList.add("open");
   const pop = document.createElement("div"); pop.className="ppick-pop";
-  pop.innerHTML = `<input class="inp ppick-search" placeholder="Buscar cliente por nombre o empresa…" autocomplete="off" spellcheck="false"><div class="ppick-list"></div>`;
+  pop.innerHTML = `<input class="inp ppick-search" placeholder="Search customer by name or company…" autocomplete="off" spellcheck="false"><div class="ppick-list"></div>`;
   document.body.appendChild(pop);
   const search = pop.querySelector(".ppick-search"), listEl = pop.querySelector(".ppick-list");
   const paint=(q)=>{
@@ -2705,8 +2811,8 @@ function openClientePicker(anchor){
     if(q) lista = lista.filter(c=> ((c.nombre||"")+" "+(c.empresa||"")+" "+(c.email||"")).toLowerCase().includes(q));
     let html = lista.map(c=>`<button type="button" class="ppick-item${c.id===draft.clienteId?" active":""}" data-pickcli="${c.id}">
       <span class="pi-name">${esc(c.nombre)}${c.empresa?` · ${esc(c.empresa)}`:""}</span></button>`).join("");
-    if(!lista.length) html = `<div class="ppick-empty">No hay clientes que coincidan.</div>`;
-    html += `<button type="button" class="ppick-item new" data-pickcli="__new">＋ Agregar cliente nuevo…</button>`;
+    if(!lista.length) html = `<div class="ppick-empty">No customers match.</div>`;
+    html += `<button type="button" class="ppick-item new" data-pickcli="__new">＋ Add new customer…</button>`;
     listEl.innerHTML = html;
     listEl.querySelectorAll("[data-pickcli]").forEach(it=> it.onclick=()=>{
       const v=it.dataset.pickcli; closeProductPicker();
@@ -2760,6 +2866,101 @@ function saveCliente(id){
   save(); toast("Customer saved"); renderDocModal();
 }
 
+
+/* ============================================================
+   VISTA: Clientes (punto 13) — listado, edición y borrado.
+   Las facturas guardan un snapshot del cliente (doc.cliente), así que
+   borrar el maestro NO altera las ventas históricas. Igual avisamos
+   cuántas ventas tiene asociadas antes de borrar.
+   ============================================================ */
+let cliFiltro = "";
+function ventasDeCliente(id){ return (db.ventas||[]).filter(v=>v.clienteId===id); }
+function viewClientes(){
+  const q = cliFiltro.trim().toLowerCase();
+  let list = (db.clientes||[]).slice().sort((a,b)=>String(a.nombre||"").localeCompare(String(b.nombre||""),"en",{numeric:true}));
+  if(q) list = list.filter(c=> ((c.nombre||"")+" "+(c.empresa||"")+" "+(c.email||"")+" "+(c.ciudad||"")+" "+(c.pais||"")).toLowerCase().includes(q));
+  const rows = list.map(c=>{
+    const nv = ventasDeCliente(c.id).length;
+    return `<tr>
+      <td><b>${esc(c.nombre||"—")}</b>${c.empresa?`<div class="hint" style="font-size:11.5px">${esc(c.empresa)}</div>`:""}</td>
+      <td>${esc(c.email||"—")}${c.telefono?`<div class="hint" style="font-size:11.5px">${esc(c.telefono)}</div>`:""}</td>
+      <td>${esc([c.ciudad,c.estado].filter(Boolean).join(", ")||"—")}</td>
+      <td>${esc(c.pais||"—")}</td>
+      <td class="r num">${nv}</td>
+      <td class="r" style="white-space:nowrap">
+        <a href="#" data-cliedit="${c.id}">Edit</a>
+        <a href="#" data-clidel="${c.id}" style="color:var(--down);margin-left:10px">Delete</a>
+      </td>
+    </tr>`;
+  }).join("");
+  const body = list.length
+    ? `<div class="table-scroll"><table>
+        <thead><tr><th>Customer</th><th>Email</th><th>City</th><th>Country</th><th class="r">Sales</th><th class="r">Actions</th></tr></thead>
+        <tbody>${rows}</tbody></table></div>`
+    : emptyState("No customers yet","Create one from a sale, or add it here with “New customer”.");
+  return `
+  <div class="head"><div class="title"><h2>Customers</h2><p>${db.clientes.length} customer(s). Invoices keep a snapshot, so deleting one won’t change past sales.</p></div>
+    <div class="actions"><button class="btn primary" data-clinew>+ New customer</button></div>
+  </div>
+  <div class="panel">
+    <div class="phead" style="gap:10px"><input class="inp" id="cliSearch" placeholder="Search by name, company, email, city or country…" value="${esc(cliFiltro)}" style="max-width:420px">
+      ${cliFiltro?`<button class="btn sm" data-cliclear>Clear</button>`:""}</div>
+    ${body}
+  </div>`;
+}
+function wireClientes(){
+  const m=document.getElementById("main");
+  const s=m.querySelector("#cliSearch"); if(s){ s.oninput=()=>{ cliFiltro=s.value; const b=m.querySelector(".table-scroll"); render(); const s2=document.getElementById("cliSearch"); if(s2){ s2.focus(); s2.setSelectionRange(s2.value.length,s2.value.length); } }; }
+  const cc=m.querySelector("[data-cliclear]"); if(cc) cc.onclick=()=>{ cliFiltro=""; render(); };
+  const nw=m.querySelector("[data-clinew]"); if(nw) nw.onclick=()=> openClienteStandalone(null);
+  m.querySelectorAll("[data-cliedit]").forEach(a=> a.onclick=e=>{ e.preventDefault(); openClienteStandalone(a.dataset.cliedit); });
+  m.querySelectorAll("[data-clidel]").forEach(a=> a.onclick=e=>{ e.preventDefault(); deleteCliente(a.dataset.clidel); });
+}
+/* Form de cliente independiente de la venta (no toca draft). */
+function openClienteStandalone(id){
+  const c = id ? clienteById(id) : null;
+  buildModal(c?"Edit customer":"New customer", `
+    <div class="grid-form" style="grid-template-columns:1fr 1fr;padding:0">
+      <div class="field" style="grid-column:1/3"><label>Customer name <span class="hint" style="font-weight:400">· required</span></label><input class="inp" id="cs_nom" value="${c?esc(c.nombre):""}"></div>
+      <div class="field"><label>Contact name</label><input class="inp" id="cs_con" value="${c?esc(c.contacto):""}"></div>
+      <div class="field"><label>Company</label><input class="inp" id="cs_emp" value="${c?esc(c.empresa):""}"></div>
+      <div class="field"><label>Phone</label><input class="inp" id="cs_tel" value="${c?esc(c.telefono):""}"></div>
+      <div class="field"><label>Email</label><input class="inp" id="cs_mail" value="${c?esc(c.email):""}"></div>
+      <div class="field" style="grid-column:1/3"><label>Address</label><input class="inp" id="cs_dir" value="${c?esc(c.direccion):""}" placeholder="Street address"></div>
+      <div class="field"><label>City</label><input class="inp" id="cs_ciu" value="${c?esc(c.ciudad):""}"></div>
+      <div class="field"><label>State</label><input class="inp" id="cs_est" value="${c?esc(c.estado):""}" placeholder="FL, NJ..."></div>
+      <div class="field"><label>ZIP</label><input class="inp" id="cs_zip" value="${c?esc(c.zip):""}"></div>
+      <div class="field"><label>Country</label><input class="inp" id="cs_pais" value="${c?esc(c.pais):""}" placeholder="USA, Japan, Argentina..."></div>
+    </div>
+  `, [
+    {label:"Cancel",cls:"btn",act:closeModal},
+    {label:"Save customer",cls:"btn primary",act:()=>saveClienteStandalone(id)}
+  ], true);
+  document.getElementById("cs_nom").focus();
+}
+function saveClienteStandalone(id){
+  const g=x=>document.getElementById(x).value.trim();
+  const nom=g("cs_nom");
+  if(!nom){ toast("Customer name is required","warn"); return; }
+  const mail=g("cs_mail");
+  if(mail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(mail)){ toast("The email format isn't valid","warn"); return; }
+  const campos={ nombre:nom, contacto:g("cs_con"), empresa:g("cs_emp"), telefono:g("cs_tel"),
+                 email:mail, direccion:g("cs_dir"), ciudad:g("cs_ciu"), estado:g("cs_est"), zip:g("cs_zip"), pais:g("cs_pais") };
+  if(id){ Object.assign(clienteById(id), campos); }
+  else { db.clientes.push(Object.assign({id:uid()}, campos)); }
+  save(); toast("Customer saved"); closeModal(); render();
+}
+function deleteCliente(id){
+  const c=clienteById(id); if(!c) return;
+  const nv=ventasDeCliente(id).length;
+  const msg = nv>0
+    ? `Delete "${c.nombre}"?\n\nThis customer has ${nv} sale(s). Those invoices keep their own snapshot and won't change, but the customer will no longer appear in the picker or list.`
+    : `Delete "${c.nombre}"?`;
+  if(!confirm(msg)) return;
+  db.clientes = db.clientes.filter(x=>x.id!==id);
+  save(); toast("Customer deleted","warn"); render();
+}
+
 function renderLines(){
   const isC = draft.tipo==="compra";
   const host = document.getElementById("lineHost");
@@ -2769,7 +2970,7 @@ function renderLines(){
       const newFields = l.crear ? `
         <div style="display:flex;gap:6px;margin-top:6px">
           <input class="inp" placeholder="SKU" value="${esc(l.sku)}" data-k="sku" data-i="${i}" style="max-width:110px">
-          <input class="inp" placeholder="Nombre del producto nuevo" value="${esc(l.nombre)}" data-k="nombre" data-i="${i}">
+          <input class="inp" placeholder="New product name" value="${esc(l.nombre)}" data-k="nombre" data-i="${i}">
         </div>` : "";
       return `<tr>
         <td style="min-width:220px">
@@ -2779,7 +2980,7 @@ function renderLines(){
         <td style="width:90px"><input class="inp num" data-k="cantidad" data-i="${i}" value="${l.cantidad}"></td>
         <td style="width:120px"><input class="inp num" data-k="precio" data-i="${i}" value="${l.precio}"></td>
         <td class="r num sub-cell" style="width:120px">${money(l.cantidad*l.precio)}</td>
-        <td style="width:34px"><button class="btn ghost sm" data-del="${i}" title="Quitar">✕</button></td>
+        <td style="width:34px"><button class="btn ghost sm" data-del="${i}" title="Remove">✕</button></td>
       </tr>`;
     }
     // ---- VENTA ----
@@ -2787,7 +2988,7 @@ function renderLines(){
     const comprom = p ? comprometidoOtras(l.productoId, i) : 0;
     const over = p && (parseNum(l.cantidad)||0) > rem;
     const dispInfo = p
-      ? `<div class="disp-info" data-di="${i}" style="font-size:11px;margin-top:4px;color:${over?'var(--alert)':'var(--muted)'}">disp: ${qty(p.stock)}${comprom>0?` · quedan ${qty(rem)}`:""}${over?" · <b>excede stock</b>":""}</div>`
+      ? `<div class="disp-info" data-di="${i}" style="font-size:11px;margin-top:4px;color:${over?'var(--alert)':'var(--muted)'}">avail: ${qty(stockBaseVenta(l.productoId))}${comprom>0?` · left ${qty(rem)}`:""}${over?" · <b>over stock</b>":""}</div>`
       : `<div class="disp-info" data-di="${i}" style="font-size:11px;margin-top:4px"></div>`;
     return `<tr>
       <td style="min-width:220px">
@@ -2800,13 +3001,13 @@ function renderLines(){
       <td style="width:110px"><input class="inp num" data-k="precio" data-i="${i}" value="${l.precio}"></td>
       <td class="r num" style="width:52px;color:var(--muted)" data-mg="${i}">${p&&l.precio>0?nf0.format((l.precio-l.costoRef)/l.precio*100)+"%":"—"}</td>
       <td class="r num sub-cell" style="width:100px">${money(l.cantidad*l.precio)}</td>
-      <td style="width:34px"><button class="btn ghost sm" data-del="${i}" title="Quitar">✕</button></td>
+      <td style="width:34px"><button class="btn ghost sm" data-del="${i}" title="Remove">✕</button></td>
     </tr>`;
   }).join("");
 
   const thead = isC
-    ? `<tr><th>Producto</th><th class="r">Cant.</th><th class="r">Costo unit.</th><th class="r">Subtotal</th><th></th></tr>`
-    : `<tr><th>Producto</th><th class="r">Cant.</th><th class="r">Costo</th><th class="r">Markup&nbsp;%</th><th class="r">Precio unit.</th><th class="r" title="Real margin on revenue">Mg&nbsp;%</th><th class="r">Subtotal</th><th></th></tr>`;
+    ? `<tr><th>Product</th><th class="r">Qty</th><th class="r">Unit cost</th><th class="r">Subtotal</th><th></th></tr>`
+    : `<tr><th>Product</th><th class="r">Qty</th><th class="r">Cost</th><th class="r">Markup&nbsp;%</th><th class="r">Unit price</th><th class="r" title="Real margin on revenue">Mrg&nbsp;%</th><th class="r">Subtotal</th><th></th></tr>`;
   host.innerHTML = `<div class="table-scroll"><table class="line-tbl">
     <thead>${thead}</thead>
     <tbody>${rows}</tbody></table></div>`;
@@ -2895,11 +3096,17 @@ function confirmDoc(){
     if(!l.cantidad || l.cantidad<=0) continue;
     let p=null;
     if(l.crear){
-      if(!l.nombre.trim()){ toast("A new product is missing its name","warn"); return; }
+      // Punto 5: si el SKU YA existe, lo adoptamos automáticamente en vez de crear
+      // un duplicado (esto evitaba el error "already belongs" y los productos
+      // fantasma en cero del punto 7).
       const dup = skuEnUso(l.sku, null);
-      if(dup){ toast(`SKU "${(l.sku||"").trim()}" already belongs to "${dup.nombre}". Pick it in the line instead of creating a new one.`,"warn"); return; }
-      p = nuevoProductoBase(l.sku, l.nombre, isC?(l.precioVentaSugerido||0):l.precio);
-      db.productos.push(p);
+      if(dup){
+        p = dup;
+      } else {
+        if(!l.nombre.trim()){ toast("A new product is missing its name","warn"); return; }
+        p = nuevoProductoBase(l.sku, l.nombre, isC?(l.precioVentaSugerido||0):l.precio);
+        db.productos.push(p);
+      }
     } else {
       p = prodById(l.productoId);
       if(!p){ toast("A line has no product assigned","warn"); return; }
@@ -2942,9 +3149,13 @@ function confirmDoc(){
     const pedido={};
     resolved.forEach(r=>{ pedido[r.prod.id]=(pedido[r.prod.id]||0)+r.cantidad; });
     const faltantes=[];
+    // Si estamos editando y NO cambiamos de local, el stock del doc original "vuelve"
+    // y podemos revalidarlo. Si movimos el doc a OTRO local, ese revert pertenece al
+    // local viejo, no al nuevo -> no lo acreditamos acá (punto 10).
+    const sameStore = editing && oldDoc && (oldDoc.store===store);
     Object.keys(pedido).forEach(id=>{
       const p=prodById(id);
-      const eff = stockDe(p, store) + (revertMap[id]||0);   // store stock (+ revert if editing same store)
+      const eff = stockDe(p, store) + (sameStore ? (revertMap[id]||0) : 0);
       if(pedido[id]>eff) faltantes.push(`• ${p.nombre}: available ${qty(eff)} in ${storeName(store)}, you asked ${qty(pedido[id])}`);
     });
     if(faltantes.length){
@@ -2961,7 +3172,7 @@ function confirmDoc(){
                        : round2(subtotalLineas + envioMonto);
   const doc = {
     id: editing ? draft.editingId : uid(), tipo:draft.tipo, store, contraparte:draft.contraparte.trim(),
-    fecha:draft.fecha, numero:draft.numero.trim(),
+    fecha:normISO(draft.fecha) || new Date().toISOString().slice(0,10), numero:draft.numero.trim(),
     lineas: resolved.map(r=>{
       const base = { productoId:r.prod.id, sku:r.prod.sku, nombre:r.prod.nombre, cantidad:r.cantidad, precio:r.precio, costo:r.costo };
       if(isC){
@@ -2980,7 +3191,7 @@ function confirmDoc(){
     doc.envio = { tipo:draft.envio.tipo, monto:envioMonto };
     doc.contraparte = cli ? clienteLinea(cli) : draft.contraparte.trim();
   }
-  const refTxt = (isC?"Compra":"Venta") + (doc.numero?(" "+doc.numero):"") + (doc.contraparte?(" · "+doc.contraparte):"");
+  const refTxt = (isC?"Purchase":"Sale") + (doc.numero?(" "+doc.numero):"") + (doc.contraparte?(" · "+doc.contraparte):"");
 
   // Recién ahora mutamos: primero revertimos el documento original (si estábamos editando)
   if(oldDoc) revertDoc(oldDoc);
@@ -3008,8 +3219,8 @@ function confirmDoc(){
   draft.editingId=null;
   save(); closeModal();
   const uds=qty(doc.lineas.reduce((a,l)=>a+l.cantidad,0));
-  toast(editing ? `Documento actualizado`
-       : (isC?`Compra cargada · +${uds} u` : `Venta registrada · −${uds} u`), isC?"up":"down");
+  toast(editing ? `Document updated`
+       : (isC?`Purchase saved · +${uds} u` : `Sale recorded · −${uds} u`), isC?"up":"down");
   render();
 }
 
@@ -3066,7 +3277,7 @@ function editDoc(tipo,id){
   const list = tipo==="compra"?db.compras:db.ventas;
   const d=list.find(x=>x.id===id); if(!d) return;
   draft = {
-    tipo, editingId:id, store:d.store||STORE_IDS[0], contraparte:d.contraparte||"", fecha:d.fecha, numero:d.numero||"",
+    tipo, editingId:id, store:d.store||STORE_IDS[0], storeOrig:d.store||STORE_IDS[0], contraparte:d.contraparte||"", fecha:normISO(d.fecha), numero:d.numero||"",
     clienteId:d.clienteId||"", envio: d.envio ? {tipo:d.envio.tipo, monto:d.envio.monto||0} : {tipo:"free",monto:0},
     handling:d.handling||0, flete:d.flete||0,
     lineas: d.lineas.map(l=>({ key:uid(), productoId:l.productoId, sku:l.sku, nombre:l.nombre, cantidad:l.cantidad, precio:l.precio,
@@ -3122,16 +3333,16 @@ function verDoc(tipo,id){
   const cli = d.cliente || (d.clienteId?clienteById(d.clienteId):null);
   const sub = (d.subtotal!=null) ? d.subtotal : totalLineas(d.lineas);
   const extras = isC
-    ? ((d.handling||d.flete) ? `<div class="totrow"><span style="color:var(--muted)">Handling + flete</span><span class="num">${money((d.handling||0)+(d.flete||0))}</span></div>` : "")
-    : `<div class="totrow"><span style="color:var(--muted)">Envío</span><span class="num">${d.envio&&d.envio.tipo==="monto"?money(d.envio.monto):"Free shipping"}</span></div>`;
+    ? ((d.handling||d.flete) ? `<div class="totrow"><span style="color:var(--muted)">Handling + freight</span><span class="num">${money((d.handling||0)+(d.flete||0))}</span></div>` : "")
+    : `<div class="totrow"><span style="color:var(--muted)">Shipping</span><span class="num">${d.envio&&d.envio.tipo==="monto"?money(d.envio.monto):"Free shipping"}</span></div>`;
   const cliBlock = (!isC && cli) ? `<p style="margin:0 0 14px;color:var(--muted);font-size:13px">
       <b>${esc(cli.nombre)}</b>${cli.empresa?` · ${esc(cli.empresa)}`:""}<br>
       ${esc(clienteDireccion(cli)||"")}${cli.email?`<br>${esc(cli.email)}`:""}${cli.telefono?` · ${esc(cli.telefono)}`:""}</p>` : "";
-  buildModal(`${isC?"Compra":"Invoice"} ${esc(d.numero||"")}`.trim(), `
-    <p style="margin:0 0 6px;color:var(--muted);font-size:14px">${esc(d.contraparte||"—")} · ${esc(d.fecha)}</p>
+  buildModal(`${isC?"Purchase":"Invoice"} ${esc(d.numero||"")}`.trim(), `
+    <p style="margin:0 0 6px;color:var(--muted);font-size:14px">${esc(d.contraparte||"—")} · ${esc(fmtDate(d.fecha))}</p>
     ${cliBlock}
     <div class="table-scroll"><table>
-      <thead><tr><th>Producto</th><th class="r">Cant.</th><th class="r">${isC?"Costo":"Precio"}</th><th class="r">Subtotal</th></tr></thead>
+      <thead><tr><th>Product</th><th class="r">Qty</th><th class="r">${isC?"Cost":"Price"}</th><th class="r">Subtotal</th></tr></thead>
       <tbody>${rows}</tbody></table></div>
     <div class="totrow"><span style="color:var(--muted)">Subtotal</span><span class="num">${money(sub)}</span></div>
     ${extras}
@@ -3140,7 +3351,7 @@ function verDoc(tipo,id){
     {label:"Borrar",cls:"btn danger",act:()=>deleteDoc(tipo,id)},
     ...(isC?[]:[{label:"⤓ Descargar PDF",cls:"btn",act:()=>generarInvoicePDF(id)},
               {label:"Copiar",cls:"btn",act:()=>copyDoc(tipo,id)}]),
-    {label:"Editar",cls:"btn",act:()=>{ closeModal(); editDoc(tipo,id); }},
+    {label:"Edit",cls:"btn",act:()=>{ closeModal(); editDoc(tipo,id); }},
     {label:"Cerrar",cls:"btn",act:closeModal}
   ]);
 }
@@ -3154,84 +3365,122 @@ function pdfMoney(n){ return db.config.moneda + " " + nf2.format(n||0); }
 
 function generarInvoicePDF(id){
   if(!pdfReady()){ toast("Couldn't load the PDF generator (try once with internet)","warn"); return; }
-  const d = db.ventas.find(v=>v.id===id); if(!d){ toast("Venta no encontrada","warn"); return; }
+  const d = db.ventas.find(v=>v.id===id); if(!d){ toast("Sale not found","warn"); return; }
   const cli = d.cliente || (d.clienteId?clienteById(d.clienteId):null);
   const { jsPDF } = window.jspdf;
-  const doc = new jsPDF({ unit:"pt", format:"letter" });   // formato US (Letter)
-  const M=48, W=doc.internal.pageSize.getWidth();
-  let y=54;
-  const em=db.config.emisor||{};
+  const doc = new jsPDF({ unit:"pt", format:"letter" });
+  const W = doc.internal.pageSize.getWidth();
+  const H = doc.internal.pageSize.getHeight();
+  const M = 48;
+  const em = db.config.emisor||{};
+  // Paleta (mismo azul del tema)
+  const INK=[26,26,26], MUT=[120,120,120], LINE=[228,225,220], ACC=[37,99,235], ZEBRA=[248,247,245];
+  const setInk=(c)=>doc.setTextColor(c[0],c[1],c[2]);
 
-  // Encabezado
-  doc.setFont("helvetica","bold"); doc.setFontSize(20);
-  doc.text(em.nombre || "INVOICE", M, y);
-  doc.setFont("helvetica","normal"); doc.setFontSize(10); doc.setTextColor(90);
-  let yr=54;
-  const right=(t,yy)=>{ doc.text(t, W-M, yy, {align:"right"}); };
-  doc.setFont("helvetica","bold"); doc.setFontSize(13); doc.setTextColor(20);
-  right("INVOICE", yr); yr+=16;
-  doc.setFont("helvetica","normal"); doc.setFontSize(10); doc.setTextColor(90);
-  right(`#${d.numero||"—"}`, yr); yr+=13;
-  right(`Date: ${d.fecha||""}`, yr);
-  if(em.direccion||em.email||em.tel){
-    y+=16; doc.setFontSize(9); doc.setTextColor(110);
-    [em.direccion, em.email, em.tel].filter(Boolean).forEach(t=>{ doc.text(String(t), M, y); y+=12; });
-  }
-  y=Math.max(y, 108);
+  /* ---------- Header band ---------- */
+  doc.setFillColor(ACC[0],ACC[1],ACC[2]); doc.rect(0,0,W,96,"F");
+  doc.setTextColor(255,255,255);
+  doc.setFont("helvetica","bold"); doc.setFontSize(19);
+  doc.text(em.nombre || "INVOICE", M, 42);
+  doc.setFont("helvetica","normal"); doc.setFontSize(8.5);
+  let hy=60;
+  [em.direccion, [em.email, em.tel].filter(Boolean).join("  ·  ")].filter(Boolean).forEach(t=>{ doc.text(String(t), M, hy); hy+=12; });
+  // right side: INVOICE + number + date
+  doc.setFont("helvetica","bold"); doc.setFontSize(22);
+  doc.text("INVOICE", W-M, 40, {align:"right"});
+  doc.setFont("helvetica","normal"); doc.setFontSize(9.5);
+  doc.text(`No. ${d.numero||"—"}`, W-M, 58, {align:"right"});
+  doc.text(fmtDate(d.fecha), W-M, 72, {align:"right"});
 
-  // Bill To
-  doc.setDrawColor(220); doc.line(M, y, W-M, y); y+=20;
-  doc.setFont("helvetica","bold"); doc.setFontSize(10); doc.setTextColor(20);
-  doc.text("BILL TO", M, y); y+=15;
-  doc.setFont("helvetica","normal"); doc.setTextColor(60);
+  /* ---------- Bill To ---------- */
+  let y=132;
+  doc.setFont("helvetica","bold"); doc.setFontSize(9); setInk(MUT);
+  doc.text("BILL TO", M, y);
+  doc.text("STORE", W-M-150, y);
+  y+=15; setInk(INK); doc.setFontSize(10);
+  const leftLines=[];
   if(cli){
-    doc.setFont("helvetica","bold"); doc.text(cli.nombre||"", M, y); doc.setFont("helvetica","normal"); y+=13;
-    const linea2=[cli.empresa, cli.contacto].filter(Boolean).join(" · ");
-    if(linea2){ doc.text(linea2, M, y); y+=13; }
-    if(cli.direccion){ doc.text(cli.direccion, M, y); y+=13; }
-    const cz=[cli.ciudad, cli.estado, cli.zip].filter(Boolean).join(", ");
-    if(cz){ doc.text(cz, M, y); y+=13; }
-    const ce=[cli.email, cli.telefono].filter(Boolean).join(" · ");
-    if(ce){ doc.text(ce, M, y); y+=13; }
-  } else { doc.text("—", M, y); y+=13; }
-  y+=10;
+    leftLines.push(["bold", cli.nombre||""]);
+    const l2=[cli.empresa, cli.contacto].filter(Boolean).join(" · "); if(l2) leftLines.push(["normal", l2]);
+    if(cli.direccion) leftLines.push(["normal", cli.direccion]);
+    const cz=[cli.ciudad, cli.estado, cli.zip].filter(Boolean).join(", "); if(cz) leftLines.push(["normal", cz]);
+    if(cli.pais) leftLines.push(["normal", cli.pais]);
+    const ce=[cli.email, cli.telefono].filter(Boolean).join(" · "); if(ce) leftLines.push(["muted", ce]);
+  } else leftLines.push(["normal","—"]);
+  let ly=y;
+  leftLines.forEach(([style,txt])=>{
+    doc.setFont("helvetica", style==="bold"?"bold":"normal"); setInk(style==="muted"?MUT:INK);
+    doc.setFontSize(style==="bold"?10.5:9.5);
+    doc.splitTextToSize(txt, 260).forEach(t=>{ doc.text(t, M, ly); ly+=13; });
+  });
+  // store box (right)
+  doc.setFont("helvetica","normal"); doc.setFontSize(10); setInk(INK);
+  doc.text(storeName(d.store||STORE_IDS[0]), W-M-150, y);
 
-  // Tabla
-  const cols=[ {x:M, w:W-M-M-210, t:"Item", a:"left"},
-               {x:W-M-210, w:50, t:"Qty", a:"right"},
-               {x:W-M-150, w:70, t:"Unit price", a:"right"},
-               {x:W-M-70,  w:70, t:"Amount", a:"right"} ];
-  doc.setFillColor(245); doc.rect(M, y-12, W-2*M, 22, "F");
-  doc.setFont("helvetica","bold"); doc.setFontSize(9.5); doc.setTextColor(40);
-  cols.forEach(c=> doc.text(c.t, c.a==="right"?(c.x+c.w):c.x, y+3, {align:c.a}));
-  y+=22;
-  doc.setFont("helvetica","normal"); doc.setTextColor(55);
+  /* ---------- Table ---------- */
+  y = Math.max(ly, y+13) + 18;
+  const cItem=M, wItem=W-M-M-200;
+  const cQty=W-M-200, wQty=44;
+  const cUnit=W-M-150, wUnit=74;
+  const cAmt=W-M-70, wAmt=70;
+  const drawHead=(yy)=>{
+    doc.setFillColor(ACC[0],ACC[1],ACC[2]); doc.rect(M, yy-13, W-2*M, 24, "F");
+    doc.setTextColor(255,255,255); doc.setFont("helvetica","bold"); doc.setFontSize(9);
+    doc.text("ITEM", cItem+6, yy+3);
+    doc.text("QTY", cQty+wQty, yy+3, {align:"right"});
+    doc.text("UNIT PRICE", cUnit+wUnit, yy+3, {align:"right"});
+    doc.text("AMOUNT", cAmt+wAmt, yy+3, {align:"right"});
+    return yy+24;
+  };
+  y = drawHead(y);
+  doc.setFont("helvetica","normal");
+  let zebra=false;
   d.lineas.forEach(l=>{
-    if(y>720){ doc.addPage(); y=60; }
     const nom=(l.sku?`[${l.sku}] `:"")+(l.nombre||"");
-    const wrapped=doc.splitTextToSize(nom, cols[0].w);
-    doc.text(wrapped, cols[0].x, y);
-    doc.text(qty(l.cantidad), cols[1].x+cols[1].w, y, {align:"right"});
-    doc.text(pdfMoney(l.precio), cols[2].x+cols[2].w, y, {align:"right"});
-    doc.text(pdfMoney(l.cantidad*l.precio), cols[3].x+cols[3].w, y, {align:"right"});
-    y += Math.max(16, wrapped.length*12);
-    doc.setDrawColor(238); doc.line(M, y-6, W-M, y-6);
+    const wrapped=doc.splitTextToSize(nom, wItem-8);
+    const rowH=Math.max(20, wrapped.length*11.5 + 8);
+    if(y+rowH>H-96){ y=drawHead(60); zebra=false; }
+    if(zebra){ doc.setFillColor(ZEBRA[0],ZEBRA[1],ZEBRA[2]); doc.rect(M, y-12, W-2*M, rowH, "F"); }
+    zebra=!zebra;
+    const tTop=y+1;                                  // baseline superior del renglón
+    setInk(INK); doc.setFontSize(9.5);
+    doc.text(wrapped, cItem+6, tTop);
+    setInk(INK);
+    doc.text(qty(l.cantidad), cQty+wQty, tTop, {align:"right"});
+    doc.text(pdfMoney(l.precio), cUnit+wUnit, tTop, {align:"right"});
+    doc.setFont("helvetica","bold"); doc.text(pdfMoney(l.cantidad*l.precio), cAmt+wAmt, tTop, {align:"right"}); doc.setFont("helvetica","normal");
+    y += rowH;
+    doc.setDrawColor(LINE[0],LINE[1],LINE[2]); doc.line(M, y-6, W-M, y-6);
   });
 
-  // Totales
-  y+=6; const sub=(d.subtotal!=null)?d.subtotal:totalLineas(d.lineas);
+  /* ---------- Totals box ---------- */
+  y+=14;
+  const sub=(d.subtotal!=null)?d.subtotal:totalLineas(d.lineas);
   const envio = d.envio && d.envio.tipo==="monto" ? (d.envio.monto||0) : 0;
-  const tot=(row,val,bold)=>{ doc.setFont("helvetica",bold?"bold":"normal"); doc.setTextColor(bold?20:90);
-    doc.text(row, W-M-160, y, {align:"left"}); doc.text(val, W-M, y, {align:"right"}); y+=16; };
-  tot("Subtotal", pdfMoney(sub));
-  tot("Shipping", d.envio && d.envio.tipo==="free" ? "Free" : pdfMoney(envio));
-  doc.setDrawColor(200); doc.line(W-M-160, y-8, W-M, y-8);
-  doc.setFontSize(11); tot("TOTAL", pdfMoney(d.total), true);
+  const boxX=W-M-230, boxW=230;
+  const line=(label,val,opts={})=>{
+    doc.setFont("helvetica",opts.bold?"bold":"normal");
+    doc.setFontSize(opts.big?12:10);
+    setInk(opts.bold?INK:MUT);
+    doc.text(label, boxX, y); setInk(opts.bold?INK:INK);
+    doc.text(val, W-M, y, {align:"right"}); y+= opts.big?22:16;
+  };
+  line("Subtotal", pdfMoney(sub));
+  line("Shipping", d.envio && d.envio.tipo==="free" ? "Free" : pdfMoney(envio));
+  y+=4;
+  doc.setDrawColor(ACC[0],ACC[1],ACC[2]); doc.setLineWidth(1.2); doc.line(boxX, y-8, W-M, y-8); doc.setLineWidth(1);
+  y+=4;
+  doc.setFillColor(ACC[0],ACC[1],ACC[2]);
+  const total=(d.total!=null)?d.total:round2(sub+envio);
+  line("TOTAL", pdfMoney(total), {bold:true, big:true});
 
-  doc.setFontSize(8.5); doc.setTextColor(150);
-  doc.text("Thank you for your business.", M, 760);
-  doc.save(`invoice-${(d.numero||"venta")}.pdf`);
-  toast("Invoice descargado");
+  /* ---------- Footer ---------- */
+  setInk(MUT); doc.setFont("helvetica","normal"); doc.setFontSize(8.5);
+  doc.text("Thank you for your business.", M, H-46);
+  doc.setDrawColor(LINE[0],LINE[1],LINE[2]); doc.line(M, H-58, W-M, H-58);
+
+  doc.save(`invoice-${(d.numero||"sale")}.pdf`);
+  toast("Invoice downloaded");
 }
 
 /* Lista de precios para clientes (punto 10). Recibe la lista ya filtrada. */
@@ -3279,73 +3528,127 @@ function exportPnL(desde, hasta){
   if(!window.XLSX){ toast("Couldn't load the Excel engine (try once with internet)","warn"); return; }
   const d0 = desde ? new Date(desde+"T00:00:00") : null;
   const d1 = hasta ? new Date(hasta+"T23:59:59") : null;
-  const inRange = v=>{ const f=new Date(v.fecha+"T12:00:00"); if(d0&&f<d0) return false; if(d1&&f>d1) return false; return true; };
+  const inRange = v=>{ const f=new Date((normISO(v.fecha)||v.fecha)+"T12:00:00"); if(d0&&f<d0) return false; if(d1&&f>d1) return false; return true; };
 
-  // aggregate sales by store + product
-  const agg = {};  // store -> prodKey -> {sku,nombre,units,revenue,cogs}
-  STORE_IDS.forEach(s=> agg[s]={});
+  // ---- Aggregations ----
+  // Por local: ingresos por producto, flete cobrado al cliente, COGS (FIFO real),
+  //            y detalle por producto (para las hojas de análisis).
+  const stTot = {};                 // store -> {sales, shipping, cogs}
+  const detail = {};                // store -> prodKey -> {sku,nombre,units,revenue,cogs}
+  STORE_IDS.forEach(s=>{ stTot[s]={sales:0,shipping:0,cogs:0}; detail[s]={}; });
+
   db.ventas.filter(inRange).forEach(v=>{
     const st = v.store || STORE_IDS[0];
-    v.lineas.forEach(l=>{
-      const k=l.productoId||l.sku||l.nombre;
-      const e = agg[st][k] = agg[st][k] || { sku:l.sku||"", nombre:l.nombre||"", units:0, revenue:0, cogs:0 };
-      e.units += l.cantidad;
-      e.revenue += round2((l.precio||0)*l.cantidad);
-      e.cogs += round2(l.cogs!=null ? l.cogs : (l.costo||0)*l.cantidad);
+    if(!stTot[st]){ stTot[st]={sales:0,shipping:0,cogs:0}; detail[st]={}; }
+    (v.lineas||[]).forEach(l=>{
+      const rev = round2((l.precio||0)*l.cantidad);
+      const cogs = round2(l.cogs!=null ? l.cogs : (l.costo||0)*l.cantidad);
+      stTot[st].sales += rev; stTot[st].cogs += cogs;
+      const k = l.productoId||l.sku||l.nombre;
+      const e = detail[st][k] = detail[st][k] || { sku:l.sku||"", nombre:l.nombre||"", units:0, revenue:0, cogs:0 };
+      e.units += l.cantidad; e.revenue += rev; e.cogs += cogs;
     });
+    if(v.envio && v.envio.tipo==="monto") stTot[st].shipping += round2(v.envio.monto||0);
   });
+  STORE_IDS.forEach(s=>{ stTot[s].sales=round2(stTot[s].sales); stTot[s].shipping=round2(stTot[s].shipping); stTot[s].cogs=round2(stTot[s].cogs); });
 
+  const consol = { sales:0, shipping:0, cogs:0 };
+  STORE_IDS.forEach(s=>{ consol.sales+=stTot[s].sales; consol.shipping+=stTot[s].shipping; consol.cogs+=stTot[s].cogs; });
+  consol.sales=round2(consol.sales); consol.shipping=round2(consol.shipping); consol.cogs=round2(consol.cogs);
+
+  // ---- Formatos de celda (SheetJS CE sólo soporta number formats, no negrita) ----
+  const MFMT = '"$"#,##0.00;("$"#,##0.00)';   // moneda, negativos entre paréntesis (estilo contable)
+  const PFMT = '0.0%';
+  const setFmt = (ws, ref, z)=>{ const c=ws[ref]; if(c && typeof c.v==="number") c.z=z; };
+  const colLetters = ["A","B","C","D","E","F","G","H"];
+
+  const period = `Period: ${desde?fmtDate(desde):"start"}  →  ${hasta?fmtDate(hasta):"today"}`;
   const wb = XLSX.utils.book_new();
+
+  /* ---------- HOJA 1: Income Statement (multi-step + análisis vertical) ---------- */
+  // Columnas: Concept | Akira | Silver | Consolidated | % of revenue
+  const netA = round2(stTot.akira.sales + stTot.akira.shipping);
+  const netS = round2(stTot.silver.sales + stTot.silver.shipping);
+  const netC = round2(consol.sales + consol.shipping);
+  const gpA = round2(netA - stTot.akira.cogs);
+  const gpS = round2(netS - stTot.silver.cogs);
+  const gpC = round2(netC - consol.cogs);
+  const pct = (n)=> netC>0 ? (n/netC) : 0;   // vertical analysis sobre net revenue consolidado
+
+  const IS = [
+    ["Income Statement (Preliminary)"],
+    [period],
+    [""],
+    ["Concept", storeName("akira"), storeName("silver"), "Consolidated", "% of revenue"],
+    ["Product sales", stTot.akira.sales, stTot.silver.sales, consol.sales, pct(consol.sales)],
+    ["Shipping billed to customers", stTot.akira.shipping, stTot.silver.shipping, consol.shipping, pct(consol.shipping)],
+    ["Net revenue", netA, netS, netC, pct(netC)],
+    ["Cost of goods sold (FIFO)", -stTot.akira.cogs, -stTot.silver.cogs, -consol.cogs, pct(-consol.cogs)],
+    ["Gross profit", gpA, gpS, gpC, pct(gpC)],
+    ["Gross margin %", (netA>0?gpA/netA:0), (netS>0?gpS/netS:0), (netC>0?gpC/netC:0), ""],
+    [""],
+    ["Operating expenses", "n/a", "n/a", "n/a", ""],
+    ["  (rent, payroll, marketing, fees — not tracked in this system)"],
+    ["Operating income", gpA, gpS, gpC, pct(gpC)],
+    [""],
+    ["Notes:"],
+    ["• COGS uses actual FIFO cost layers (not last cost)."],
+    ["• Inbound freight/handling is capitalized into landed cost, so it is already inside COGS."],
+    ["• Operating expenses are not captured here — plug them into your structure-cost model."],
+  ];
+  const ws1 = XLSX.utils.aoa_to_sheet(IS);
+  ws1["!cols"]=[{wch:44},{wch:14},{wch:14},{wch:16},{wch:13}];
+  ws1["!merges"]=[
+    {s:{r:0,c:0},e:{r:0,c:4}},
+    {s:{r:1,c:0},e:{r:1,c:4}},
+  ];
+  // aplicar formatos: filas de datos 5..14 (0-indexed r=4..13), cols B..D moneda, E %
+  for(let r=4;r<=13;r++){
+    ["B","C","D"].forEach(col=> setFmt(ws1, col+(r+1), MFMT));
+    setFmt(ws1, "E"+(r+1), PFMT);
+  }
+  // fila 10 (Gross margin %) las cols B..D son porcentaje, no moneda
+  ["B","C","D"].forEach(col=> setFmt(ws1, col+"10", PFMT));
+  XLSX.utils.book_append_sheet(wb, ws1, "Income Statement");
+
+  /* ---------- HOJAS DE DETALLE por producto (una por local) ---------- */
   const header = ["SKU","Product","Units","Revenue","COGS (FIFO)","Gross margin","Margin %"];
-  const consol = {};   // prodKey -> merged across stores
-  const mkRows = (obj)=>{
-    const rows=[]; let tU=0,tR=0,tC=0;
+  const mkDetail = (obj, titulo)=>{
+    let tU=0,tR=0,tC=0;
+    const body=[];
     Object.values(obj).sort((a,b)=>b.revenue-a.revenue).forEach(e=>{
-      const gm=round2(e.revenue-e.cogs), pct = e.revenue>0? round2(gm/e.revenue*100):0;
-      rows.push([e.sku, e.nombre, e.units, e.revenue, e.cogs, gm, pct]);
+      const gm=round2(e.revenue-e.cogs), p = e.revenue>0? (gm/e.revenue):0;
+      body.push([e.sku, e.nombre, e.units, e.revenue, e.cogs, gm, p]);
       tU+=e.units; tR+=e.revenue; tC+=e.cogs;
     });
-    const tGM=round2(tR-tC), tPct=tR>0?round2(tGM/tR*100):0;
-    rows.push([]); rows.push(["","TOTAL",tU,round2(tR),round2(tC),tGM,tPct]);
-    return { rows, totals:{units:tU,revenue:round2(tR),cogs:round2(tC),gm:tGM} };
+    const tGM=round2(tR-tC), tP=tR>0?(tGM/tR):0;
+    const aoa=[[titulo],[period],[],header,...body,[],["","TOTAL",tU,round2(tR),round2(tC),tGM,tP]];
+    const ws=XLSX.utils.aoa_to_sheet(aoa);
+    ws["!cols"]=[{wch:14},{wch:42},{wch:8},{wch:13},{wch:13},{wch:13},{wch:10}];
+    ws["!merges"]=[{s:{r:0,c:0},e:{r:0,c:6}},{s:{r:1,c:0},e:{r:1,c:6}}];
+    const last = aoa.length;                    // total row = last
+    for(let r=5;r<=last;r++){                   // data rows start at excel row 5
+      ["D","E","F"].forEach(col=> setFmt(ws, col+r, MFMT));
+      setFmt(ws, "G"+r, PFMT);
+    }
+    return ws;
   };
-
-  // per-store sheets
-  const storeTotals=[];
   STORE_IDS.forEach(s=>{
-    const { rows, totals } = mkRows(agg[s]);
-    const ws = XLSX.utils.aoa_to_sheet([[storeName(s)+" — Preliminary P&L"],[`Period: ${desde||"start"} → ${hasta||"today"}`],[],header,...rows]);
-    ws["!cols"]=[{wch:14},{wch:40},{wch:8},{wch:12},{wch:13},{wch:13},{wch:9}];
-    XLSX.utils.book_append_sheet(wb, ws, storeName(s).slice(0,28));
-    storeTotals.push({ store:storeName(s), ...totals });
-    // merge into consolidated
-    Object.entries(agg[s]).forEach(([k,e])=>{ const c=consol[k]=consol[k]||{sku:e.sku,nombre:e.nombre,units:0,revenue:0,cogs:0}; c.units+=e.units; c.revenue+=e.revenue; c.cogs+=e.cogs; });
+    XLSX.utils.book_append_sheet(wb, mkDetail(detail[s], storeName(s)+" — Detail by product"), ("Detail "+storeName(s)).slice(0,28));
   });
+  // consolidado por producto
+  const consolProd={};
+  STORE_IDS.forEach(s=> Object.entries(detail[s]).forEach(([k,e])=>{ const c=consolProd[k]=consolProd[k]||{sku:e.sku,nombre:e.nombre,units:0,revenue:0,cogs:0}; c.units+=e.units; c.revenue+=e.revenue; c.cogs+=e.cogs; }));
+  XLSX.utils.book_append_sheet(wb, mkDetail(consolProd, "Consolidated — Detail by product"), "Detail Consolidated");
 
-  // consolidated sheet (put first)
-  const { rows:crows } = mkRows(consol);
-  const cws = XLSX.utils.aoa_to_sheet([
-    ["Consolidated — Preliminary P&L"],
-    [`Period: ${desde||"start"} → ${hasta||"today"}`],
-    [],
-    ["Store","Units","Revenue","COGS (FIFO)","Gross margin"],
-    ...storeTotals.map(t=>[t.store,t.units,t.revenue,t.cogs,t.gm]),
-    [],
-    header, ...crows
-  ]);
-  cws["!cols"]=[{wch:16},{wch:40},{wch:8},{wch:12},{wch:13},{wch:13},{wch:9}];
-  XLSX.utils.book_append_sheet(wb, cws, "Consolidated");
-  // move Consolidated to the front
-  wb.SheetNames = ["Consolidated", ...wb.SheetNames.filter(n=>n!=="Consolidated")];
-
-  XLSX.writeFile(wb, `PnL-preliminary-${new Date().toISOString().slice(0,10)}.xlsx`);
-  toast("Preliminary P&L exported (Excel)");
+  XLSX.writeFile(wb, `income-statement-${new Date().toISOString().slice(0,10)}.xlsx`);
+  toast("Income statement exported (Excel)");
 }
 function openPnLExport(){
   const today=new Date().toISOString().slice(0,10);
   const first=today.slice(0,8)+"01";
-  buildModal("Export preliminary P&L", `
-    <p class="hint" style="margin:0 0 12px">Revenue and FIFO COGS by store + consolidated, for the selected period. Ships as an Excel workbook to assemble with your structure costs.</p>
+  buildModal("Export income statement", `
+    <p class="hint" style="margin:0 0 12px">Multi-step income statement (net revenue → FIFO COGS → gross profit) by store and consolidated, plus product detail. Excel workbook for the selected period.</p>
     <div class="grid-form" style="grid-template-columns:1fr 1fr;padding:0">
       <div class="field"><label>From</label><input class="inp" type="date" id="pnl_d0" value="${first}"></div>
       <div class="field"><label>To</label><input class="inp" type="date" id="pnl_d1" value="${today}"></div>
@@ -3361,9 +3664,9 @@ function openPnLExport(){
    ============================================================ */
 let pdfLines = [];   // líneas de texto reconstruidas
 function openImport(){
-  buildModal("Importar factura (PDF)", `
+  buildModal("Import invoice (PDF)", `
     <div class="banner">
-      Elegí o arrastrá el PDF de la factura. Lo lee la IA (Gemini) y arma una tabla editable — revisá cantidades, costos y a qué producto va cada renglón <b>antes de confirmar</b>.
+      Choose or drag the invoice PDF. The AI reads it and builds an editable table — check quantities, costs and which product each line maps to <b>before confirming</b>.
     </div>
     <div class="drop" id="drop">
       <div class="di">✨</div>
@@ -3372,7 +3675,7 @@ function openImport(){
       <input type="file" id="iaInput" accept="application/pdf" hidden>
     </div>
     <div id="importOut"></div>
-  `,[{label:"Cancelar",cls:"btn",act:closeModal}], true);
+  `,[{label:"Close",cls:"btn",act:closeModal}], true);
 
   const drop=document.getElementById("drop"), input=document.getElementById("iaInput");
   drop.onclick=()=>input.click();
@@ -3404,13 +3707,13 @@ async function handlePdfIA(file){
     const j=await res.json();
     if(!res.ok || !j.ok){
       const det = j && (j.detalle||j.error||j.raw) ? esc(j.detalle||j.error||j.raw) : ("HTTP "+res.status);
-      out.innerHTML=`<div class="banner warn">No se pudo leer con IA: ${det}.<br>Probá con la detección local o cargá a mano.</div>`;
+      out.innerHTML=`<div class="banner warn">Couldn\u2019t read with AI: ${det}. Try local detection or load it by hand.</div>`;
       return;
     }
     const d=j.data||{};
     const lineas=Array.isArray(d.lineas)?d.lineas:[];
     if(!lineas.length){
-      out.innerHTML=`<div class="banner warn">La IA no encontró renglones de productos en ese PDF. Revisá el archivo o cargá a mano.</div>`;
+      out.innerHTML=`<div class="banner warn">The AI found no product lines in that PDF. Check the file or load it by hand.</div>`;
       return;
     }
     // adaptar a la estructura que consume showImportEditor
@@ -3423,15 +3726,15 @@ async function handlePdfIA(file){
         costo:parseNum(l.precio),
         msrp:parseNum(l.msrp)||0,
         ext:parseNum(l.cantidad)*parseNum(l.precio),
-        raw:"leído con IA"+(j.model?(" · "+j.model):"")
+        raw:""
       })).filter(it=>it.desc),
       mode:"ia"
     };
-    pdfLines=["(documento leído con IA — sin volcado de texto crudo)"];
+    pdfLines=["(document read with AI — no raw text dump)"];
     showImportEditor(file.name, parsed);
   }catch(e){
     console.error(e);
-    out.innerHTML=`<div class="banner warn">Falló la lectura con IA (${esc(e.message||"error")}). Probá con la detección local o cargá a mano.</div>`;
+    out.innerHTML=`<div class="banner warn">AI read failed (${esc(e.message||"error")}). Try local detection or load it by hand.</div>`;
   }
 }
 /* Normaliza fecha devuelta por la IA a YYYY-MM-DD si viene en otro formato reconocible */
@@ -3446,8 +3749,8 @@ function normFechaIA(f){
 
 async function handlePdf(file){
   const out=document.getElementById("importOut");
-  if(!window.pdfjsLib){ out.innerHTML=`<div class="banner warn">No se pudo cargar el lector de PDF (pdf.js). Revisá tu conexión y reintentá, o cargá la compra a mano.</div>`; return; }
-  out.innerHTML=`<p style="color:var(--muted);padding:14px 0">Leyendo ${esc(file.name)}…</p>`;
+  if(!window.pdfjsLib){ out.innerHTML=`<div class="banner warn">Couldn\u2019t load the PDF reader (pdf.js). Check your connection and retry, or load the purchase by hand.</div>`; return; }
+  out.innerHTML=`<p style="color:var(--muted);padding:14px 0">Reading ${esc(file.name)}…</p>`;
   try{
     const buf=await file.arrayBuffer();
     const pdf=await pdfjsLib.getDocument({data:buf}).promise;
@@ -3572,8 +3875,8 @@ function showImportEditor(fname, parsed){
   const out=document.getElementById("importOut");
   const { meta, items, mode } = parsed;
   if(!items.length){
-    out.innerHTML=`<div class="banner warn">Extraje el texto pero no encontré renglones con cantidad y precio. Revisá el texto crudo abajo y cargá a mano si hace falta.</div>
-      <details open><summary>Texto extraído</summary><div class="rawbox">${esc(pdfLines.join("\n"))}</div></details>`;
+    out.innerHTML=`<div class="banner warn">Extracted the text but found no lines with qty and price. Check the raw text below and load by hand if needed.</div>
+      <details open><summary>Extracted text</summary><div class="rawbox">${esc(pdfLines.join("\n"))}</div></details>`;
     return;
   }
   // mapear cada ítem a un producto existente por SKU (o por nombre)
@@ -3591,8 +3894,7 @@ function showImportEditor(fname, parsed){
   const rows=items.map((c,i)=>`<tr>
     <td class="c"><input type="checkbox" data-sel="${i}" ${c.sel?"checked":""}></td>
     <td class="c">${c.sku?`<span class="sku">${esc(c.sku)}</span>`:'<span style="color:var(--muted)">—</span>'}</td>
-    <td style="font-size:12.5px;max-width:250px">${esc(c.desc)}
-      <div style="font-size:10.5px;color:var(--muted);margin-top:2px" class="num">${esc(c.raw)}</div></td>
+    <td class="imp-desc">${esc(c.desc)}</td>
     <td style="width:74px"><input class="inp num" data-imp="cantidad" data-i="${i}" value="${c.cantidad}"></td>
     <td style="width:104px"><input class="inp num" data-imp="costo" data-i="${i}" value="${c.costo}"></td>
     <td style="width:104px"><input class="inp num" data-imp="msrp" data-i="${i}" value="${c.msrp||0}"></td>
@@ -3607,19 +3909,18 @@ function showImportEditor(fname, parsed){
 
   out.innerHTML=`
     <div class="banner ok">
-      Detecté <b>${items.length}</b> renglón(es) en <b>${esc(fname)}</b> ${mode==="estructurado"?"(formato reconocido)":mode==="ia"?"(leído con IA — revisá igual)":"(detección genérica — revisá bien)"}.
-      ${metaBits?`<br><span style="font-weight:400">${metaBits}</span>`:""}
+      Detected <b>${items.length}</b> line(s) in <b>${esc(fname)}</b>${metaBits?` \u00B7 <span style="font-weight:400">${metaBits}</span>`:""} \u2014 review before confirming.
     </div>
-    ${meta.flete? `<div class="banner">Detected a <b>freight/handling</b> charge of ${money(meta.flete)}. It's loaded in the purchase and will be <b>spread across all units</b> when you confirm (not added as stock).</div>`:""}
+    ${meta.flete? `<div class="banner" style="white-space:normal">Detected a <b>freight/handling</b> charge of ${money(meta.flete)}. It's loaded in the purchase and will be <b>spread across all units</b> when you confirm (not added as stock).</div>`:""}
     <p style="font-size:12px;color:var(--muted);margin:0 0 8px">
-      <b>Costo</b> = lo que pagás (NET) e impacta el último costo. <b>P. venta</b> = sugerido (MSRP) para productos nuevos.
+      <b>Cost</b> = what you pay (NET); updates last cost. <b>Sale price</b> = suggested (MSRP) for new products.
     </p>
     <div class="table-scroll"><table class="line-tbl">
-      <thead><tr><th class="c">✓</th><th class="c">SKU</th><th>Descripción</th><th class="r">Cant.</th><th class="r">Costo</th><th class="r">P. venta</th><th>Producto destino</th></tr></thead>
+      <thead><tr><th class="c">✓</th><th class="c">SKU</th><th>Description</th><th class="r">Qty</th><th class="r">Cost</th><th class="r">Sale price</th><th>Target product</th></tr></thead>
       <tbody>${rows}</tbody></table></div>
-    <details><summary>Ver texto crudo del PDF</summary><div class="rawbox">${esc(pdfLines.join("\n"))}</div></details>
+    <details><summary>View raw PDF text</summary><div class="rawbox">${esc(pdfLines.join("\n"))}</div></details>
     <div style="display:flex;justify-content:flex-end;margin-top:16px">
-      <button class="btn up" id="toDraft">Pasar a editor de compra →</button>
+      <button class="btn up" id="toDraft">Continue to purchase editor →</button>
     </div>`;
 
   out.querySelectorAll("[data-sel]").forEach(cb=> cb.onchange=()=> items[+cb.dataset.sel].sel=cb.checked);
