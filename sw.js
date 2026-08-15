@@ -7,7 +7,7 @@
    - pdf.js (CDN): cache-first para importar offline.
    Igual conviene subir este string al cambiar la app, por prolijidad.
    ============================================================ */
-const CACHE = "mayor-stock-v24";
+const CACHE = "mayor-stock-v25";
 
 const ASSETS = [
   "./",
@@ -20,7 +20,7 @@ const ASSETS = [
   "./favicon.png"
 ];
 
-const CDN = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/";
+const CDN = "https://cdnjs.cloudflare.com/ajax/libs/";   // pdf.js + jsPDF: cache-first offline
 
 self.addEventListener("install", e => {
   e.waitUntil(

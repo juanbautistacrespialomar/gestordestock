@@ -476,7 +476,7 @@
     </div>
     <div id="loginErr" class="login-err"></div>
     <button class="btn primary login-btn" id="loginBtn">Entrar</button>
-    <p class="login-build">build v18</p>
+    <p class="login-build">build v25</p>
   </div>
 </div>
 <div class="topbar" id="topbar">
@@ -555,6 +555,7 @@
 <div id="toasts"></div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script>
 /* ============================================================
    Gestor de Stock — vanilla, último costo, sincronizado
@@ -575,14 +576,44 @@ const API_URL = "https://mayor-stock-api.juanbautistacrespialomar.workers.dev";
 const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2,7);
 
 /* ---------- Estado local ---------- */
-let db = load();
 function load(){
   try{
     const raw = localStorage.getItem(KEY);
-    if(raw) return JSON.parse(raw);
+    if(raw) return migrate(JSON.parse(raw));
   }catch(e){ console.warn("load fail", e); }
-  return { config:{ moneda:"$" }, productos:[], compras:[], ventas:[], movimientos:[] };
+  return migrate({ config:{ moneda:"$" }, productos:[], compras:[], ventas:[], movimientos:[] });
 }
+/* Migración idempotente: completa campos nuevos sin romper datos viejos.
+   - Costos desglosados: el costo total histórico (ultimoCosto) pasa a ser Neto
+     (handling/flete arrancan en 0). El total sigue siendo ultimoCosto.
+   - Jerarquía TCG (metadata, sin conversión de stock): categoría/nivel/factores.
+   - Clientes y numeración US (arranca en 101). */
+const PACKS_POR_BOX_DEF = 24;
+const BOXES_POR_CASE = { "Pokémon TCG":6, "Magic":6, "One Piece TCG":12, "Yu-Gi-Oh!":12, "Disney Lorcana":4, "Digimon":12, "Dragon Ball":12, "Flesh and Blood":4 };
+function boxesCaseDefault(cat){ return BOXES_POR_CASE[cat] || 6; }
+function migrate(d){
+  d.config = d.config || {};
+  if(d.config.moneda==null) d.config.moneda = "$";
+  if(d.config.facturaInicio==null) d.config.facturaInicio = 101;   // numeración US
+  if(d.config.emisor==null) d.config.emisor = { nombre:"", direccion:"", email:"", tel:"" };
+  d.productos = d.productos || [];
+  d.compras = d.compras || [];
+  d.ventas = d.ventas || [];
+  d.movimientos = d.movimientos || [];
+  d.clientes = d.clientes || [];
+  const r2 = n => Math.round((n||0)*100)/100;
+  d.productos.forEach(p=>{
+    if(p.costoNeto==null){ p.costoNeto = p.ultimoCosto||0; p.costoHandling = 0; p.costoFlete = 0; }
+    // total = neto+handling+flete; mantenemos ultimoCosto como el TOTAL canónico
+    if(p.ultimoCosto==null) p.ultimoCosto = r2((p.costoNeto||0)+(p.costoHandling||0)+(p.costoFlete||0));
+    if(p.categoria==null) p.categoria = "";             // se deriva/edita en la ficha (sagaDe no está listo en load)
+    if(p.nivel==null) p.nivel = "unidad";               // unidad | pack | box | case
+    if(p.packsPorBox==null) p.packsPorBox = PACKS_POR_BOX_DEF;
+    if(p.boxesPorCase==null) p.boxesPorCase = boxesCaseDefault(p.categoria);
+  });
+  return d;
+}
+let db = load();
 function persistLocal(){ localStorage.setItem(KEY, JSON.stringify(db)); }
 
 /* ---------- Sesión ---------- */
@@ -769,6 +800,12 @@ function toast(msg, kind="up"){
 
 /* ---------- Helpers de stock ---------- */
 function prodById(id){ return db.productos.find(p=>p.id===id); }
+function clienteById(id){ return db.clientes.find(c=>c.id===id); }
+function clienteLinea(c){ return c ? (c.empresa ? `${c.nombre} · ${c.empresa}` : c.nombre) : ""; }
+function clienteDireccion(c){
+  if(!c) return "";
+  return [c.direccion, [c.ciudad, c.estado, c.zip].filter(Boolean).join(", ")].filter(Boolean).join(" · ");
+}
 function findProdBySku(sku){
   if(!sku) return null;
   const s = sku.trim().toLowerCase();
@@ -804,15 +841,17 @@ function necesitaPedido(p){ return sinStock(p) || bajoStock(p); }
    serie (comportamiento correcto: en la práctica se anula con nota de
    crédito, no se borra). Si borrás la última, ese número se reutiliza.
    ============================================================ */
-const FC_PV  = "0001";   // punto de venta; cambialo acá si algún día lo necesitás
-const FC_PAD = 7;        // dígitos del secuencial -> 0000001
+/* Formato estadounidense: entero simple, sin punto de venta. Arranca en
+   config.facturaInicio (101 por defecto) y toma el mayor ya usado + 1.
+   Es SUGERIDO: el campo es editable en el modal de venta. */
 function nextFacturaVenta(){
-  let max = 0;
+  const inicio = parseInt(db.config.facturaInicio,10) || 101;
+  let max = inicio - 1;
   (db.ventas||[]).forEach(v=>{
-    const m = /^FC\s+\d+-(\d+)$/i.exec(String(v.numero||"").trim());
-    if(m){ const n = parseInt(m[1],10); if(n>max) max=n; }
+    const n = parseInt(String(v.numero||"").replace(/[^\d]/g,""),10);
+    if(!isNaN(n) && n>max) max=n;
   });
-  return `FC ${FC_PV}-${String(max+1).padStart(FC_PAD,"0")}`;
+  return String(max+1);
 }
 
 /* ============================================================
@@ -1221,6 +1260,7 @@ function viewProd(){
   <div class="head">
     <div class="title"><h2>Productos</h2><p>Maestro de artículos. El costo se actualiza con cada compra (último costo).</p></div>
     <div class="actions">
+      ${db.productos.length?`<button class="btn" id="btnExpPrecios">⤓ Lista de precios</button>`:""}
       ${db.productos.length?`<button class="btn" id="btnSel">${selMode?ICO.x+"Cancelar":ICO.select+"Seleccionar"}</button>`:""}
       <button class="btn primary" data-newp>+ Nuevo producto</button>
     </div>
@@ -1289,6 +1329,11 @@ function refreshSelbar(){
 }
 /* Selección múltiple + filtros del maestro */
 function wireProd(){
+  const exp=document.getElementById("btnExpPrecios");
+  if(exp) exp.onclick=()=>{
+    const base = (selMode && selProd.size) ? db.productos.filter(p=>selProd.has(p.id)) : filtrarProds(prodFiltros);
+    exportListaPrecios(base);
+  };
   const btn=document.getElementById("btnSel");
   if(btn) btn.onclick=()=>{ selMode=!selMode; if(!selMode) selProd.clear(); render(); };
   if(!document.getElementById("prodBody")) return;   // no estamos en Productos
@@ -1450,7 +1495,7 @@ function renderDocRows(tipo){
       <td>${esc(d.contraparte||"—")}</td>
       <td class="c num">${qty(items)}</td>
       <td class="r num">${money(d.total)}</td>
-      <td class="r" style="white-space:nowrap"><button class="btn ghost sm" data-vdoc="${tipo}:${d.id}">Ver</button><button class="btn ghost sm" data-editdoc="${tipo}:${d.id}">Editar</button><button class="btn ghost sm" data-deldoc="${tipo}:${d.id}" style="color:var(--alert)">Borrar</button></td>
+      <td class="r" style="white-space:nowrap"><button class="btn ghost sm" data-vdoc="${tipo}:${d.id}">Ver</button>${tipo==="venta"?`<button class="btn ghost sm" data-copydoc="${tipo}:${d.id}">Copiar</button>`:""}<button class="btn ghost sm" data-editdoc="${tipo}:${d.id}">Editar</button><button class="btn ghost sm" data-deldoc="${tipo}:${d.id}" style="color:var(--alert)">Borrar</button></td>
     </tr>`;
   }).join("") || `<tr><td colspan="6" style="text-align:center;color:var(--muted);padding:22px">Ningún documento coincide con los filtros.</td></tr>`;
   const cnt=document.getElementById("docCount");
@@ -1458,6 +1503,7 @@ function renderDocRows(tipo){
   const kp=document.getElementById("docKpis");
   if(kp) kp.innerHTML = docKpisHTML(tipo, list);
   body.querySelectorAll("[data-vdoc]").forEach(b=> b.onclick=()=>{ const[t,id]=b.dataset.vdoc.split(":"); verDoc(t,id); });
+  body.querySelectorAll("[data-copydoc]").forEach(b=> b.onclick=()=>{ const[t,id]=b.dataset.copydoc.split(":"); copyDoc(t,id); });
   body.querySelectorAll("[data-editdoc]").forEach(b=> b.onclick=()=>{ const[t,id]=b.dataset.editdoc.split(":"); editDoc(t,id); });
   body.querySelectorAll("[data-deldoc]").forEach(b=> b.onclick=()=>{ const[t,id]=b.dataset.deldoc.split(":"); deleteDoc(t,id); });
 }
@@ -1684,13 +1730,18 @@ function viewDatos(){
 
   <div class="panel">
     <div class="phead"><h3>Configuración</h3></div>
-    <div class="grid-form" style="grid-template-columns:200px">
-      <div class="field">
-        <label>Símbolo de moneda</label>
-        <input class="inp" id="cfgMon" value="${esc(db.config.moneda)}" maxlength="4">
-      </div>
-      <button class="btn" data-savecfg style="justify-self:start">Guardar</button>
+    <div class="grid-form" style="grid-template-columns:1fr 1fr">
+      <div class="field"><label>Símbolo de moneda</label><input class="inp" id="cfgMon" value="${esc(db.config.moneda)}" maxlength="4"></div>
+      <div class="field"><label>N° de invoice inicial</label><input class="inp num" id="cfgFac" value="${esc(String(db.config.facturaInicio||101))}"></div>
     </div>
+    <div class="phead" style="margin:14px 0 6px;padding:0"><h3 style="font-size:13px">Datos del emisor (aparecen en el invoice PDF)</h3></div>
+    <div class="grid-form" style="grid-template-columns:1fr 1fr">
+      <div class="field" style="grid-column:1/3"><label>Nombre / empresa</label><input class="inp" id="cfgEmNom" value="${esc((db.config.emisor||{}).nombre||"")}"></div>
+      <div class="field" style="grid-column:1/3"><label>Dirección</label><input class="inp" id="cfgEmDir" value="${esc((db.config.emisor||{}).direccion||"")}"></div>
+      <div class="field"><label>Email</label><input class="inp" id="cfgEmMail" value="${esc((db.config.emisor||{}).email||"")}"></div>
+      <div class="field"><label>Teléfono</label><input class="inp" id="cfgEmTel" value="${esc((db.config.emisor||{}).tel||"")}"></div>
+    </div>
+    <button class="btn" data-savecfg style="justify-self:start;margin-top:12px">Guardar</button>
   </div>`;
 }
 
@@ -1740,6 +1791,13 @@ function wire(){
   const rst=m.querySelector("[data-reset]"); if(rst) rst.onclick=resetAll;
   const cfg=m.querySelector("[data-savecfg]"); if(cfg) cfg.onclick=()=>{
     db.config.moneda = (document.getElementById("cfgMon").value||"$").trim()||"$";
+    const fi=parseInt(document.getElementById("cfgFac").value,10); if(!isNaN(fi)&&fi>0) db.config.facturaInicio=fi;
+    db.config.emisor = {
+      nombre:(document.getElementById("cfgEmNom").value||"").trim(),
+      direccion:(document.getElementById("cfgEmDir").value||"").trim(),
+      email:(document.getElementById("cfgEmMail").value||"").trim(),
+      tel:(document.getElementById("cfgEmTel").value||"").trim()
+    };
     save(); toast("Configuración guardada"); render();
   };
 
@@ -1755,41 +1813,119 @@ function wire(){
 /* ============================================================
    MODAL: Producto
    ============================================================ */
+const CATEGORIAS = ["Pokémon TCG","Magic","One Piece TCG","Yu-Gi-Oh!","Disney Lorcana","Digimon","Dragon Ball","Flesh and Blood","Otros"];
+const NIVELES = [["unidad","Unidad / suelto"],["pack","Pack / foil (sobre sellado)"],["box","Booster box"],["case","Case"]];
+
 function openProd(id){
   const p = id ? prodById(id) : null;
-  const modal = buildModal(p?"Editar producto":"Nuevo producto", `
+  const neto = p?(p.costoNeto||0):0, hand = p?(p.costoHandling||0):0, fle = p?(p.costoFlete||0):0;
+  const total = p?(p.ultimoCosto||0):0;
+  const desglosaInicial = (hand>0 || fle>0);
+  let catActual = p?(p.categoria || sagaDe(p) || "Otros"):"Otros";
+  const catList = CATEGORIAS.includes(catActual) ? CATEGORIAS : [catActual, ...CATEGORIAS];
+  const catOpts = catList.map(c=>`<option value="${esc(c)}" ${c===catActual?"selected":""}>${esc(c)}</option>`).join("");
+  const nivOpts = NIVELES.map(([v,l])=>`<option value="${v}" ${p&&p.nivel===v?"selected":""}>${esc(l)}</option>`).join("");
+  buildModal(p?"Editar producto":"Nuevo producto", `
     <div class="grid-form" style="grid-template-columns:1fr 1fr;padding:0">
       <div class="field"><label>SKU / código</label><input class="inp" id="p_sku" value="${p?esc(p.sku):""}"></div>
-      <div class="field"><label>Unidad</label><input class="inp" id="p_uni" value="${p?esc(p.unidad):"u"}" placeholder="u, kg, caja..."></div>
+      <div class="field"><label>Unidad</label><input class="inp" id="p_uni" value="${p?esc(p.unidad):"u"}" placeholder="u, pack, box, case..."></div>
       <div class="field" style="grid-column:1/3"><label>Nombre</label><input class="inp" id="p_nom" value="${p?esc(p.nombre):""}"></div>
       <div class="field"><label>Stock inicial</label><input class="inp num" id="p_stk" value="${p?p.stock:0}" ${p?'disabled':''}></div>
-      <div class="field"><label>Último costo</label><input class="inp num" id="p_cos" value="${p?p.ultimoCosto:0}"></div>
-      <div class="field"><label>Precio de venta</label><input class="inp num" id="p_pv" value="${p?p.precioVenta:0}"></div>
       <div class="field"><label>Punto de repedido</label><input class="inp num" id="p_rep" value="${p?p.puntoRepedido:0}"></div>
+    </div>
+
+    <div class="phead" style="margin:16px 0 6px;padding:0"><h3 style="font-size:13px">Costo</h3>
+      <label style="font-size:12px;color:var(--muted);display:flex;gap:6px;align-items:center;cursor:pointer">
+        <input type="checkbox" id="p_desglosa" ${desglosaInicial?"checked":""}> Desglosar componentes
+      </label>
+    </div>
+    <div class="grid-form" style="grid-template-columns:1fr 1fr 1fr;padding:0">
+      <div class="field" id="p_wrapNeto"><label>Costo neto</label><input class="inp num" id="p_neto" value="${neto}"></div>
+      <div class="field" id="p_wrapHand"><label>Handling</label><input class="inp num" id="p_hand" value="${hand}"></div>
+      <div class="field" id="p_wrapFlete"><label>Flete</label><input class="inp num" id="p_flete" value="${fle}"></div>
+      <div class="field" style="grid-column:1/4"><label>Costo total ${db.config.moneda}</label><input class="inp num" id="p_cos" value="${total}"></div>
+    </div>
+
+    <div class="phead" style="margin:16px 0 6px;padding:0"><h3 style="font-size:13px">Precio de venta</h3></div>
+    <div class="grid-form" style="grid-template-columns:1fr 1fr;padding:0">
+      <div class="field"><label>Markup % sobre costo total</label><input class="inp num" id="p_mk" value="${p&&p.ultimoCosto>0?round2((p.precioVenta/p.ultimoCosto-1)*100):0}"></div>
+      <div class="field"><label>Precio de venta</label><input class="inp num" id="p_pv" value="${p?p.precioVenta:0}"></div>
+    </div>
+    <p class="hint" id="p_mgReal" style="font-size:12px;margin:6px 0 0"></p>
+
+    <div class="phead" style="margin:16px 0 6px;padding:0"><h3 style="font-size:13px">Categoría y jerarquía TCG</h3></div>
+    <div class="grid-form" style="grid-template-columns:1fr 1fr;padding:0">
+      <div class="field"><label>Categoría</label><select class="inp" id="p_cat">${catOpts}</select></div>
+      <div class="field"><label>Nivel</label><select class="inp" id="p_niv">${nivOpts}</select></div>
+      <div class="field"><label>Packs por box</label><input class="inp num" id="p_ppb" value="${p?p.packsPorBox:PACKS_POR_BOX_DEF}"></div>
+      <div class="field"><label>Boxes por case</label><input class="inp num" id="p_bpc" value="${p?p.boxesPorCase:boxesCaseDefault(catActual)}"></div>
     </div>
     ${p?'<p style="font-size:12.5px;color:var(--muted);margin:14px 0 0">El stock se ajusta desde compras y ventas, no acá.</p>':''}
   `, [
     p ? {label:"Eliminar",cls:"btn danger",act:()=>{ delProd(p.id); }} : null,
     {label:"Cancelar",cls:"btn",act:closeModal},
     {label:"Guardar",cls:"btn primary",act:()=>saveProd(id)}
-  ].filter(Boolean));
-  document.getElementById("p_sku").focus();
+  ].filter(Boolean), true);
+
+  // --- Lógica de costo: total = neto+handling+flete cuando se desglosa ---
+  const $=x=>document.getElementById(x);
+  function syncDesglose(){
+    const on = $("p_desglosa").checked;
+    ["p_wrapHand","p_wrapFlete"].forEach(w=> $(w).style.display = on?"":"none");
+    $("p_wrapNeto").querySelector("label").textContent = on?"Costo neto":"Costo neto (= total)";
+    $("p_cos").disabled = on;                 // si desglosás, el total es calculado
+    if(on) recalcTotal(); else { $("p_neto").value = $("p_cos").value; }
+  }
+  function recalcTotal(){
+    if(!$("p_desglosa").checked) return;
+    const t = round2(parseNum($("p_neto").value)+parseNum($("p_hand").value)+parseNum($("p_flete").value));
+    $("p_cos").value = t; syncMarkup("cos");
+  }
+  function totalCosto(){ return parseNum($("p_cos").value); }
+  function pintarMargen(){
+    const pv=parseNum($("p_pv").value), c=totalCosto();
+    const mg = pv>0 ? (pv-c)/pv*100 : 0;
+    $("p_mgReal").textContent = pv>0 ? `Margen real: ${nf0.format(mg)}% sobre venta · ganás ${money(pv-c)} por unidad` : "Cargá un precio para ver el margen real.";
+  }
+  function syncMarkup(from){
+    const c=totalCosto();
+    if(from==="mk" || from==="cos"){ const mk=parseNum($("p_mk").value); $("p_pv").value = round2(c*(1+mk/100)); }
+    else if(from==="pv"){ $("p_mk").value = c>0 ? round2((parseNum($("p_pv").value)/c-1)*100) : 0; }
+    pintarMargen();
+  }
+  $("p_desglosa").onchange=syncDesglose;
+  ["p_neto","p_hand","p_flete"].forEach(k=> $(k).oninput=()=>{ recalcTotal(); });
+  $("p_cos").oninput=()=>{ if(!$("p_desglosa").checked) $("p_neto").value=$("p_cos").value; syncMarkup("cos"); };
+  $("p_mk").oninput=()=>syncMarkup("mk");
+  $("p_pv").oninput=()=>syncMarkup("pv");
+  $("p_cat").onchange=()=>{ $("p_bpc").value = boxesCaseDefault($("p_cat").value); };
+  syncDesglose(); pintarMargen();
+  $("p_sku").focus();
 }
 function saveProd(id){
   const g=x=>document.getElementById(x).value;
   const nom=g("p_nom").trim();
   if(!nom){ toast("Poné un nombre","warn"); return; }
   const sku=g("p_sku").trim();
-  const dup=skuEnUso(sku, id);   // en alta id=undefined -> chequea contra todos; en edición se excluye a sí mismo
+  const dup=skuEnUso(sku, id);
   if(dup){ toast(`El SKU "${sku}" ya lo usa "${dup.nombre}"`,"warn"); return; }
+  const desglosa = document.getElementById("p_desglosa").checked;
+  const neto = parseNum(g("p_neto"));
+  const hand = desglosa ? parseNum(g("p_hand")) : 0;
+  const flete = desglosa ? parseNum(g("p_flete")) : 0;
+  const total = round2(neto + hand + flete);           // = p_cos cuando desglosa; = neto si no
+  const campos = {
+    sku, unidad:g("p_uni").trim()||"u", nombre:nom,
+    costoNeto:neto, costoHandling:hand, costoFlete:flete, ultimoCosto:total,
+    precioVenta:parseNum(g("p_pv")), puntoRepedido:parseNum(g("p_rep")),
+    categoria:g("p_cat"), nivel:g("p_niv"),
+    packsPorBox:parseNum(g("p_ppb"))||PACKS_POR_BOX_DEF, boxesPorCase:parseNum(g("p_bpc"))||boxesCaseDefault(g("p_cat"))
+  };
   if(id){
-    const p=prodById(id);
-    p.sku=sku; p.unidad=g("p_uni").trim()||"u"; p.nombre=nom;
-    p.ultimoCosto=parseNum(g("p_cos")); p.precioVenta=parseNum(g("p_pv")); p.puntoRepedido=parseNum(g("p_rep"));
+    Object.assign(prodById(id), campos);
   } else {
     const stk=parseNum(g("p_stk"));
-    const p={ id:uid(), sku:sku, unidad:g("p_uni").trim()||"u", nombre:nom,
-      stock:0, ultimoCosto:parseNum(g("p_cos")), precioVenta:parseNum(g("p_pv")), puntoRepedido:parseNum(g("p_rep")) };
+    const p=Object.assign({ id:uid(), stock:0 }, campos);
     db.productos.push(p);
     if(stk) moverStock(p, stk, p.ultimoCosto, "ajuste", null, "Stock inicial");
   }
@@ -1810,31 +1946,62 @@ let draft = null;  // { tipo, contraparte, fecha, numero, lineas:[{key,productoI
 function openDoc(tipo, pre){
   draft = pre || {
     tipo, contraparte:"", fecha:new Date().toISOString().slice(0,10),
-    numero: tipo==="venta" ? nextFacturaVenta() : "",   // venta = correlativo automático
+    numero: tipo==="venta" ? nextFacturaVenta() : "",
+    clienteId:"", envio:{ tipo:"free", monto:0 },
+    handling:0, flete:0,
     lineas:[ blankLine() ]
   };
   draft.tipo = tipo;
+  if(!draft.envio) draft.envio = { tipo:"free", monto:0 };
+  if(draft.handling==null) draft.handling = 0;
+  if(draft.flete==null) draft.flete = 0;
   renderDocModal();
 }
 function blankLine(){ return { key:uid(), productoId:"", sku:"", nombre:"", cantidad:1, precio:0, precioVentaSugerido:0, crear:false, margen:0, costoRef:0 }; }
 
 function renderDocModal(){
   const isC = draft.tipo==="compra";
+  const cli = clienteById(draft.clienteId);
+  const clienteRow = isC ? "" : `
+    <div class="field" style="grid-column:1/3">
+      <label>Cliente <span class="hint" style="font-weight:400">· requerido</span></label>
+      <button type="button" class="ppick-btn${cli?"":" placeholder"}" id="d_cli">
+        <span class="ppick-label">${cli?esc(clienteLinea(cli)):"— elegir cliente —"}</span><span class="ppick-caret">▾</span>
+      </button>
+      ${cli?`<div class="hint" style="font-size:11px;margin-top:4px">${esc(clienteDireccion(cli)||cli.email||"")}</div>`:""}
+    </div>`;
   const body = `
     ${isC?`<div class="banner ok" style="justify-content:space-between;align-items:center">
       <span>¿Tenés la factura en PDF? Importala y lleno las líneas solo.</span>
       <button class="btn sm" id="d_import" style="white-space:nowrap">⤒ Importar PDF</button>
     </div>`:""}
-    <div class="grid-form" style="grid-template-columns:1fr 1fr 1fr;padding:0;margin-bottom:16px">
-      <div class="field"><label>${isC?"Proveedor":"Cliente"}</label><input class="inp" id="d_cp" value="${esc(draft.contraparte)}"></div>
+    <div class="grid-form" style="grid-template-columns:1fr 1fr;padding:0;margin-bottom:12px">
+      ${isC?`<div class="field" style="grid-column:1/3"><label>Proveedor</label><input class="inp" id="d_cp" value="${esc(draft.contraparte)}"></div>`:clienteRow}
       <div class="field"><label>Fecha</label><input class="inp" type="date" id="d_fe" value="${esc(draft.fecha)}"></div>
-      <div class="field"><label>N° comprobante${isC?"":' <span class="hint" style="font-weight:400">· correlativo automático</span>'}</label><input class="inp" id="d_nu" value="${esc(draft.numero)}"${isC?"":' readonly style="opacity:.85;cursor:not-allowed"'}></div>
+      <div class="field"><label>${isC?"N° comprobante":'N° invoice <span class="hint" style="font-weight:400">· sugerido, editable</span>'}</label><input class="inp" id="d_nu" value="${esc(draft.numero)}"></div>
     </div>
     <div id="lineHost"></div>
     <button class="btn sm" id="addLine" style="margin-top:10px">+ Agregar línea</button>
+    ${isC?`
+    <div class="phead" style="margin:16px 0 6px;padding:0"><h3 style="font-size:13px">Costos adicionales (se prorratean por unidad)</h3></div>
+    <div class="grid-form" style="grid-template-columns:1fr 1fr;padding:0">
+      <div class="field"><label>Handling total</label><input class="inp num" id="d_hand" value="${draft.handling||0}"></div>
+      <div class="field"><label>Flete total</label><input class="inp num" id="d_flete" value="${draft.flete||0}"></div>
+    </div>
+    <p class="hint" id="d_proHint" style="font-size:12px;margin:6px 0 0"></p>
+    `:`
+    <div class="phead" style="margin:16px 0 6px;padding:0"><h3 style="font-size:13px">Envío al cliente</h3></div>
+    <div class="grid-form" style="grid-template-columns:auto 1fr;padding:0;align-items:end">
+      <div class="field"><label>Tipo</label>
+        <select class="inp" id="d_envtipo">
+          <option value="free" ${draft.envio.tipo==="free"?"selected":""}>Free shipping</option>
+          <option value="monto" ${draft.envio.tipo==="monto"?"selected":""}>Monto</option>
+        </select>
+      </div>
+      <div class="field"><label>Costo de envío</label><input class="inp num" id="d_envmonto" value="${draft.envio.monto||0}" ${draft.envio.tipo==="free"?"disabled":""}></div>
+    </div>`}
     <div id="docWarn"></div>
   `;
-  const total = totalLineas(draft.lineas);
   const editing = !!draft.editingId;
   buildModal(
     isC?(editing?"Editar compra":"Cargar compra"):(editing?"Editar venta":"Nueva venta"), body,
@@ -1843,14 +2010,42 @@ function renderDocModal(){
       {label: editing?"Guardar cambios" : (isC?"Confirmar compra (+stock)":"Confirmar venta (−stock)"),cls:isC?"btn up":"btn down",act:confirmDoc}
     ],
     true,
-    `<div class="totrow"><span style="color:var(--muted)">Total documento</span><span class="num">${money(total)}</span></div>`
+    `<div class="totrow"><span style="color:var(--muted)">Total documento</span><span class="num" id="docTotal">${money(docTotal())}</span></div>`
   );
   renderLines();
-  document.getElementById("d_cp").oninput=e=>draft.contraparte=e.target.value;
+  const cp=document.getElementById("d_cp"); if(cp) cp.oninput=e=>draft.contraparte=e.target.value;
   document.getElementById("d_fe").oninput=e=>draft.fecha=e.target.value;
-  if(isC){ const nu=document.getElementById("d_nu"); if(nu) nu.oninput=e=>draft.numero=e.target.value; }
+  document.getElementById("d_nu").oninput=e=>draft.numero=e.target.value;
   document.getElementById("addLine").onclick=()=>{ draft.lineas.push(blankLine()); renderLines(); refreshTotal(); };
   const imp=document.getElementById("d_import"); if(imp) imp.onclick=()=> openImport();
+  if(isC){
+    document.getElementById("d_hand").oninput=e=>{ draft.handling=parseNum(e.target.value); pintarProrateo(); };
+    document.getElementById("d_flete").oninput=e=>{ draft.flete=parseNum(e.target.value); pintarProrateo(); };
+    pintarProrateo();
+  } else {
+    document.getElementById("d_cli").onclick=(e)=> openClientePicker(e.currentTarget);
+    const et=document.getElementById("d_envtipo"), em=document.getElementById("d_envmonto");
+    et.onchange=()=>{ draft.envio.tipo=et.value; em.disabled=(et.value==="free"); if(et.value==="free"){ draft.envio.monto=0; em.value=0; } refreshTotal(); };
+    em.oninput=()=>{ draft.envio.monto=parseNum(em.value); refreshTotal(); };
+  }
+}
+/* Unidades totales del documento (para prorratear costos adicionales). */
+function unidadesDoc(){ return draft.lineas.reduce((a,l)=> a + (parseNum(l.cantidad)||0), 0); }
+/* Total del documento: líneas + envío (venta). En compra el handling/flete NO
+   suma al total facturado por el proveedor si vino aparte, pero acá lo sumamos
+   para reflejar el desembolso total. */
+function docTotal(){
+  const base = totalLineas(draft.lineas);
+  if(draft.tipo==="compra") return round2(base + (draft.handling||0) + (draft.flete||0));
+  return round2(base + (draft.envio && draft.envio.tipo==="monto" ? (draft.envio.monto||0) : 0));
+}
+function pintarProrateo(){
+  const h=document.getElementById("d_proHint"); if(!h) return;
+  const u=unidadesDoc(), extra=(draft.handling||0)+(draft.flete||0);
+  h.textContent = (extra>0 && u>0)
+    ? `Se reparten ${money(extra)} entre ${qty(u)} u = ${money(extra/u)} por unidad, sumado al costo de cada producto.`
+    : "Cargá handling/flete y se prorratean por unidad al confirmar.";
+  refreshTotal();
 }
 
 /* ============================================================
@@ -2080,16 +2275,91 @@ function applyProdSelection(i, value){
   if(value==="__new"){ l.crear=true; l.productoId=""; l.sku=""; l.nombre=""; renderLines(); return; }
   l.crear=false; l.productoId=value;
   const p = prodById(value);
-  if(p && isC && !l.precio){ l.precio = p.ultimoCosto; }
+  if(p && isC && !l.precio){ l.precio = (p.costoNeto!=null?p.costoNeto:p.ultimoCosto); }
   if(p && !isC){
     l.costoRef = p.ultimoCosto||0;
-    l.margen   = l.margen||0;
-    l.precio   = round2(l.costoRef*(1+(l.margen||0)/100)) || (p.precioVenta||0);
+    if(p.precioVenta>0){                          // trae el precio de lista y deriva el markup
+      l.precio = p.precioVenta;
+      l.margen = l.costoRef>0 ? round2((l.precio/l.costoRef-1)*100) : 0;
+    } else {
+      l.margen = l.margen||0;
+      l.precio = round2(l.costoRef*(1+(l.margen||0)/100));
+    }
     const rem = dispRestante(p.id, i);           // respetar stock restante al elegir
     if((parseNum(l.cantidad)||0) > rem) l.cantidad = Math.max(0, rem);
   }
   renderLines(); refreshTotal();
 }
+/* ============================================================
+   PUNTO 7 — Clientes: autocompletar + alta de cliente nuevo
+   ============================================================ */
+function openClientePicker(anchor){
+  closeProductPicker();
+  _pickerAnchor = anchor; anchor.classList.add("open");
+  const pop = document.createElement("div"); pop.className="ppick-pop";
+  pop.innerHTML = `<input class="inp ppick-search" placeholder="Buscar cliente por nombre o empresa…" autocomplete="off" spellcheck="false"><div class="ppick-list"></div>`;
+  document.body.appendChild(pop);
+  const search = pop.querySelector(".ppick-search"), listEl = pop.querySelector(".ppick-list");
+  const paint=(q)=>{
+    q=(q||"").trim().toLowerCase();
+    let lista = db.clientes.slice().sort((a,b)=>String(a.nombre||"").localeCompare(String(b.nombre||""),"es"));
+    if(q) lista = lista.filter(c=> ((c.nombre||"")+" "+(c.empresa||"")+" "+(c.email||"")).toLowerCase().includes(q));
+    let html = lista.map(c=>`<button type="button" class="ppick-item${c.id===draft.clienteId?" active":""}" data-pickcli="${c.id}">
+      <span class="pi-name">${esc(c.nombre)}${c.empresa?` · ${esc(c.empresa)}`:""}</span></button>`).join("");
+    if(!lista.length) html = `<div class="ppick-empty">No hay clientes que coincidan.</div>`;
+    html += `<button type="button" class="ppick-item new" data-pickcli="__new">＋ Agregar cliente nuevo…</button>`;
+    listEl.innerHTML = html;
+    listEl.querySelectorAll("[data-pickcli]").forEach(it=> it.onclick=()=>{
+      const v=it.dataset.pickcli; closeProductPicker();
+      if(v==="__new") openClienteForm(null, search.value.trim());
+      else { draft.clienteId=v; renderDocModal(); }
+    });
+  };
+  paint("");
+  search.oninput=()=>paint(search.value);
+  positionPicker(pop, anchor);
+  window.addEventListener("scroll", repositionPicker, true);
+  window.addEventListener("resize", closeProductPicker);
+  setTimeout(()=>{ document.addEventListener("mousedown", onPickerOutside, true); document.addEventListener("keydown", onPickerKey, true); }, 0);
+  search.focus();
+}
+/* Alta de cliente. Reemplaza el modal de venta; al guardar, vuelve con
+   renderDocModal() (el draft persiste en memoria). */
+function openClienteForm(id, nombrePre){
+  const c = id ? clienteById(id) : null;
+  buildModal(c?"Editar cliente":"Nuevo cliente", `
+    <div class="grid-form" style="grid-template-columns:1fr 1fr;padding:0">
+      <div class="field" style="grid-column:1/3"><label>Nombre de cliente <span class="hint" style="font-weight:400">· requerido</span></label><input class="inp" id="c_nom" value="${c?esc(c.nombre):esc(nombrePre||"")}"></div>
+      <div class="field"><label>Nombre de contacto</label><input class="inp" id="c_con" value="${c?esc(c.contacto):""}"></div>
+      <div class="field"><label>Empresa</label><input class="inp" id="c_emp" value="${c?esc(c.empresa):""}"></div>
+      <div class="field"><label>Teléfono</label><input class="inp" id="c_tel" value="${c?esc(c.telefono):""}"></div>
+      <div class="field"><label>Email <span class="hint" style="font-weight:400">· requerido</span></label><input class="inp" id="c_mail" value="${c?esc(c.email):""}"></div>
+      <div class="field" style="grid-column:1/3"><label>Dirección <span class="hint" style="font-weight:400">· requerido</span></label><input class="inp" id="c_dir" value="${c?esc(c.direccion):""}" placeholder="Street address"></div>
+      <div class="field"><label>Ciudad</label><input class="inp" id="c_ciu" value="${c?esc(c.ciudad):""}"></div>
+      <div class="field"><label>Estado</label><input class="inp" id="c_est" value="${c?esc(c.estado):""}" placeholder="FL, NJ..."></div>
+      <div class="field"><label>ZIP <span class="hint" style="font-weight:400">· requerido</span></label><input class="inp" id="c_zip" value="${c?esc(c.zip):""}"></div>
+    </div>
+  `, [
+    {label:"Cancelar",cls:"btn",act:()=>renderDocModal()},
+    {label:"Guardar cliente",cls:"btn primary",act:()=>saveCliente(id)}
+  ], true);
+  document.getElementById("c_nom").focus();
+}
+function saveCliente(id){
+  const g=x=>document.getElementById(x).value.trim();
+  const nom=g("c_nom"), mail=g("c_mail"), dir=g("c_dir"), zip=g("c_zip");
+  if(!nom){ toast("El nombre de cliente es obligatorio","warn"); return; }
+  if(!mail || !dir || !zip){ toast("Faltan campos requeridos: email, dirección y ZIP","warn"); return; }
+  if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(mail)){ toast("El email no tiene formato válido","warn"); return; }
+  const campos={ nombre:nom, contacto:g("c_con"), empresa:g("c_emp"), telefono:g("c_tel"),
+                 email:mail, direccion:dir, ciudad:g("c_ciu"), estado:g("c_est"), zip };
+  let cid=id;
+  if(id){ Object.assign(clienteById(id), campos); }
+  else { const nc=Object.assign({id:uid()}, campos); db.clientes.push(nc); cid=nc.id; }
+  draft.clienteId=cid;
+  save(); toast("Cliente guardado"); renderDocModal();
+}
+
 function renderLines(){
   const isC = draft.tipo==="compra";
   const host = document.getElementById("lineHost");
@@ -2125,17 +2395,18 @@ function renderLines(){
         ${dispInfo}
       </td>
       <td style="width:80px"><input class="inp num" data-k="cantidad" data-i="${i}" value="${l.cantidad}"></td>
-      <td class="r num" style="width:96px;color:var(--muted)">${p?money(l.costoRef):"—"}</td>
-      <td style="width:78px"><input class="inp num" data-k="margen" data-i="${i}" value="${l.margen||0}" placeholder="%"></td>
+      <td class="r num" style="width:90px;color:var(--muted)">${p?money(l.costoRef):"—"}</td>
+      <td style="width:74px"><input class="inp num" data-k="margen" data-i="${i}" value="${l.margen||0}" placeholder="%"></td>
       <td style="width:110px"><input class="inp num" data-k="precio" data-i="${i}" value="${l.precio}"></td>
-      <td class="r num sub-cell" style="width:110px">${money(l.cantidad*l.precio)}</td>
+      <td class="r num" style="width:52px;color:var(--muted)" data-mg="${i}">${p&&l.precio>0?nf0.format((l.precio-l.costoRef)/l.precio*100)+"%":"—"}</td>
+      <td class="r num sub-cell" style="width:100px">${money(l.cantidad*l.precio)}</td>
       <td style="width:34px"><button class="btn ghost sm" data-del="${i}" title="Quitar">✕</button></td>
     </tr>`;
   }).join("");
 
   const thead = isC
     ? `<tr><th>Producto</th><th class="r">Cant.</th><th class="r">Costo unit.</th><th class="r">Subtotal</th><th></th></tr>`
-    : `<tr><th>Producto</th><th class="r">Cant.</th><th class="r">Costo</th><th class="r">Margen&nbsp;%</th><th class="r">Precio unit.</th><th class="r">Subtotal</th><th></th></tr>`;
+    : `<tr><th>Producto</th><th class="r">Cant.</th><th class="r">Costo</th><th class="r">Markup&nbsp;%</th><th class="r">Precio unit.</th><th class="r" title="Margen real sobre venta">Mg&nbsp;%</th><th class="r">Subtotal</th><th></th></tr>`;
   host.innerHTML = `<div class="table-scroll"><table class="line-tbl">
     <thead>${thead}</thead>
     <tbody>${rows}</tbody></table></div>`;
@@ -2168,6 +2439,10 @@ function renderLines(){
         const pi=host.querySelector(`[data-k="precio"][data-i="${i}"]`); if(pi) pi.value=l.precio;
       }
       else l[k]=inp.value;
+      if(!isC && (k==="precio"||k==="margen")){
+        const mg=host.querySelector(`[data-mg="${i}"]`);
+        if(mg) mg.textContent = (l.precio>0) ? nf0.format((l.precio-l.costoRef)/l.precio*100)+"%" : "—";
+      }
       if(k==="cantidad"||k==="precio"||k==="margen"){ updateSubtotals(); refreshTotal(); }
     };
   });
@@ -2186,13 +2461,23 @@ function updateSubtotals(){
   });
 }
 function refreshTotal(){
-  const total = totalLineas(draft.lineas);
-  const foot=document.querySelector(".modal .mextra .num");
-  if(foot) foot.textContent = money(total);
+  const foot=document.getElementById("docTotal") || document.querySelector(".modal .mextra .num");
+  if(foot) foot.textContent = money(docTotal());
+  const h=document.getElementById("d_proHint");
+  if(h && draft.tipo==="compra"){
+    const u=unidadesDoc(), extra=(draft.handling||0)+(draft.flete||0);
+    h.textContent = (extra>0 && u>0)
+      ? `Se reparten ${money(extra)} entre ${qty(u)} u = ${money(extra/u)} por unidad, sumado al costo de cada producto.`
+      : "Cargá handling/flete y se prorratean por unidad al confirmar.";
+  }
 }
 
 function confirmDoc(){
   const isC = draft.tipo==="compra";
+  // Venta: exigir cliente cargado ANTES de generar el invoice (punto 7)
+  if(!isC && !clienteById(draft.clienteId)){
+    toast("Elegí (o creá) un cliente antes de generar la venta","warn"); return;
+  }
   // Resolver líneas
   const resolved = [];
   for(const l of draft.lineas){
@@ -2203,18 +2488,29 @@ function confirmDoc(){
       const dup = skuEnUso(l.sku, null);   // si ese SKU ya existe, mejor enganchar al producto existente que duplicarlo
       if(dup){ toast(`El SKU "${(l.sku||"").trim()}" ya es de "${dup.nombre}". Elegí ese producto en la línea en vez de crear uno nuevo.`,"warn"); return; }
       p = { id:uid(), sku:(l.sku||"").trim(), unidad:"u", nombre:l.nombre.trim(),
-            stock:0, ultimoCosto:0, precioVenta: isC?(l.precioVentaSugerido||0):l.precio, puntoRepedido:0 };
+            stock:0, costoNeto:0, costoHandling:0, costoFlete:0, ultimoCosto:0,
+            precioVenta: isC?(l.precioVentaSugerido||0):l.precio, puntoRepedido:0,
+            categoria:"Otros", nivel:"unidad", packsPorBox:PACKS_POR_BOX_DEF, boxesPorCase:boxesCaseDefault("Otros") };
       db.productos.push(p);
     } else {
       p = prodById(l.productoId);
       if(!p){ toast("Hay una línea sin producto asignado","warn"); return; }
     }
     // costo snapshot para el margen: en venta usamos el costo de referencia de la línea
-    // (último costo del producto al momento de vender); en compra el costo ES el precio.
+    // (último costo del producto al momento de vender); en compra el costo ES el precio neto.
     const costoSnap = isC ? l.precio : (l.costoRef!=null ? l.costoRef : (p.ultimoCosto||0));
     resolved.push({ prod:p, cantidad:l.cantidad, precio:l.precio, costo:costoSnap });
   }
   if(!resolved.length){ toast("Cargá al menos una línea válida","warn"); return; }
+
+  // PUNTO 1 — prorrateo de costos adicionales (compra), POR UNIDAD:
+  // cada unidad del documento carga (handling+flete)/unidades_totales.
+  let handPU=0, fletePU=0;
+  if(isC){
+    const uds = resolved.reduce((a,r)=>a+r.cantidad,0);
+    handPU  = uds>0 ? (draft.handling||0)/uds : 0;
+    fletePU = uds>0 ? (draft.flete||0)/uds : 0;
+  }
 
   // Si estamos editando, calculamos (sin mutar) el efecto de revertir el documento original
   const editing = !!draft.editingId;
@@ -2247,12 +2543,32 @@ function confirmDoc(){
     }
   }
 
+  const subtotalLineas = totalLineas(resolved);
+  const cli = isC ? null : clienteById(draft.clienteId);
+  const envioMonto = (!isC && draft.envio && draft.envio.tipo==="monto") ? (draft.envio.monto||0) : 0;
+  const totalDoc = isC ? round2(subtotalLineas + (draft.handling||0) + (draft.flete||0))
+                       : round2(subtotalLineas + envioMonto);
   const doc = {
     id: editing ? draft.editingId : uid(), tipo:draft.tipo, contraparte:draft.contraparte.trim(),
     fecha:draft.fecha, numero:draft.numero.trim(),
-    lineas: resolved.map(r=>({ productoId:r.prod.id, sku:r.prod.sku, nombre:r.prod.nombre, cantidad:r.cantidad, precio:r.precio, costo:r.costo })),
-    total: totalLineas(resolved)
+    lineas: resolved.map(r=>{
+      const base = { productoId:r.prod.id, sku:r.prod.sku, nombre:r.prod.nombre, cantidad:r.cantidad, precio:r.precio, costo:r.costo };
+      if(isC){
+        base.neto = r.precio; base.handling = round2(handPU); base.flete = round2(fletePU);
+        base.costoTotal = round2(r.precio + handPU + fletePU);   // costo landed unitario
+      }
+      return base;
+    }),
+    subtotal: subtotalLineas,
+    total: totalDoc
   };
+  if(isC){ doc.handling = draft.handling||0; doc.flete = draft.flete||0; }
+  else {
+    doc.clienteId = draft.clienteId;
+    doc.cliente = cli ? { nombre:cli.nombre, contacto:cli.contacto, empresa:cli.empresa, telefono:cli.telefono, email:cli.email, direccion:cli.direccion, ciudad:cli.ciudad, estado:cli.estado, zip:cli.zip } : null;  // snapshot para el invoice
+    doc.envio = { tipo:draft.envio.tipo, monto:envioMonto };
+    doc.contraparte = cli ? clienteLinea(cli) : draft.contraparte.trim();
+  }
   const refTxt = (isC?"Compra":"Venta") + (doc.numero?(" "+doc.numero):"") + (doc.contraparte?(" · "+doc.contraparte):"");
 
   // Recién ahora mutamos: primero revertimos el documento original (si estábamos editando)
@@ -2260,8 +2576,10 @@ function confirmDoc(){
 
   resolved.forEach(r=>{
     if(isC){
-      moverStock(r.prod, +r.cantidad, r.precio, "compra", doc.id, refTxt);
-      r.prod.ultimoCosto = r.precio;      // <-- último costo
+      const landed = round2(r.precio + handPU + fletePU);
+      moverStock(r.prod, +r.cantidad, landed, "compra", doc.id, refTxt);
+      r.prod.costoNeto = r.precio; r.prod.costoHandling = round2(handPU); r.prod.costoFlete = round2(fletePU);
+      r.prod.ultimoCosto = landed;        // <-- costo total (landed) = neto + prorrateos
     } else {
       moverStock(r.prod, -r.cantidad, r.precio, "venta", doc.id, refTxt);
       r.prod.precioVenta = r.precio;      // <-- último precio de venta
@@ -2279,10 +2597,17 @@ function confirmDoc(){
 
 /* ---- Revertir / borrar / editar documentos ---- */
 function recomputeUltimoCosto(prod){
-  // último costo = precio de la compra más reciente que todavía contenga este producto
+  // último costo (landed) = de la compra más reciente que todavía contenga este producto.
+  // Usamos el desglose guardado (neto+handling+flete). Compras viejas sin desglose caen a l.precio.
   for(let i=db.compras.length-1;i>=0;i--){
     const l = db.compras[i].lineas.find(x=>x.productoId===prod.id);
-    if(l){ prod.ultimoCosto = l.precio; return; }
+    if(l){
+      prod.costoNeto = (l.neto!=null) ? l.neto : l.precio;
+      prod.costoHandling = l.handling||0;
+      prod.costoFlete = l.flete||0;
+      prod.ultimoCosto = (l.costoTotal!=null) ? l.costoTotal : l.precio;
+      return;
+    }
   }
   // si no queda ninguna compra con ese producto, dejamos el último costo como está
 }
@@ -2316,9 +2641,48 @@ function editDoc(tipo,id){
   const d=list.find(x=>x.id===id); if(!d) return;
   draft = {
     tipo, editingId:id, contraparte:d.contraparte||"", fecha:d.fecha, numero:d.numero||"",
-    lineas: d.lineas.map(l=>({ key:uid(), productoId:l.productoId, sku:l.sku, nombre:l.nombre, cantidad:l.cantidad, precio:l.precio, precioVentaSugerido:0, crear:false }))
+    clienteId:d.clienteId||"", envio: d.envio ? {tipo:d.envio.tipo, monto:d.envio.monto||0} : {tipo:"free",monto:0},
+    handling:d.handling||0, flete:d.flete||0,
+    lineas: d.lineas.map(l=>({ key:uid(), productoId:l.productoId, sku:l.sku, nombre:l.nombre, cantidad:l.cantidad, precio:l.precio,
+      costoRef: prodById(l.productoId) ? (prodById(l.productoId).ultimoCosto||0) : (l.costo||0),
+      margen: (l.costo>0)? round2((l.precio/l.costo-1)*100) : 0, precioVentaSugerido:0, crear:false }))
   };
   renderDocModal();
+}
+/* PUNTO 9 — Copiar venta: parte de una venta previa como documento NUEVO.
+   Re-valida stock actual y recorta cantidades que ya no alcanzan (avisa).
+   El bloqueo duro final lo aplica confirmDoc igual. */
+function copyDoc(tipo,id){
+  const list = tipo==="compra"?db.compras:db.ventas;
+  const d=list.find(x=>x.id===id); if(!d) return;
+  if(document.getElementById("scrim")) closeModal();
+  draft = {
+    tipo, editingId:null,
+    contraparte: tipo==="compra"?(d.contraparte||""):"",
+    fecha:new Date().toISOString().slice(0,10),
+    numero: tipo==="venta" ? nextFacturaVenta() : "",
+    clienteId: tipo==="venta"?(d.clienteId||""):"",
+    envio: (tipo==="venta" && d.envio) ? {tipo:d.envio.tipo, monto:d.envio.monto||0} : {tipo:"free",monto:0},
+    handling:0, flete:0,
+    lineas: d.lineas.map(l=>{
+      const p=prodById(l.productoId);
+      return { key:uid(), productoId:l.productoId, sku:l.sku, nombre:l.nombre, cantidad:l.cantidad, precio:l.precio,
+        costoRef: p?(p.ultimoCosto||0):(l.costo||0), margen:(l.costo>0)?round2((l.precio/l.costo-1)*100):0, precioVentaSugerido:0, crear:false };
+    })
+  };
+  // Recorte por stock (solo venta): tope = stock actual, repartido si hay líneas repetidas
+  const recortes=[];
+  if(tipo==="venta"){
+    const usado={};
+    draft.lineas.forEach(l=>{
+      const p=prodById(l.productoId); if(!p) return;
+      const disp=Math.max(0,(p.stock||0)-(usado[l.productoId]||0));
+      if(l.cantidad>disp){ recortes.push(`• ${p.nombre}: pedías ${qty(l.cantidad)}, hay ${qty(disp)}`); l.cantidad=disp; }
+      usado[l.productoId]=(usado[l.productoId]||0)+l.cantidad;
+    });
+  }
+  renderDocModal();
+  if(recortes.length) alert("Copié la venta pero recorté cantidades por falta de stock:\n\n"+recortes.join("\n")+"\n\nRevisá antes de confirmar.");
 }
 
 /* Ver documento existente (solo lectura) */
@@ -2331,18 +2695,151 @@ function verDoc(tipo,id){
     <td class="r num">${qty(l.cantidad)}</td>
     <td class="r num">${money(l.precio)}</td>
     <td class="r num">${money(l.cantidad*l.precio)}</td></tr>`).join("");
-  buildModal(`${isC?"Compra":"Venta"} ${esc(d.numero||"")}`.trim(), `
-    <p style="margin:0 0 14px;color:var(--muted);font-size:14px">
-      ${esc(d.contraparte||"—")} · ${esc(d.fecha)}</p>
+  const cli = d.cliente || (d.clienteId?clienteById(d.clienteId):null);
+  const sub = (d.subtotal!=null) ? d.subtotal : totalLineas(d.lineas);
+  const extras = isC
+    ? ((d.handling||d.flete) ? `<div class="totrow"><span style="color:var(--muted)">Handling + flete</span><span class="num">${money((d.handling||0)+(d.flete||0))}</span></div>` : "")
+    : `<div class="totrow"><span style="color:var(--muted)">Envío</span><span class="num">${d.envio&&d.envio.tipo==="monto"?money(d.envio.monto):"Free shipping"}</span></div>`;
+  const cliBlock = (!isC && cli) ? `<p style="margin:0 0 14px;color:var(--muted);font-size:13px">
+      <b>${esc(cli.nombre)}</b>${cli.empresa?` · ${esc(cli.empresa)}`:""}<br>
+      ${esc(clienteDireccion(cli)||"")}${cli.email?`<br>${esc(cli.email)}`:""}${cli.telefono?` · ${esc(cli.telefono)}`:""}</p>` : "";
+  buildModal(`${isC?"Compra":"Invoice"} ${esc(d.numero||"")}`.trim(), `
+    <p style="margin:0 0 6px;color:var(--muted);font-size:14px">${esc(d.contraparte||"—")} · ${esc(d.fecha)}</p>
+    ${cliBlock}
     <div class="table-scroll"><table>
       <thead><tr><th>Producto</th><th class="r">Cant.</th><th class="r">${isC?"Costo":"Precio"}</th><th class="r">Subtotal</th></tr></thead>
       <tbody>${rows}</tbody></table></div>
-    <div class="totrow"><span style="color:var(--muted)">Total</span><span class="num">${money(d.total)}</span></div>
+    <div class="totrow"><span style="color:var(--muted)">Subtotal</span><span class="num">${money(sub)}</span></div>
+    ${extras}
+    <div class="totrow" style="font-weight:700"><span>Total</span><span class="num">${money(d.total)}</span></div>
   `,[
     {label:"Borrar",cls:"btn danger",act:()=>deleteDoc(tipo,id)},
+    ...(isC?[]:[{label:"⤓ Descargar PDF",cls:"btn",act:()=>generarInvoicePDF(id)},
+              {label:"Copiar",cls:"btn",act:()=>copyDoc(tipo,id)}]),
     {label:"Editar",cls:"btn",act:()=>{ closeModal(); editDoc(tipo,id); }},
     {label:"Cerrar",cls:"btn",act:closeModal}
   ]);
+}
+
+/* ============================================================
+   PUNTO 8 y 10 — Generación de PDF (invoice de venta + lista de precios)
+   Usa jsPDF (UMD por CDN, cacheado por el SW para uso offline).
+   ============================================================ */
+function pdfReady(){ return !!(window.jspdf && window.jspdf.jsPDF); }
+function pdfMoney(n){ return db.config.moneda + " " + nf2.format(n||0); }
+
+function generarInvoicePDF(id){
+  if(!pdfReady()){ toast("No se pudo cargar el generador de PDF (probá con internet una vez)","warn"); return; }
+  const d = db.ventas.find(v=>v.id===id); if(!d){ toast("Venta no encontrada","warn"); return; }
+  const cli = d.cliente || (d.clienteId?clienteById(d.clienteId):null);
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF({ unit:"pt", format:"letter" });   // formato US (Letter)
+  const M=48, W=doc.internal.pageSize.getWidth();
+  let y=54;
+  const em=db.config.emisor||{};
+
+  // Encabezado
+  doc.setFont("helvetica","bold"); doc.setFontSize(20);
+  doc.text(em.nombre || "INVOICE", M, y);
+  doc.setFont("helvetica","normal"); doc.setFontSize(10); doc.setTextColor(90);
+  let yr=54;
+  const right=(t,yy)=>{ doc.text(t, W-M, yy, {align:"right"}); };
+  doc.setFont("helvetica","bold"); doc.setFontSize(13); doc.setTextColor(20);
+  right("INVOICE", yr); yr+=16;
+  doc.setFont("helvetica","normal"); doc.setFontSize(10); doc.setTextColor(90);
+  right(`#${d.numero||"—"}`, yr); yr+=13;
+  right(`Date: ${d.fecha||""}`, yr);
+  if(em.direccion||em.email||em.tel){
+    y+=16; doc.setFontSize(9); doc.setTextColor(110);
+    [em.direccion, em.email, em.tel].filter(Boolean).forEach(t=>{ doc.text(String(t), M, y); y+=12; });
+  }
+  y=Math.max(y, 108);
+
+  // Bill To
+  doc.setDrawColor(220); doc.line(M, y, W-M, y); y+=20;
+  doc.setFont("helvetica","bold"); doc.setFontSize(10); doc.setTextColor(20);
+  doc.text("BILL TO", M, y); y+=15;
+  doc.setFont("helvetica","normal"); doc.setTextColor(60);
+  if(cli){
+    doc.setFont("helvetica","bold"); doc.text(cli.nombre||"", M, y); doc.setFont("helvetica","normal"); y+=13;
+    const linea2=[cli.empresa, cli.contacto].filter(Boolean).join(" · ");
+    if(linea2){ doc.text(linea2, M, y); y+=13; }
+    if(cli.direccion){ doc.text(cli.direccion, M, y); y+=13; }
+    const cz=[cli.ciudad, cli.estado, cli.zip].filter(Boolean).join(", ");
+    if(cz){ doc.text(cz, M, y); y+=13; }
+    const ce=[cli.email, cli.telefono].filter(Boolean).join(" · ");
+    if(ce){ doc.text(ce, M, y); y+=13; }
+  } else { doc.text("—", M, y); y+=13; }
+  y+=10;
+
+  // Tabla
+  const cols=[ {x:M, w:W-M-M-210, t:"Item", a:"left"},
+               {x:W-M-210, w:50, t:"Qty", a:"right"},
+               {x:W-M-150, w:70, t:"Unit price", a:"right"},
+               {x:W-M-70,  w:70, t:"Amount", a:"right"} ];
+  doc.setFillColor(245); doc.rect(M, y-12, W-2*M, 22, "F");
+  doc.setFont("helvetica","bold"); doc.setFontSize(9.5); doc.setTextColor(40);
+  cols.forEach(c=> doc.text(c.t, c.a==="right"?(c.x+c.w):c.x, y+3, {align:c.a}));
+  y+=22;
+  doc.setFont("helvetica","normal"); doc.setTextColor(55);
+  d.lineas.forEach(l=>{
+    if(y>720){ doc.addPage(); y=60; }
+    const nom=(l.sku?`[${l.sku}] `:"")+(l.nombre||"");
+    const wrapped=doc.splitTextToSize(nom, cols[0].w);
+    doc.text(wrapped, cols[0].x, y);
+    doc.text(qty(l.cantidad), cols[1].x+cols[1].w, y, {align:"right"});
+    doc.text(pdfMoney(l.precio), cols[2].x+cols[2].w, y, {align:"right"});
+    doc.text(pdfMoney(l.cantidad*l.precio), cols[3].x+cols[3].w, y, {align:"right"});
+    y += Math.max(16, wrapped.length*12);
+    doc.setDrawColor(238); doc.line(M, y-6, W-M, y-6);
+  });
+
+  // Totales
+  y+=6; const sub=(d.subtotal!=null)?d.subtotal:totalLineas(d.lineas);
+  const envio = d.envio && d.envio.tipo==="monto" ? (d.envio.monto||0) : 0;
+  const tot=(row,val,bold)=>{ doc.setFont("helvetica",bold?"bold":"normal"); doc.setTextColor(bold?20:90);
+    doc.text(row, W-M-160, y, {align:"left"}); doc.text(val, W-M, y, {align:"right"}); y+=16; };
+  tot("Subtotal", pdfMoney(sub));
+  tot("Shipping", d.envio && d.envio.tipo==="free" ? "Free" : pdfMoney(envio));
+  doc.setDrawColor(200); doc.line(W-M-160, y-8, W-M, y-8);
+  doc.setFontSize(11); tot("TOTAL", pdfMoney(d.total), true);
+
+  doc.setFontSize(8.5); doc.setTextColor(150);
+  doc.text("Thank you for your business.", M, 760);
+  doc.save(`invoice-${(d.numero||"venta")}.pdf`);
+  toast("Invoice descargado");
+}
+
+/* Lista de precios para clientes (punto 10). Recibe la lista ya filtrada. */
+function exportListaPrecios(prods){
+  if(!pdfReady()){ toast("No se pudo cargar el generador de PDF (probá con internet una vez)","warn"); return; }
+  if(!prods.length){ toast("No hay productos para exportar","warn"); return; }
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF({ unit:"pt", format:"letter" });
+  const M=48, W=doc.internal.pageSize.getWidth(); let y=56;
+  const em=db.config.emisor||{};
+  doc.setFont("helvetica","bold"); doc.setFontSize(18); doc.setTextColor(20);
+  doc.text(em.nombre?`${em.nombre} — Price list`:"Price list", M, y); y+=18;
+  doc.setFont("helvetica","normal"); doc.setFontSize(9.5); doc.setTextColor(120);
+  doc.text(new Date().toLocaleDateString("es-AR"), M, y); y+=20;
+
+  const cSKU=M, cName=M+90, cPrice=W-M;
+  doc.setFillColor(245); doc.rect(M, y-12, W-2*M, 22, "F");
+  doc.setFont("helvetica","bold"); doc.setFontSize(9.5); doc.setTextColor(40);
+  doc.text("SKU", cSKU, y+3); doc.text("Product", cName, y+3); doc.text("Price", cPrice, y+3, {align:"right"});
+  y+=22; doc.setFont("helvetica","normal"); doc.setTextColor(55);
+  prods.slice().sort((a,b)=>String(a.nombre||"").localeCompare(String(b.nombre||""),"es")).forEach(p=>{
+    if(y>740){ doc.addPage(); y=60; }
+    doc.setTextColor(120); doc.setFontSize(8.5); doc.text(p.sku||"—", cSKU, y);
+    doc.setTextColor(55); doc.setFontSize(10);
+    const wrapped=doc.splitTextToSize(p.nombre||"", cPrice-cName-70);
+    doc.text(wrapped, cName, y);
+    doc.text(pdfMoney(p.precioVenta), cPrice, y, {align:"right"});
+    y += Math.max(15, wrapped.length*12);
+    doc.setDrawColor(240); doc.line(M, y-5, W-M, y-5);
+  });
+  doc.save(`lista-precios-${new Date().toISOString().slice(0,10)}.pdf`);
+  toast(`Lista de precios exportada · ${prods.length} productos`);
 }
 
 /* ============================================================
@@ -2637,7 +3134,7 @@ function showImportEditor(fname, parsed){
       precioVentaSugerido: c.msrp||0,
       cantidad:c.cantidad, precio:c.costo
     }));
-    openDoc("compra", { tipo:"compra", contraparte:meta.proveedor||"", fecha:meta.fecha||new Date().toISOString().slice(0,10), numero:meta.numero||"", lineas });
+    openDoc("compra", { tipo:"compra", contraparte:meta.proveedor||"", fecha:meta.fecha||new Date().toISOString().slice(0,10), numero:meta.numero||"", handling:0, flete:meta.flete||0, lineas });
   };
 }
 
@@ -2756,7 +3253,7 @@ function importJSON(){
         const data=JSON.parse(r.result);
         if(!data.productos) throw new Error("estructura inválida");
         if(!confirm("Esto reemplaza todos los datos actuales. ¿Seguir?")) return;
-        db=Object.assign({config:{moneda:"$"},productos:[],compras:[],ventas:[],movimientos:[]}, data);
+        db=migrate(Object.assign({config:{moneda:"$"},productos:[],compras:[],ventas:[],movimientos:[],clientes:[]}, data));
         save(); toast("Datos importados"); render();
       }catch(e){ toast("JSON inválido","warn"); }
     };
@@ -2766,7 +3263,7 @@ function importJSON(){
 }
 function resetAll(){
   if(!confirm("Se borra TODO (productos, compras, ventas y movimientos). ¿Seguro?")) return;
-  db={ config:{moneda:db.config.moneda||"$"}, productos:[], compras:[], ventas:[], movimientos:[] };
+  db=migrate({ config:db.config, productos:[], compras:[], ventas:[], movimientos:[], clientes:[] });
   save(); toast("Todo borrado","warn"); render();
 }
 
