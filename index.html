@@ -3415,13 +3415,13 @@ async function handlePdfIA(file){
     }
     // adaptar a la estructura que consume showImportEditor
     const parsed={
-      meta:{ numero:d.numero||"", fecha:normFechaIA(d.fecha), proveedor:d.proveedor||"", flete:0, moneda:d.moneda||"" },
+      meta:{ numero:d.numero||"", fecha:normFechaIA(d.fecha), proveedor:d.proveedor||"", flete:parseNum(d.flete)||0, moneda:d.moneda||"" },
       items:lineas.map(l=>({
         sku:(l.sku||"").toString().trim(),
         desc:(l.nombre||"").toString().trim(),
         cantidad:parseNum(l.cantidad),
         costo:parseNum(l.precio),
-        msrp:0,
+        msrp:parseNum(l.msrp)||0,
         ext:parseNum(l.cantidad)*parseNum(l.precio),
         raw:"leído con IA"+(j.model?(" · "+j.model):"")
       })).filter(it=>it.desc),
@@ -3610,7 +3610,7 @@ function showImportEditor(fname, parsed){
       Detecté <b>${items.length}</b> renglón(es) en <b>${esc(fname)}</b> ${mode==="estructurado"?"(formato reconocido)":mode==="ia"?"(leído con IA — revisá igual)":"(detección genérica — revisá bien)"}.
       ${metaBits?`<br><span style="font-weight:400">${metaBits}</span>`:""}
     </div>
-    ${meta.flete? `<div class="banner">Detecté un cargo de <b>flete/handling</b> por ${money(meta.flete)} que <b>no</b> se agrega como stock. Si querés prorratearlo al costo, avisame y lo sumamos.</div>`:""}
+    ${meta.flete? `<div class="banner">Detected a <b>freight/handling</b> charge of ${money(meta.flete)}. It's loaded in the purchase and will be <b>spread across all units</b> when you confirm (not added as stock).</div>`:""}
     <p style="font-size:12px;color:var(--muted);margin:0 0 8px">
       <b>Costo</b> = lo que pagás (NET) e impacta el último costo. <b>P. venta</b> = sugerido (MSRP) para productos nuevos.
     </p>
