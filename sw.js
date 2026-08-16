@@ -7,7 +7,7 @@
    - pdf.js (CDN): cache-first para importar offline.
    Igual conviene subir este string al cambiar la app, por prolijidad.
    ============================================================ */
-const CACHE = "mayor-stock-v32";   // in-transit purchases no longer count/sell until Received (state governs stock); split available vs in-transit rows; stock-status filter; in-transit KPI
+const CACHE = "mayor-stock-v33";   // fix: alertas de reposicion respetan el foco de local (no cruzan Akira/Silver) y el filtro "pedir" del maestro usa el mismo criterio que la alerta
 
 const ASSETS = [
   "./",

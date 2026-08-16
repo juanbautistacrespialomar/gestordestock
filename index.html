@@ -612,7 +612,7 @@
     </div>
     <div id="loginErr" class="login-err"></div>
     <button class="btn primary login-btn" id="loginBtn">Sign in</button>
-    <p class="login-build">build v27</p>
+    <p class="login-build">build v28</p>
   </div>
 </div>
 <div class="topbar" id="topbar">
@@ -879,6 +879,14 @@ function perteneceAStore(p, store){
   return docs.some(d => d.store===store && (d.lineas||[]).some(l=>l.productoId===p.id));
 }
 function stockEnFoco(p){ return effectiveStores().reduce((a,s)=> a + stockDe(p,s), 0); }
+/* ¿Este producto está dentro del foco de local actual?
+   - En "All (consolidated)" mostramos todo.
+   - En un local puntual, sólo los que PERTENECEN a alguno de los locales en foco.
+   Misma regla que el maestro (perteneceAStore) para que dashboard y lista coincidan. */
+function enFocoActual(p){
+  if(activeStore==="all") return true;
+  return effectiveStores().some(s=> perteneceAStore(p, s));
+}
 
 /* ============================================================
    STOCK EN TRÁNSITO (compras aún no recibidas)
@@ -1260,7 +1268,7 @@ function nextFacturaVenta(){
    ============================================================ */
 const ALERTKEY = "gstock_alert_dismissed";
 function firmaReposicion(){
-  return db.productos.filter(necesitaPedido).map(p=>p.id).sort().join("|");
+  return productosVendibles().filter(enFocoActual).filter(necesitaPedido).map(p=>p.id).sort().join("|");
 }
 function alertaDescartada(firma){
   try{ return localStorage.getItem(ALERTKEY) === firma; }catch(e){ return false; }
@@ -1548,7 +1556,7 @@ function filtrarProds(f){
     if(xs==="transit"){
       if(transitoEnFoco(p)<=0) return false;
     } else {
-      if(f.estado==="pedir" && !(p.puntoRepedido>0 && sf<=p.puntoRepedido)) return false;
+      if(f.estado==="pedir" && !necesitaPedido(p)) return false;
       if(f.estado==="con" && !(sf>0)) return false;
       if(f.estado==="sin" && sf!==0) return false;
       if(f.estado==="bajo" && !(sf>0 && p.puntoRepedido>0 && sf<=p.puntoRepedido)) return false;
@@ -1650,7 +1658,7 @@ function irAPedidos(){
   toast("Filtering products to reorder","warn");
 }
 function viewDash(){
-  const vend = productosVendibles();
+  const vend = productosVendibles().filter(enFocoActual);
   const negs   = vend.filter(p=> stockEnFoco(p)<0);
   const enCero = vend.filter(p=> stockEnFoco(p)===0);
   const bajoM  = vend.filter(p=> stockEnFoco(p)>0 && bajoStock(p));
