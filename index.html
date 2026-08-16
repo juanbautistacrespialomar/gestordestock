@@ -426,8 +426,8 @@
   .donut-seg:hover{opacity:.82}
   .donut-svg.has-active .donut-seg{opacity:.32}
   .donut-svg.has-active .donut-seg.on{opacity:1}
-  .donut-ctr-val{font-family:var(--mono);font-weight:700;font-size:15px;fill:var(--text)}
-  .donut-ctr-lbl{font-size:10.5px;fill:var(--muted)}
+  .donut-ctr-val{font-family:var(--mono);font-weight:700;fill:var(--text)}
+  .donut-ctr-lbl{fill:var(--muted)}
   .donut-legend{flex:1;min-width:170px;display:flex;flex-direction:column;gap:3px}
   .donut-leg{display:flex;align-items:center;gap:9px;padding:5px 8px;border-radius:7px;cursor:pointer;transition:background .12s}
   .donut-leg:hover{background:var(--surface-2)}
@@ -1584,8 +1584,8 @@ function donut(cid, items, fmt){
   const svg = `<svg class="donut-svg" viewBox="0 0 42 42" data-donut="${esc(cid)}" data-totfmt="${esc(fmt(total))}">
     <circle cx="21" cy="21" r="15.915" fill="none" stroke="var(--surface-2)" stroke-width="6"></circle>
     ${segs.map(s=>s.seg).join("")}
-    <text x="21" y="20.4" text-anchor="middle" class="donut-ctr-val" data-ctrval>${esc(fmt(total))}</text>
-    <text x="21" y="25.2" text-anchor="middle" class="donut-ctr-lbl" data-ctrlbl>Total</text>
+    <text x="21" y="20.6" text-anchor="middle" font-size="3.6" class="donut-ctr-val" data-ctrval="1">${esc(fmt(total))}</text>
+    <text x="21" y="24.4" text-anchor="middle" font-size="2.1" class="donut-ctr-lbl" data-ctrlbl="1">Total</text>
   </svg>`;
   const legend = `<div class="donut-legend">${segs.map(s=>`
     <div class="donut-leg" data-donut="${esc(cid)}" data-idx="${s.idx}">
