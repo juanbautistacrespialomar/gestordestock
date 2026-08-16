@@ -346,6 +346,8 @@
 
   /* store switcher + power-bi style slicers */
   .storebar{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin:0 0 16px}
+  .storebar .sb-viewas{display:flex;gap:8px;align-items:center;margin-left:auto}
+  @media(max-width:640px){ .storebar .sb-viewas{margin-left:0;width:100%} }
   .storebar .sb-label{font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);margin-right:4px}
   .chip-btn{border:1px solid var(--line);background:var(--card);color:var(--text);border-radius:999px;padding:6px 14px;font-size:13px;font-weight:600;cursor:pointer;transition:.12s;white-space:nowrap}
   .chip-btn:hover{border-color:var(--accent)}
@@ -363,6 +365,10 @@
   .slicer-reset{height:36px;font-size:12px;color:var(--accent);background:none;border:none;cursor:pointer;font-weight:700;padding:0 6px}
   .pill.blocked{background:#7c4a03;color:#ffd9a0}
   .pill.inv{background:#3a2a6b;color:#d7c9ff}
+  .inv-badge{display:inline-block;font-size:11.5px;font-weight:700;padding:3px 9px;border-radius:999px;white-space:nowrap}
+  .inv-badge.transit{background:var(--up-bg);color:var(--accent-ink);border:1px solid color-mix(in srgb,var(--accent) 30%,transparent)}
+  .inv-badge.received{background:#123a2a;color:#7fe0b8;border:1px solid #1c5a41}
+  :root:not([data-theme="dark"]) .inv-badge.received{background:#e6f6ee;color:#1c7a52;border-color:#bfe6d2}
   .banner{padding:11px 14px;border-radius:8px;font-size:13.5px;margin-bottom:14px;display:flex;gap:9px;align-items:flex-start}
   .banner.warn{background:var(--alert-bg);color:#8a2b2b;border:1px solid #e6c4c4}
   .banner.ok{background:var(--up-bg);color:var(--accent-ink);border:1px solid #bcd8ca}
@@ -745,6 +751,9 @@ function effectiveStores(){
 }
 
 const PRODUCT_STATES = { SALE:"sale", BLOCKED:"blocked", INVESTMENT:"investment" };
+/* Estado de envío de una factura de COMPRA (tracking, no toca stock). */
+const INVOICE_STATUS = { IN_TRANSIT:"in_transit", RECEIVED:"received" };
+function invoiceStatusLabel(s){ return s===INVOICE_STATUS.RECEIVED ? "Received" : "In transit"; }
 const LANGS = [["JP","JP"],["ESP","SP/ESP"]];
 function langLabel(v){ const l=LANGS.find(x=>x[0]===v); return l?l[1]:(v||"—"); }
 
@@ -775,12 +784,19 @@ function migrate(d){
   if(d.config.moneda==null) d.config.moneda = "$";
   if(d.config.facturaInicio==null) d.config.facturaInicio = 101;   // numeración US
   if(d.config.emisor==null) d.config.emisor = { nombre:"", direccion:"", email:"", tel:"" };
+  if(d.config.commissionRate==null) d.config.commissionRate = 0.10;  // comisión del vendedor sobre el MARGEN (0.10 = 10%). Editable en Settings.
   d.productos = d.productos || [];
   d.compras = d.compras || [];
   d.ventas = d.ventas || [];
   d.movimientos = d.movimientos || [];
   d.clientes = d.clientes || [];
   d.solicitudes = d.solicitudes || [];   // approval requests for blocked items (point 5, MVP2)
+  // Invoices de COMPRA: estado de envío. Por defecto "in_transit" hasta que se
+  // marca "received" (la mercadería llegó). No afecta stock ni FIFO: es tracking.
+  d.compras.forEach(c=>{ if(c.status==null) c.status = INVOICE_STATUS.IN_TRANSIT; });
+  // Ventas: snapshot de la tasa de comisión vigente al momento de la venta, para
+  // que un cambio futuro de tasa no reescriba comisiones ya devengadas.
+  d.ventas.forEach(v=>{ if(v.commissionRate==null) v.commissionRate = d.config.commissionRate; });
   const r2 = n => Math.round((n||0)*100)/100;
   const DEF_STORE = STORE_IDS[0];   // "akira": target for legacy (store-less) stock
   d.productos.forEach(p=>{
@@ -858,6 +874,46 @@ function perteneceAStore(p, store){
   return docs.some(d => d.store===store && (d.lineas||[]).some(l=>l.productoId===p.id));
 }
 function stockEnFoco(p){ return effectiveStores().reduce((a,s)=> a + stockDe(p,s), 0); }
+
+/* ============================================================
+   Punto 2/3: vista de stock en UNIDADES o CASES
+   ------------------------------------------------------------
+   unitsPerCase(p): cuántas unidades de stock entran en un case de ESE
+   producto. Reusamos boxesPorCase (que ya trae defaults por categoría,
+   Pokémon=6, etc.) porque la unidad de stock de Juan es el box y el case
+   trae N boxes. Es editable por producto en el formulario.
+   ============================================================ */
+let stockView = "units";   // "units" | "cases"  (toggle global de la barra superior)
+function unitsPerCase(p){ const u = (p && (p.boxesPorCase)) || boxesCaseDefault(p&&p.categoria); return u>0 ? u : 1; }
+/* Convierte una cantidad de unidades a la vista activa. En cases mostramos
+   hasta 2 decimales (un case parcial es 6,5 y no "6"); si da entero, entero. */
+function stockDisplay(p, units){
+  if(stockView!=="cases") return qty(units);
+  const cases = units / unitsPerCase(p);
+  return nf0.format(Math.round(cases*100)/100);
+}
+/* Sufijo textual para encabezados/celdas según la vista. */
+function stockUnitWord(){ return stockView==="cases" ? "cases" : "units"; }
+
+/* ============================================================
+   Punto 4: comisión del vendedor = MARGEN de la venta × tasa
+   ------------------------------------------------------------
+   El margen se toma sobre productos (precio − COGS FIFO), sin envío.
+   La tasa se congela por venta (doc.commissionRate); si falta, cae a la
+   tasa global vigente. TODO el consumo de estos valores va detrás de
+   isAdmin() en la UI: un seller no ve la comisión bajo ningún caso.
+   ============================================================ */
+function saleRevenueProd(d){ return round2((d.lineas||[]).reduce((a,l)=> a + (l.cantidad||0)*(l.precio||0), 0)); }
+function saleCogs(d){
+  return round2((d.lineas||[]).reduce((a,l)=>{
+    if(l.cogs!=null) return a + l.cogs;
+    const c = (l.costo!=null) ? l.costo : ((prodById(l.productoId)||{}).ultimoCosto||0);
+    return a + (l.cantidad||0)*c;
+  }, 0));
+}
+function saleMargin(d){ return round2(saleRevenueProd(d) - saleCogs(d)); }
+function saleCommissionRate(d){ return (d && d.commissionRate!=null) ? d.commissionRate : (db.config.commissionRate||0); }
+function saleCommission(d){ return round2(saleMargin(d) * saleCommissionRate(d)); }
 function stockTotalP(p){ return STORE_IDS.reduce((a,s)=> a + stockDe(p,s), 0); }   // sellable only, excludes __inv
 function recalcStockMirror(p){ p.stock = stockTotalP(p); }
 
@@ -1331,16 +1387,30 @@ function setView(v){
   if(mm){ mm.classList.remove("view-anim"); void mm.offsetWidth; mm.classList.add("view-anim"); }
 }
 /* Store switcher: All (admin only) + one chip per allowed store. Point 1. */
+function stockViewSwitchHTML(){
+  // Punto 2: sólo en vistas de stock (dashboard / productos).
+  if(view!=="dash" && view!=="prod") return "";
+  return `<div class="sb-viewas"><span class="sb-label">View as</span>
+    <button class="chip-btn ${stockView==="units"?"on":""}" data-stockview="units">Units</button>
+    <button class="chip-btn ${stockView==="cases"?"on":""}" data-stockview="cases">Cases</button></div>`;
+}
 function storeBarHTML(){
   const allow = allowedStores();
-  if(allow.length<=1) return "";   // seller with a single store: no need for a switcher
+  const sw = stockViewSwitchHTML();
+  // Un seller con un único local no necesita el selector de tienda, pero SÍ
+  // puede querer el toggle Units/Cases. Si no hay ni uno ni otro, no hay barra.
+  if(allow.length<=1 && !sw) return "";
   const chips = [];
-  chips.push(`<button class="chip-btn ${activeStore==="all"?"on":""}" data-store="all">All (consolidated)</button>`);
-  allow.forEach(s=> chips.push(`<button class="chip-btn ${activeStore===s?"on":""}" data-store="${s}">${esc(storeName(s))}</button>`));
-  return `<div class="storebar"><span class="sb-label">Store</span>${chips.join("")}</div>`;
+  if(allow.length>1){
+    chips.push(`<button class="chip-btn ${activeStore==="all"?"on":""}" data-store="all">All (consolidated)</button>`);
+    allow.forEach(s=> chips.push(`<button class="chip-btn ${activeStore===s?"on":""}" data-store="${s}">${esc(storeName(s))}</button>`));
+  }
+  const left = chips.length ? `<span class="sb-label">Store</span>${chips.join("")}` : "";
+  return `<div class="storebar">${left}${sw}</div>`;
 }
 function wireStoreBar(){
   document.querySelectorAll("[data-store]").forEach(b=> b.onclick=()=>{ activeStore=b.dataset.store; render(); });
+  document.querySelectorAll("[data-stockview]").forEach(b=> b.onclick=()=>{ stockView=b.dataset.stockview; render(); });
 }
 function applyRoleUI(){
   // hide admin-only nav entries for sellers
@@ -1574,7 +1644,7 @@ function viewDash(){
         ${sortTh(dashFiltros,"sku","SKU","")}
         ${sortTh(dashFiltros,"nombre","Product","")}
         ${activeStore==="all"&&multi?`<th class="r">Akira</th><th class="r">Silver</th>`:""}
-        ${sortTh(dashFiltros,"stock","Stock","r")}
+        ${sortTh(dashFiltros,"stock",stockView==="cases"?"Stock (cases)":"Stock","r")}
         ${sortTh(dashFiltros,"costo","Last cost","r")}
         ${sortTh(dashFiltros,"valor","Valued","r")}
       </tr></thead>
@@ -1596,12 +1666,12 @@ function renderDashRows(){
     const flag = esBloqueado(p) ? '<span class="pill blocked">blocked</span>'
                : sf<0 ? '<span class="pill low">negative</span>'
                : bajoStock(p) ? '<span class="pill low">reorder</span>' : "";
-    const perStore = showCols ? `<td class="r num">${qty(stockDe(p,"akira"))}</td><td class="r num">${qty(stockDe(p,"silver"))}</td>` : "";
+    const perStore = showCols ? `<td class="r num">${stockDisplay(p,stockDe(p,"akira"))}</td><td class="r num">${stockDisplay(p,stockDe(p,"silver"))}</td>` : "";
     return `<tr data-ficha="${p.id}" style="cursor:pointer">
       <td><span class="sku">${esc(p.sku||"—")}</span></td>
       <td>${esc(p.nombre)} ${flag}</td>
       ${perStore}
-      <td class="r ${cls}">${qty(sf)}</td>
+      <td class="r ${cls}">${stockDisplay(p,sf)}</td>
       <td class="r num">${money(p.ultimoCosto)}</td>
       <td class="r num">${money(val)}</td>
     </tr>`;
@@ -1961,7 +2031,7 @@ function viewProd(){
     ${total ? `
     ${filterBarHTML("p", prodFiltros)}
     <div class="table-scroll"><table>
-      <thead><tr>${selMode?`<th class="c"><input type="checkbox" id="selall"></th>`:""}${sortTh(prodFiltros,"sku","SKU","")}${sortTh(prodFiltros,"nombre","Name","")}<th class="c">Lang</th>${showCols?`<th class="r">Akira</th><th class="r">Silver</th>`:""}${sortTh(prodFiltros,"stock","Stock","r")}${sortTh(prodFiltros,"costo","Last cost","r")}${sortTh(prodFiltros,"pventa","List price","r")}<th></th></tr></thead>
+      <thead><tr>${selMode?`<th class="c"><input type="checkbox" id="selall"></th>`:""}${sortTh(prodFiltros,"sku","SKU","")}${sortTh(prodFiltros,"nombre","Name","")}<th class="c">Lang</th>${showCols?`<th class="r">Akira</th><th class="r">Silver</th>`:""}${sortTh(prodFiltros,"stock",stockView==="cases"?"Stock (cases)":"Stock","r")}${sortTh(prodFiltros,"costo","Last cost","r")}${sortTh(prodFiltros,"pventa","List price","r")}<th></th></tr></thead>
       <tbody id="prodBody"></tbody></table></div>`
       : emptyState("The master is empty","Create your first product, or let them appear on their own when you import a purchase with new SKUs.")}
   </div>`;
@@ -1976,14 +2046,14 @@ function renderProdRows(){
     let cls="stock-cell"; if(sf<0) cls+=" neg"; else if(sf===0) cls+=" zero"; else if(bajoStock(p)) cls+=" low";
     const chk = selMode ? `<td class="c" data-nofic><input type="checkbox" class="selchk" data-selp="${p.id}" ${selProd.has(p.id)?"checked":""}></td>` : "";
     const flag = esBloqueado(p) ? ' <span class="pill blocked">blocked</span>' : "";
-    const perStore = showCols ? `<td class="r num">${qty(stockDe(p,"akira"))}</td><td class="r num">${qty(stockDe(p,"silver"))}</td>` : "";
+    const perStore = showCols ? `<td class="r num">${stockDisplay(p,stockDe(p,"akira"))}</td><td class="r num">${stockDisplay(p,stockDe(p,"silver"))}</td>` : "";
     return `<tr data-ficha="${p.id}" style="cursor:pointer">
       ${chk}
       <td><span class="sku">${esc(p.sku||"—")}</span></td>
       <td>${esc(p.nombre)}${flag}</td>
       <td class="c">${esc(langLabel(p.idioma))}</td>
       ${perStore}
-      <td class="r ${cls}">${qty(sf)}</td>
+      <td class="r ${cls}">${stockDisplay(p,sf)}</td>
       <td class="r num">${money(p.ultimoCosto)}</td>
       <td class="r num">${moneyOpt(p.precioVenta)}</td>
       <td class="r"><button class="btn ghost sm" data-editp="${p.id}">Edit</button></td>
@@ -2090,6 +2160,8 @@ function viewDocs(tipo){
         ${sortTh(f,"contraparte",isC?"Supplier":"Customer","")}
         ${sortTh(f,"items","Items","c")}
         ${sortTh(f,"total","Total","r")}
+        ${isC?`<th class="c">Status</th>`:""}
+        ${(!isC && isAdmin())?`<th class="r">Commission</th>`:""}
         <th></th>
       </tr></thead>
       <tbody id="docBody"></tbody></table></div>`
@@ -2138,11 +2210,14 @@ function docKpisHTML(tipo, list){
   }
   const margen = total - cogs;
   const margenPct = total>0 ? (margen/total*100) : 0;
+  const commKpi = isAdmin() ? `
+    <div class="kpi"><div class="lbl">Commission</div><div class="val">${money(list.reduce((a,d)=>a+saleCommission(d),0))}</div><div class="sub">seller earnings on margin</div></div>` : "";
   return `
     <div class="kpi"><div class="lbl">Sales</div><div class="val">${n}</div><div class="sub">documents in range</div></div>
     <div class="kpi"><div class="lbl">Units sold</div><div class="val">${qty(uds)}</div><div class="sub">items out</div></div>
     <div class="kpi"><div class="lbl">Total sold</div><div class="val">${money(total)}</div><div class="sub">${n?`avg ticket ${money(total/n)}`:"—"}</div></div>
-    <div class="kpi"><div class="lbl">Gross margin (FIFO)</div><div class="val">${money(margen)}</div><div class="sub">${total>0?`${nf0.format(margenPct)}% on revenue`:"load sales to see margin"}</div></div>`;
+    <div class="kpi"><div class="lbl">Gross margin (FIFO)</div><div class="val">${money(margen)}</div><div class="sub">${total>0?`${nf0.format(margenPct)}% on revenue`:"load sales to see margin"}</div></div>
+    ${commKpi}`;
 }
 
 function filtrarDocs(tipo){
@@ -2177,13 +2252,18 @@ function filtrarDocs(tipo){
 }
 function renderDocRows(tipo){
   const body=document.getElementById("docBody"); if(!body) return;
+  const isC = tipo==="compra";
   const stores=effectiveStores();
   const all=(tipo==="compra"?db.compras:db.ventas).filter(d=>stores.includes(d.store||STORE_IDS[0]));
   const list=filtrarDocs(tipo).filter(d=>stores.includes(d.store||STORE_IDS[0])), total=all.length;
   const showStore = allowedStores().length>1;
-  const cols = showStore?7:6;
+  const showComm = !isC && isAdmin();
+  const cols = (showStore?7:6) + (isC?1:0) + (showComm?1:0);
   body.innerHTML = list.map(d=>{
     const items=d.lineas.reduce((a,l)=>a+l.cantidad,0);
+    const received = d.status===INVOICE_STATUS.RECEIVED;
+    const statusCell = isC ? `<td class="c"><span class="inv-badge ${received?'received':'transit'}">${received?'✓ Received':'⋯ In transit'}</span></td>` : "";
+    const commCell = showComm ? `<td class="r num">${money(saleCommission(d))}</td>` : "";
     return `<tr>
       <td class="num">${esc(d.numero||"—")}</td>
       <td>${esc(fmtDate(d.fecha))}</td>
@@ -2191,7 +2271,9 @@ function renderDocRows(tipo){
       <td>${esc(d.contraparte||"—")}</td>
       <td class="c num">${qty(items)}</td>
       <td class="r num">${money(d.total)}</td>
-      <td class="r" style="white-space:nowrap"><button class="btn ghost sm" data-vdoc="${tipo}:${d.id}">View</button>${tipo==="venta"?`<button class="btn ghost sm" data-copydoc="${tipo}:${d.id}">Copy</button>`:""}<button class="btn ghost sm" data-editdoc="${tipo}:${d.id}">Edit</button><button class="btn ghost sm" data-deldoc="${tipo}:${d.id}" style="color:var(--alert)">Delete</button></td>
+      ${statusCell}
+      ${commCell}
+      <td class="r" style="white-space:nowrap">${isC?`<button class="btn ghost sm" data-invstatus="${d.id}">${received?'Mark in transit':'Mark received'}</button>`:""}<button class="btn ghost sm" data-vdoc="${tipo}:${d.id}">View</button>${tipo==="venta"?`<button class="btn ghost sm" data-copydoc="${tipo}:${d.id}">Copy</button>`:""}<button class="btn ghost sm" data-editdoc="${tipo}:${d.id}">Edit</button><button class="btn ghost sm" data-deldoc="${tipo}:${d.id}" style="color:var(--alert)">Delete</button></td>
     </tr>`;
   }).join("") || `<tr><td colspan="${cols}" style="text-align:center;color:var(--muted);padding:22px">No document matches the filters.</td></tr>`;
   const cnt=document.getElementById("docCount");
@@ -2199,9 +2281,18 @@ function renderDocRows(tipo){
   const kp=document.getElementById("docKpis");
   if(kp) kp.innerHTML = docKpisHTML(tipo, list);
   body.querySelectorAll("[data-vdoc]").forEach(b=> b.onclick=()=>{ const[t,id]=b.dataset.vdoc.split(":"); verDoc(t,id); });
+  body.querySelectorAll("[data-invstatus]").forEach(b=> b.onclick=()=> toggleInvoiceStatus(b.dataset.invstatus));
   body.querySelectorAll("[data-copydoc]").forEach(b=> b.onclick=()=>{ const[t,id]=b.dataset.copydoc.split(":"); copyDoc(t,id); });
   body.querySelectorAll("[data-editdoc]").forEach(b=> b.onclick=()=>{ const[t,id]=b.dataset.editdoc.split(":"); editDoc(t,id); });
   body.querySelectorAll("[data-deldoc]").forEach(b=> b.onclick=()=>{ const[t,id]=b.dataset.deldoc.split(":"); deleteDoc(t,id); });
+}
+/* Punto 1: alterna el estado de envío de una factura de compra (no toca stock). */
+function toggleInvoiceStatus(id){
+  const c = db.compras.find(x=>x.id===id); if(!c) return;
+  c.status = (c.status===INVOICE_STATUS.RECEIVED) ? INVOICE_STATUS.IN_TRANSIT : INVOICE_STATUS.RECEIVED;
+  save();
+  toast(c.status===INVOICE_STATUS.RECEIVED ? "Invoice marked received" : "Invoice back in transit", "up");
+  if(document.getElementById("docBody")) renderDocRows("compra");
 }
 function wireDocFiltros(){
   if(!document.getElementById("docBody")) return;
@@ -2449,6 +2540,8 @@ function viewDatos(){
     <div class="grid-form" style="grid-template-columns:1fr 1fr">
       <div class="field"><label>Currency symbol</label><input class="inp" id="cfgMon" value="${esc(db.config.moneda)}" maxlength="4"></div>
       <div class="field"><label>Starting invoice #</label><input class="inp num" id="cfgFac" value="${esc(String(db.config.facturaInicio||101))}"></div>
+      ${isAdmin()?`<div class="field"><label>Sales commission (% of margin)</label><input class="inp num" id="cfgComm" value="${esc(String(round2((db.config.commissionRate||0)*100)))}"></div>
+      <div class="field" style="justify-content:flex-end"><p class="hint" style="font-size:11.5px;margin:0 0 8px">Applies to new sales. Existing sales keep the rate they were booked at.</p></div>`:""}
       <button class="btn" data-savecfg style="justify-self:start;margin-top:4px">Save</button>
     </div>
   </div>
@@ -2515,6 +2608,8 @@ function wire(){
   m.querySelectorAll("[data-savecfg]").forEach(cfg=> cfg.onclick=()=>{
     db.config.moneda = (document.getElementById("cfgMon").value||"$").trim()||"$";
     const fi=parseInt(document.getElementById("cfgFac").value,10); if(!isNaN(fi)&&fi>0) db.config.facturaInicio=fi;
+    const commEl=document.getElementById("cfgComm");   // sólo lo renderiza el admin
+    if(commEl){ const pct=parseNum(commEl.value); if(!isNaN(pct)) db.config.commissionRate = Math.min(1, Math.max(0, round2(pct)/100)); }
     db.config.emisor = {
       nombre:(document.getElementById("cfgEmNom").value||"").trim(),
       direccion:(document.getElementById("cfgEmDir").value||"").trim(),
@@ -2596,8 +2691,9 @@ function openProd(id){
       <div class="field"><label>Category</label><select class="inp" id="p_cat">${catOpts}</select></div>
       <div class="field"><label>Level</label><select class="inp" id="p_niv">${nivOpts}</select></div>
       <div class="field"><label>Packs per box</label><input class="inp num" id="p_ppb" value="${p?p.packsPorBox:PACKS_POR_BOX_DEF}"></div>
-      <div class="field"><label>Boxes per case</label><input class="inp num" id="p_bpc" value="${p?p.boxesPorCase:boxesCaseDefault(catActual)}"></div>
+      <div class="field"><label>Units per Case</label><input class="inp num" id="p_bpc" value="${p?p.boxesPorCase:boxesCaseDefault(catActual)}"></div>
     </div>
+    <p class="hint" style="font-size:12px;margin:6px 0 0">Units per Case autofills from the category (e.g. Pokémon = 6). Edit it if this product breaks the rule — it drives the “View as: Cases” conversion.</p>
     ${p?'<p style="font-size:12.5px;color:var(--muted);margin:14px 0 0">Stock changes come from purchases and sales, not here.</p>':''}
   `, [
     p && isAdmin() ? {label:"Delete",cls:"btn danger",act:()=>{ delProd(p.id); }} : null,
@@ -3453,12 +3549,18 @@ function confirmDoc(){
     subtotal: subtotalLineas,
     total: totalDoc
   };
-  if(isC){ doc.handling = draft.handling||0; doc.flete = draft.flete||0; }
+  if(isC){
+    doc.handling = draft.handling||0; doc.flete = draft.flete||0;
+    // preservar el estado de envío al editar; una compra nueva arranca "in transit"
+    doc.status = (editing && oldDoc && oldDoc.status) ? oldDoc.status : INVOICE_STATUS.IN_TRANSIT;
+  }
   else {
     doc.clienteId = draft.clienteId;
     doc.cliente = cli ? { nombre:cli.nombre, contacto:cli.contacto, empresa:cli.empresa, telefono:cli.telefono, email:cli.email, direccion:cli.direccion, ciudad:cli.ciudad, estado:cli.estado, zip:cli.zip, pais:cli.pais||"" } : null;  // snapshot for the invoice + country slicer
     doc.envio = { tipo:draft.envio.tipo, monto:envioMonto };
     doc.contraparte = cli ? clienteLinea(cli) : draft.contraparte.trim();
+    // congelar la tasa de comisión vigente (o mantener la de la venta si se edita)
+    doc.commissionRate = (editing && oldDoc && oldDoc.commissionRate!=null) ? oldDoc.commissionRate : (db.config.commissionRate||0);
   }
   const refTxt = (isC?"Purchase":"Sale") + (doc.numero?(" "+doc.numero):"") + (doc.contraparte?(" · "+doc.contraparte):"");
 
@@ -3607,6 +3709,18 @@ function verDoc(tipo,id){
   const cliBlock = (!isC && cli) ? `<p style="margin:0 0 14px;color:var(--muted);font-size:13px">
       <b>${esc(cli.nombre)}</b>${cli.empresa?` · ${esc(cli.empresa)}`:""}<br>
       ${esc(clienteDireccion(cli)||"")}${cli.email?`<br>${esc(cli.email)}`:""}${cli.telefono?` · ${esc(cli.telefono)}`:""}</p>` : "";
+  // Punto 1: bloque de estado de envío (sólo compras)
+  const received = d.status===INVOICE_STATUS.RECEIVED;
+  const statusBlock = isC ? `<div class="totrow" style="align-items:center">
+      <span style="color:var(--muted)">Shipment status</span>
+      <span style="display:flex;gap:10px;align-items:center">
+        <span class="inv-badge ${received?'received':'transit'}">${received?'✓ Received':'⋯ In transit'}</span>
+        <button class="btn ghost sm" data-invstatus-modal="${d.id}">${received?'Mark in transit':'Mark received'}</button>
+      </span></div>` : "";
+  // Punto 4: comisión (sólo ventas y sólo admin/master)
+  const commBlock = (!isC && isAdmin()) ? `
+    <div class="totrow"><span style="color:var(--muted)">Margin (FIFO)</span><span class="num">${money(saleMargin(d))}</span></div>
+    <div class="totrow"><span style="color:var(--muted)">Commission (${nf0.format(saleCommissionRate(d)*100)}% of margin)</span><span class="num">${money(saleCommission(d))}</span></div>` : "";
   buildModal(`${isC?"Purchase":"Invoice"} ${esc(d.numero||"")}`.trim(), `
     <p style="margin:0 0 6px;color:var(--muted);font-size:14px">${esc(d.contraparte||"—")} · ${esc(fmtDate(d.fecha))}</p>
     ${cliBlock}
@@ -3616,6 +3730,8 @@ function verDoc(tipo,id){
     <div class="totrow"><span style="color:var(--muted)">Subtotal</span><span class="num">${money(sub)}</span></div>
     ${extras}
     <div class="totrow" style="font-weight:700"><span>Total</span><span class="num">${money(d.total)}</span></div>
+    ${statusBlock}
+    ${commBlock}
   `,[
     {label:"Borrar",cls:"btn danger",act:()=>deleteDoc(tipo,id)},
     ...(isC?[]:[{label:"⤓ Descargar PDF",cls:"btn",act:()=>generarInvoicePDF(id)},
@@ -3623,6 +3739,9 @@ function verDoc(tipo,id){
     {label:"Edit",cls:"btn",act:()=>{ closeModal(); editDoc(tipo,id); }},
     {label:"Cerrar",cls:"btn",act:closeModal}
   ]);
+  // Punto 1: el botón de estado dentro del detalle re-abre el modal ya actualizado.
+  const sb=document.querySelector("[data-invstatus-modal]");
+  if(sb) sb.onclick=()=>{ toggleInvoiceStatus(sb.dataset.invstatusModal); closeModal(); verDoc(tipo,id); };
 }
 
 /* ============================================================
