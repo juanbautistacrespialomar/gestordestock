@@ -369,6 +369,9 @@
   .inv-badge.transit{background:var(--up-bg);color:var(--accent-ink);border:1px solid color-mix(in srgb,var(--accent) 30%,transparent)}
   .inv-badge.received{background:#123a2a;color:#7fe0b8;border:1px solid #1c5a41}
   :root:not([data-theme="dark"]) .inv-badge.received{background:#e6f6ee;color:#1c7a52;border-color:#bfe6d2}
+  tr.row-transit td{color:var(--muted)}
+  tr.row-transit .sku{opacity:.7}
+  .stock-cell.transit{color:var(--accent-ink);font-weight:700}
   .banner{padding:11px 14px;border-radius:8px;font-size:13.5px;margin-bottom:14px;display:flex;gap:9px;align-items:flex-start}
   .banner.warn{background:var(--alert-bg);color:#8a2b2b;border:1px solid #e6c4c4}
   .banner.ok{background:var(--up-bg);color:var(--accent-ink);border:1px solid #bcd8ca}
@@ -791,9 +794,11 @@ function migrate(d){
   d.movimientos = d.movimientos || [];
   d.clientes = d.clientes || [];
   d.solicitudes = d.solicitudes || [];   // approval requests for blocked items (point 5, MVP2)
-  // Invoices de COMPRA: estado de envío. Por defecto "in_transit" hasta que se
-  // marca "received" (la mercadería llegó). No afecta stock ni FIFO: es tracking.
-  d.compras.forEach(c=>{ if(c.status==null) c.status = INVOICE_STATUS.IN_TRANSIT; });
+  // Invoices de COMPRA: estado de envío que AHORA gobierna el stock. Las compras
+  // que ya existían impactaron el inventario en su momento, así que se migran como
+  // "received" (si las pusiéramos en tránsito, vaciaríamos el stock actual). Sólo
+  // las compras nuevas nacerán "in_transit" y no suman hasta marcarse recibidas.
+  d.compras.forEach(c=>{ if(c.status==null) c.status = INVOICE_STATUS.RECEIVED; });
   // Ventas: snapshot de la tasa de comisión vigente al momento de la venta, para
   // que un cambio futuro de tasa no reescriba comisiones ya devengadas.
   d.ventas.forEach(v=>{ if(v.commissionRate==null) v.commissionRate = d.config.commissionRate; });
@@ -874,6 +879,38 @@ function perteneceAStore(p, store){
   return docs.some(d => d.store===store && (d.lineas||[]).some(l=>l.productoId===p.id));
 }
 function stockEnFoco(p){ return effectiveStores().reduce((a,s)=> a + stockDe(p,s), 0); }
+
+/* ============================================================
+   STOCK EN TRÁNSITO (compras aún no recibidas)
+   ------------------------------------------------------------
+   Es DERIVADO de db.compras con status "in_transit": no hay campo
+   nuevo en el producto, así que nunca se desincroniza. La mercadería
+   en tránsito NO está en stockPorTienda ni en las capas FIFO, por eso
+   no se puede vender ni cuenta en la valuación vendible. Se recibe
+   (marca "received") y recién ahí entra al inventario.
+   ============================================================ */
+function transitoDe(p, store){
+  let u = 0;
+  (db.compras||[]).forEach(c=>{
+    if(c.status!==INVOICE_STATUS.IN_TRANSIT) return;
+    if((c.store||STORE_IDS[0])!==store) return;
+    (c.lineas||[]).forEach(l=>{ if(l.productoId===p.id) u += (l.cantidad||0); });
+  });
+  return u;
+}
+function transitoValorDe(p, store){
+  let v = 0;
+  (db.compras||[]).forEach(c=>{
+    if(c.status!==INVOICE_STATUS.IN_TRANSIT) return;
+    if((c.store||STORE_IDS[0])!==store) return;
+    (c.lineas||[]).forEach(l=>{ if(l.productoId===p.id){ const landed=(l.costoTotal!=null)?l.costoTotal:(l.precio||0); v += (l.cantidad||0)*landed; } });
+  });
+  return round2(v);
+}
+function transitoEnFoco(p){ return effectiveStores().reduce((a,s)=> a + transitoDe(p,s), 0); }
+function transitoValorEnFoco(p){ return round2(effectiveStores().reduce((a,s)=> a + transitoValorDe(p,s), 0)); }
+/* Total de unidades en tránsito bajo el foco actual (para el KPI del panel). */
+function unidadesEnTransito(){ return productosVendibles().reduce((a,p)=> a + transitoEnFoco(p), 0); }
 
 /* ============================================================
    Punto 2/3: vista de stock en UNIDADES o CASES
@@ -1441,8 +1478,8 @@ function render(){
    ============================================================ */
 let selProd = new Set();                 // productos tildados en el maestro
 let selMode = false;                     // modo selección activado (muestra los tildes)
-let prodFiltros = { q:"", saga:"", idioma:"", estado:"", cmin:"", cmax:"", sortKey:"", sortDir:"" };
-let dashFiltros = { q:"", saga:"", idioma:"", estado:"", cmin:"", cmax:"", sortKey:"", sortDir:"" };
+let prodFiltros = { q:"", saga:"", idioma:"", estado:"", xstate:"", cmin:"", cmax:"", sortKey:"", sortDir:"" };
+let dashFiltros = { q:"", saga:"", idioma:"", estado:"", xstate:"", cmin:"", cmax:"", sortKey:"", sortDir:"" };
 let docFiltros = { compra:{q:"",desde:"",hasta:"",sortKey:"",sortDir:""}, venta:{q:"",desde:"",hasta:"",sortKey:"",sortDir:""} };
 let movFiltros = { q:"", desde:"", hasta:"", tipo:"", saga:"", vmin:"", vmax:"", sortKey:"", sortDir:"" };
 /* "Saga" = línea/juego, derivada del nombre del producto.
@@ -1497,6 +1534,7 @@ function filtrarProds(f){
   const q=(f.q||"").trim().toLowerCase();
   const cmin=f.cmin!==""&&f.cmin!=null?parseNum(f.cmin):null;
   const cmax=f.cmax!==""&&f.cmax!=null?parseNum(f.cmax):null;
+  const xs=f.xstate||"";   // "" (all) | "avail" | "transit"
   const out = db.productos.filter(p=>{
     if(soloEnVault(p)) return false;             // vault lives in its own panel
     // Punto 9: en vista de UN local, sólo productos que pertenecen a ese local
@@ -1505,12 +1543,18 @@ function filtrarProds(f){
     if(q){ const hay=((p.nombre||"")+" "+(p.sku||"")).toLowerCase(); if(!hay.includes(q)) return false; }
     if(f.saga && sagaDe(p)!==f.saga) return false;
     if(f.idioma && (p.idioma||"")!==f.idioma) return false;
-    if(f.estado==="pedir" && !(p.puntoRepedido>0 && sf<=p.puntoRepedido)) return false;
-    if(f.estado==="con" && !(sf>0)) return false;
-    if(f.estado==="sin" && sf!==0) return false;
-    if(f.estado==="bajo" && !(sf>0 && p.puntoRepedido>0 && sf<=p.puntoRepedido)) return false;
-    if(f.estado==="neg" && !(sf<0)) return false;
-    if(f.estado==="blocked" && !esBloqueado(p)) return false;
+    // En modo "in transit" listamos sólo productos con mercadería en camino y NO
+    // aplicamos los filtros de stock disponible (miran otra cosa).
+    if(xs==="transit"){
+      if(transitoEnFoco(p)<=0) return false;
+    } else {
+      if(f.estado==="pedir" && !(p.puntoRepedido>0 && sf<=p.puntoRepedido)) return false;
+      if(f.estado==="con" && !(sf>0)) return false;
+      if(f.estado==="sin" && sf!==0) return false;
+      if(f.estado==="bajo" && !(sf>0 && p.puntoRepedido>0 && sf<=p.puntoRepedido)) return false;
+      if(f.estado==="neg" && !(sf<0)) return false;
+      if(f.estado==="blocked" && !esBloqueado(p)) return false;
+    }
     const c=p.ultimoCosto||0;
     if(cmin!==null && c<cmin) return false;
     if(cmax!==null && c>cmax) return false;
@@ -1572,6 +1616,11 @@ function filterBarHTML(prefix, f){
       <option value="neg" ${f.estado==="neg"?"selected":""}>Negative</option>
       <option value="blocked" ${f.estado==="blocked"?"selected":""}>Blocked</option>
     </select>
+    <select class="inp" id="${prefix}xstate" style="flex:1;min-width:120px" title="Available vs. incoming (in transit)">
+      <option value="" ${(f.xstate||"")===""?"selected":""}>Avail. + in transit</option>
+      <option value="avail" ${f.xstate==="avail"?"selected":""}>Available only</option>
+      <option value="transit" ${f.xstate==="transit"?"selected":""}>In transit only</option>
+    </select>
     <input class="inp num" id="${prefix}cmin" placeholder="Min cost" value="${esc(f.cmin)}" style="width:90px">
     <input class="inp num" id="${prefix}cmax" placeholder="Max cost" value="${esc(f.cmax)}" style="width:90px">
     <button class="btn ghost sm" id="${prefix}clear" title="Clear filters">Clear</button>
@@ -1584,10 +1633,11 @@ function wireFilterBar(prefix, f, onChange){
   document.getElementById(prefix+"saga").onchange=e=>upd("saga",e.target);
   const idi=document.getElementById(prefix+"idioma"); if(idi) idi.onchange=e=>upd("idioma",e.target);
   document.getElementById(prefix+"estado").onchange=e=>upd("estado",e.target);
+  const xst=document.getElementById(prefix+"xstate"); if(xst) xst.onchange=e=>upd("xstate",e.target);
   document.getElementById(prefix+"cmin").oninput=e=>upd("cmin",e.target);
   document.getElementById(prefix+"cmax").oninput=e=>upd("cmax",e.target);
   document.getElementById(prefix+"clear").onclick=()=>{
-    f.q="";f.saga="";f.idioma="";f.estado="";f.cmin="";f.cmax="";f.sortKey="";f.sortDir="";
+    f.q="";f.saga="";f.idioma="";f.estado="";f.xstate="";f.cmin="";f.cmax="";f.sortKey="";f.sortDir="";
     render();
   };
 }
@@ -1595,7 +1645,7 @@ function wireFilterBar(prefix, f, onChange){
    ordenado por stock ascendente (primero lo más urgente: negativos y ceros). */
 function irAPedidos(){
   descartarAlerta(firmaReposicion());
-  Object.assign(prodFiltros, { q:"", saga:"", idioma:"", estado:"pedir", cmin:"", cmax:"", sortKey:"stock", sortDir:"asc" });
+  Object.assign(prodFiltros, { q:"", saga:"", idioma:"", estado:"pedir", xstate:"", cmin:"", cmax:"", sortKey:"stock", sortDir:"asc" });
   setView("prod");
   toast("Filtering products to reorder","warn");
 }
@@ -1632,6 +1682,7 @@ function viewDash(){
     <div class="kpi"><div class="lbl">Products</div><div class="val">${vend.length}</div><div class="sub">sellable SKUs</div></div>
     <div class="kpi"><div class="lbl">Units in stock</div><div class="val">${qty(unidadesTotales())}</div><div class="sub">${esc(foco)}</div></div>
     <div class="kpi"><div class="lbl">Valuation</div><div class="val">${money(valorizacion())}</div><div class="sub">FIFO cost layers</div></div>
+    ${unidadesEnTransito()>0?`<div class="kpi"><div class="lbl">In transit</div><div class="val">${qty(unidadesEnTransito())}</div><div class="sub">incoming · ${money(vend.reduce((a,p)=>a+transitoValorEnFoco(p),0))}</div></div>`:""}
     <div class="kpi ${porPedir.length?'warn kpi-click':''}" ${porPedir.length?'data-goto-pedir role="button" tabindex="0" title="See the reorder list"':''}><div class="lbl">Alerts</div><div class="val">${porPedir.length}</div><div class="sub">${subAlerta}</div></div>
   </div>
 
@@ -1654,25 +1705,46 @@ function viewDash(){
 }
 
 function filteredDashProds(){ return filtrarProds(dashFiltros); }
+/* Punto 1: expande cada producto a una o dos filas de stock según el filtro:
+   - "" (all): fila de disponible + fila de tránsito si hay mercadería en camino.
+   - "avail": sólo disponible.  - "transit": sólo tránsito.
+   Devuelve [{p, kind:"avail"|"transit"}]. */
+function stockRowset(list, f){
+  const xs = f.xstate || "";
+  const rows = [];
+  list.forEach(p=>{
+    const trans = transitoEnFoco(p);
+    if(xs==="transit"){ if(trans>0) rows.push({p, kind:"transit"}); }
+    else if(xs==="avail"){ rows.push({p, kind:"avail"}); }
+    else { rows.push({p, kind:"avail"}); if(trans>0) rows.push({p, kind:"transit"}); }
+  });
+  return rows;
+}
 function renderDashRows(){
   const body=document.getElementById("dashBody"); if(!body) return;
   const list=filteredDashProds();
   const showCols = activeStore==="all" && allowedStores().length>1;
   const colspan = showCols ? 7 : 5;
-  body.innerHTML = list.map(p=>{
-    const sf = stockEnFoco(p);
-    const val = valorFifoEnFoco(p);
-    let cls="stock-cell"; if(sf<0) cls+=" neg"; else if(sf===0) cls+=" zero"; else if(bajoStock(p)) cls+=" low";
-    const flag = esBloqueado(p) ? '<span class="pill blocked">blocked</span>'
-               : sf<0 ? '<span class="pill low">negative</span>'
+  const rowset = stockRowset(list, dashFiltros);
+  body.innerHTML = rowset.map(({p,kind})=>{
+    const isT = kind==="transit";
+    const units = isT ? transitoEnFoco(p) : stockEnFoco(p);
+    const val   = isT ? transitoValorEnFoco(p) : valorFifoEnFoco(p);
+    const costo = isT ? (transitoEnFoco(p)>0 ? round2(transitoValorEnFoco(p)/transitoEnFoco(p)) : (p.ultimoCosto||0)) : (p.ultimoCosto||0);
+    let cls="stock-cell";
+    if(isT) cls+=" transit";
+    else { if(units<0) cls+=" neg"; else if(units===0) cls+=" zero"; else if(bajoStock(p)) cls+=" low"; }
+    const flag = isT ? '<span class="inv-badge transit">⋯ in transit</span>'
+               : esBloqueado(p) ? '<span class="pill blocked">blocked</span>'
+               : units<0 ? '<span class="pill low">negative</span>'
                : bajoStock(p) ? '<span class="pill low">reorder</span>' : "";
-    const perStore = showCols ? `<td class="r num">${stockDisplay(p,stockDe(p,"akira"))}</td><td class="r num">${stockDisplay(p,stockDe(p,"silver"))}</td>` : "";
-    return `<tr data-ficha="${p.id}" style="cursor:pointer">
+    const perStore = showCols ? `<td class="r num">${stockDisplay(p, isT?transitoDe(p,"akira"):stockDe(p,"akira"))}</td><td class="r num">${stockDisplay(p, isT?transitoDe(p,"silver"):stockDe(p,"silver"))}</td>` : "";
+    return `<tr data-ficha="${p.id}" class="${isT?'row-transit':''}" style="cursor:pointer">
       <td><span class="sku">${esc(p.sku||"—")}</span></td>
       <td>${esc(p.nombre)} ${flag}</td>
       ${perStore}
-      <td class="r ${cls}">${stockDisplay(p,sf)}</td>
-      <td class="r num">${money(p.ultimoCosto)}</td>
+      <td class="r ${cls}">${stockDisplay(p,units)}</td>
+      <td class="r num">${money(costo)}</td>
       <td class="r num">${money(val)}</td>
     </tr>`;
   }).join("") || `<tr><td colspan="${colspan}" style="text-align:center;color:var(--muted);padding:22px">No product matches the filters.</td></tr>`;
@@ -2041,21 +2113,26 @@ function renderProdRows(){
   const list=filtrarProds(prodFiltros);
   const showCols = activeStore==="all" && allowedStores().length>1;
   const cols = (selMode?1:0)+7+(showCols?2:0);
-  body.innerHTML = list.map(p=>{
-    const sf=stockEnFoco(p);
-    let cls="stock-cell"; if(sf<0) cls+=" neg"; else if(sf===0) cls+=" zero"; else if(bajoStock(p)) cls+=" low";
-    const chk = selMode ? `<td class="c" data-nofic><input type="checkbox" class="selchk" data-selp="${p.id}" ${selProd.has(p.id)?"checked":""}></td>` : "";
-    const flag = esBloqueado(p) ? ' <span class="pill blocked">blocked</span>' : "";
-    const perStore = showCols ? `<td class="r num">${stockDisplay(p,stockDe(p,"akira"))}</td><td class="r num">${stockDisplay(p,stockDe(p,"silver"))}</td>` : "";
-    return `<tr data-ficha="${p.id}" style="cursor:pointer">
+  body.innerHTML = stockRowset(list, prodFiltros).map(({p,kind})=>{
+    const isT = kind==="transit";
+    const units = isT ? transitoEnFoco(p) : stockEnFoco(p);
+    let cls="stock-cell";
+    if(isT) cls+=" transit";
+    else { if(units<0) cls+=" neg"; else if(units===0) cls+=" zero"; else if(bajoStock(p)) cls+=" low"; }
+    // en la fila de tránsito no tiene sentido el checkbox de selección
+    const chk = selMode ? (isT ? `<td class="c"></td>` : `<td class="c" data-nofic><input type="checkbox" class="selchk" data-selp="${p.id}" ${selProd.has(p.id)?"checked":""}></td>`) : "";
+    const flag = isT ? ' <span class="inv-badge transit">⋯ in transit</span>' : (esBloqueado(p) ? ' <span class="pill blocked">blocked</span>' : "");
+    const cost = isT ? (transitoEnFoco(p)>0 ? round2(transitoValorEnFoco(p)/transitoEnFoco(p)) : (p.ultimoCosto||0)) : (p.ultimoCosto||0);
+    const perStore = showCols ? `<td class="r num">${stockDisplay(p, isT?transitoDe(p,"akira"):stockDe(p,"akira"))}</td><td class="r num">${stockDisplay(p, isT?transitoDe(p,"silver"):stockDe(p,"silver"))}</td>` : "";
+    return `<tr data-ficha="${p.id}" class="${isT?'row-transit':''}" style="cursor:pointer">
       ${chk}
       <td><span class="sku">${esc(p.sku||"—")}</span></td>
       <td>${esc(p.nombre)}${flag}</td>
       <td class="c">${esc(langLabel(p.idioma))}</td>
       ${perStore}
-      <td class="r ${cls}">${stockDisplay(p,sf)}</td>
-      <td class="r num">${money(p.ultimoCosto)}</td>
-      <td class="r num">${moneyOpt(p.precioVenta)}</td>
+      <td class="r ${cls}">${stockDisplay(p,units)}</td>
+      <td class="r num">${money(cost)}</td>
+      <td class="r num">${isT?"—":moneyOpt(p.precioVenta)}</td>
       <td class="r"><button class="btn ghost sm" data-editp="${p.id}">Edit</button></td>
     </tr>`;
   }).join("") || `<tr><td colspan="${cols}" style="text-align:center;color:var(--muted);padding:22px">No product matches the filters.</td></tr>`;
@@ -2286,13 +2363,30 @@ function renderDocRows(tipo){
   body.querySelectorAll("[data-editdoc]").forEach(b=> b.onclick=()=>{ const[t,id]=b.dataset.editdoc.split(":"); editDoc(t,id); });
   body.querySelectorAll("[data-deldoc]").forEach(b=> b.onclick=()=>{ const[t,id]=b.dataset.deldoc.split(":"); deleteDoc(t,id); });
 }
-/* Punto 1: alterna el estado de envío de una factura de compra (no toca stock). */
+/* Punto 1: alterna el estado de una compra Y aplica su efecto sobre el stock.
+   - in_transit -> received: la mercadería entra al inventario (FIFO + stock).
+   - received -> in_transit: se saca del inventario. Si ya se vendió parte, el
+     stock quedaría negativo: pedimos confirmación antes de proceder. */
 function toggleInvoiceStatus(id){
   const c = db.compras.find(x=>x.id===id); if(!c) return;
-  c.status = (c.status===INVOICE_STATUS.RECEIVED) ? INVOICE_STATUS.IN_TRANSIT : INVOICE_STATUS.RECEIVED;
+  if(c.status===INVOICE_STATUS.RECEIVED){
+    const store = c.store||STORE_IDS[0];
+    const enRiesgo = c.lineas.filter(l=>{ const p=prodById(l.productoId); return p && stockDe(p,store) < l.cantidad; });
+    if(enRiesgo.length){
+      const det = enRiesgo.map(l=>`· ${l.nombre}`).join("\n");
+      if(!confirm(`Some of this shipment was already sold, so moving it back to “in transit” will push stock negative at ${storeName(store)}:\n\n${det}\n\nContinue anyway?`)) return;
+    }
+    unreceiveInvoice(c);
+    c.status = INVOICE_STATUS.IN_TRANSIT;
+    toast("Invoice back in transit — stock removed", "warn");
+  } else {
+    receiveInvoice(c);
+    c.status = INVOICE_STATUS.RECEIVED;
+    toast("Received — stock added to inventory", "up");
+  }
   save();
-  toast(c.status===INVOICE_STATUS.RECEIVED ? "Invoice marked received" : "Invoice back in transit", "up");
   if(document.getElementById("docBody")) renderDocRows("compra");
+  else render();
 }
 function wireDocFiltros(){
   if(!document.getElementById("docBody")) return;
@@ -3569,11 +3663,16 @@ function confirmDoc(){
 
   resolved.forEach((r, idx)=>{
     if(isC){
-      const landed = round2(r.precio + handPU + fletePU);
-      fifoEntrada(r.prod, store, r.cantidad, landed, refTxt, doc.id);  // FIFO purchase layer
-      moverStock(r.prod, +r.cantidad, landed, "compra", doc.id, refTxt, { store });
-      r.prod.costoNeto = r.precio; r.prod.costoHandling = round2(handPU); r.prod.costoFlete = round2(fletePU);
-      r.prod.ultimoCosto = landed;        // last landed cost (reference only; COGS is FIFO)
+      // La compra sólo impacta stock/FIFO si queda RECEIVED. Si nace/queda
+      // "in transit", el documento se guarda pero el inventario no se mueve:
+      // la mercadería recién entra cuando se marca recibida.
+      if(doc.status===INVOICE_STATUS.RECEIVED){
+        const landed = round2(r.precio + handPU + fletePU);
+        fifoEntrada(r.prod, store, r.cantidad, landed, refTxt, doc.id);  // FIFO purchase layer
+        moverStock(r.prod, +r.cantidad, landed, "compra", doc.id, refTxt, { store });
+        r.prod.costoNeto = r.precio; r.prod.costoHandling = round2(handPU); r.prod.costoFlete = round2(fletePU);
+        r.prod.ultimoCosto = landed;        // last landed cost (reference only; COGS is FIFO)
+      }
     } else {
       const res = fifoConsumir(r.prod, store, r.cantidad);            // consume FIFO layers -> real COGS
       doc.lineas[idx].costo = res.unit;                              // store the FIFO unit cost on the line
@@ -3590,8 +3689,9 @@ function confirmDoc(){
   draft.editingId=null;
   save(); closeModal();
   const uds=qty(doc.lineas.reduce((a,l)=>a+l.cantidad,0));
+  const compraMsg = doc.status===INVOICE_STATUS.IN_TRANSIT ? `Purchase saved · ${uds} u in transit` : `Purchase saved · +${uds} u`;
   toast(editing ? `Document updated`
-       : (isC?`Purchase saved · +${uds} u` : `Sale recorded · −${uds} u`), isC?"up":"down");
+       : (isC?compraMsg : `Sale recorded · −${uds} u`), isC?"up":"down");
   render();
 }
 
@@ -3611,24 +3711,58 @@ function recomputeUltimoCosto(prod){
   }
   // si no queda ninguna compra con ese producto, dejamos el último costo como está
 }
-function revertDoc(doc){
-  const isC = doc.tipo==="compra";
+/* Aplica el efecto de una compra sobre el inventario (capas FIFO + stock del
+   local + último costo). Se llama al recibir la mercadería. Idempotencia: sólo
+   debe invocarse cuando la compra pasa a "received", nunca dos veces. */
+function receiveInvoice(doc){
+  const store = doc.store || STORE_IDS[0];
+  const refTxt = "Purchase" + (doc.numero?(" "+doc.numero):"") + (doc.contraparte?(" · "+doc.contraparte):"");
+  doc.lineas.forEach(l=>{
+    const p = prodById(l.productoId); if(!p) return;
+    const landed = (l.costoTotal!=null) ? l.costoTotal : round2((l.neto!=null?l.neto:l.precio||0) + (l.handling||0) + (l.flete||0));
+    fifoEntrada(p, store, l.cantidad, landed, refTxt, doc.id);
+    moverStock(p, +l.cantidad, landed, "compra", doc.id, refTxt, { store });
+    if(l.neto!=null){ p.costoNeto=l.neto; p.costoHandling=l.handling||0; p.costoFlete=l.flete||0; }
+    p.ultimoCosto = landed;
+  });
+}
+/* Revierte el efecto de stock de una compra recibida SIN borrar el documento
+   (des-recibir). Misma mecánica que revertDoc, pero deja la compra viva para
+   volver a marcarla "in transit". */
+function unreceiveInvoice(doc){
   const store = doc.store || STORE_IDS[0];
   doc.lineas.forEach(l=>{
     const p = prodById(l.productoId); if(!p) return;
-    if(isC){
-      fifoQuitarCompra(p, store, doc.id);                 // drop the FIFO layer this purchase created
-      p.stockPorTienda[store] = round4((stockDe(p,store)) - l.cantidad);
-    } else {
-      fifoDevolver(p, store, l.consumed);                 // put the exact consumed units back
-      p.stockPorTienda[store] = round4((stockDe(p,store)) + l.cantidad);
-    }
+    fifoQuitarCompra(p, store, doc.id);
+    p.stockPorTienda[store] = round4(stockDe(p,store) - l.cantidad);
     recalcStockMirror(p);
   });
   db.movimientos = db.movimientos.filter(m=> m.refId!==doc.id);
+  [...new Set(doc.lineas.map(l=>l.productoId))].forEach(id=>{ const p=prodById(id); if(p) recomputeUltimoCosto(p); });
+}
+function revertDoc(doc){
+  const isC = doc.tipo==="compra";
+  const store = doc.store || STORE_IDS[0];
+  // Una compra en tránsito nunca impactó stock/FIFO: al borrarla sólo se quita el
+  // documento, sin revertir inventario (no hay nada que revertir).
+  const compraSinImpacto = isC && doc.status===INVOICE_STATUS.IN_TRANSIT;
+  if(!compraSinImpacto){
+    doc.lineas.forEach(l=>{
+      const p = prodById(l.productoId); if(!p) return;
+      if(isC){
+        fifoQuitarCompra(p, store, doc.id);                 // drop the FIFO layer this purchase created
+        p.stockPorTienda[store] = round4((stockDe(p,store)) - l.cantidad);
+      } else {
+        fifoDevolver(p, store, l.consumed);                 // put the exact consumed units back
+        p.stockPorTienda[store] = round4((stockDe(p,store)) + l.cantidad);
+      }
+      recalcStockMirror(p);
+    });
+  }
+  db.movimientos = db.movimientos.filter(m=> m.refId!==doc.id);
   const list = isC?db.compras:db.ventas;
   const i = list.findIndex(x=>x.id===doc.id); if(i>=0) list.splice(i,1);
-  if(isC){
+  if(isC && !compraSinImpacto){
     [...new Set(doc.lineas.map(l=>l.productoId))].forEach(id=>{ const p=prodById(id); if(p) recomputeUltimoCosto(p); });
   }
 }

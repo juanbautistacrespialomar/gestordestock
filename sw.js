@@ -7,7 +7,7 @@
    - pdf.js (CDN): cache-first para importar offline.
    Igual conviene subir este string al cambiar la app, por prolijidad.
    ============================================================ */
-const CACHE = "mayor-stock-v31";   // invoice shipment status (in transit/received), Units/Cases stock switcher, Units-per-Case category defaults, admin-only sales commission
+const CACHE = "mayor-stock-v32";   // in-transit purchases no longer count/sell until Received (state governs stock); split available vs in-transit rows; stock-status filter; in-transit KPI
 
 const ASSETS = [
   "./",
