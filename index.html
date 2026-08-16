@@ -419,6 +419,24 @@
   .clegend{display:flex;gap:16px;font-size:12px;color:var(--muted);margin-top:4px}
   .clegend b{display:inline-block;width:9px;height:9px;border-radius:2px;margin-right:5px;vertical-align:middle}
 
+  /* ---------- Donut (interactive, no libs) ---------- */
+  .donut-wrap{display:flex;gap:18px;align-items:center;flex-wrap:wrap}
+  .donut-svg{flex:0 0 168px;width:168px;height:168px}
+  .donut-seg{cursor:pointer;transition:opacity .15s,transform .15s;transform-origin:center;transform-box:fill-box}
+  .donut-seg:hover{opacity:.82}
+  .donut-svg.has-active .donut-seg{opacity:.32}
+  .donut-svg.has-active .donut-seg.on{opacity:1}
+  .donut-ctr-val{font-family:var(--mono);font-weight:700;font-size:15px;fill:var(--text)}
+  .donut-ctr-lbl{font-size:10.5px;fill:var(--muted)}
+  .donut-legend{flex:1;min-width:170px;display:flex;flex-direction:column;gap:3px}
+  .donut-leg{display:flex;align-items:center;gap:9px;padding:5px 8px;border-radius:7px;cursor:pointer;transition:background .12s}
+  .donut-leg:hover{background:var(--surface-2)}
+  .donut-leg.on{background:var(--surface-2)}
+  .donut-leg .sw{width:11px;height:11px;border-radius:3px;flex-shrink:0}
+  .donut-leg .lg-lbl{flex:1;font-size:12.5px;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .donut-leg .lg-val{font-family:var(--mono);font-size:12px;font-weight:600;color:var(--muted);white-space:nowrap}
+  .donut-leg .lg-pct{font-size:11px;color:var(--muted);width:38px;text-align:right;white-space:nowrap}
+
   .mobtop{display:none}
 
   @media (max-width:860px){
@@ -508,7 +526,7 @@
     </div>
     <div id="loginErr" class="login-err"></div>
     <button class="btn primary login-btn" id="loginBtn">Sign in</button>
-    <p class="login-build">build v26</p>
+    <p class="login-build">build v27</p>
   </div>
 </div>
 <div class="topbar" id="topbar">
@@ -520,7 +538,7 @@
   </div>
   <div class="tb-right">
     <span class="tb-sync" data-syncchip>●</span>
-    <button class="theme-switch" data-theme-toggle aria-label="Cambiar tema" title="Cambiar tema">
+    <button class="theme-switch" data-theme-toggle aria-label="Toggle theme" title="Toggle theme">
       <span class="ts-track">
         <span class="ts-hint ts-hint-sun"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg></span>
         <span class="ts-hint ts-hint-moon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg></span>
@@ -548,13 +566,13 @@
     </nav>
     <div class="foot">
       <div class="side-actions">
-        <button class="side-btn" data-syncside data-syncicon aria-label="Sincronizar" title="Sincronizar">
+        <button class="side-btn" data-syncside data-syncicon aria-label="Sync" title="Sync">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
             <path d="M3 12a9 9 0 0 1 15-6.7L21 8"/><path d="M21 3v5h-5"/>
             <path d="M21 12a9 9 0 0 1-15 6.7L3 16"/><path d="M3 21v-5h5"/>
           </svg>
         </button>
-        <button class="side-btn is-logout" data-logout-side aria-label="Cerrar sesión" title="Cerrar sesión">
+        <button class="side-btn is-logout" data-logout-side aria-label="Sign out" title="Sign out">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
             <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="M16 17l5-5-5-5"/><path d="M21 12H9"/>
           </svg>
@@ -575,7 +593,7 @@
     <button data-view="inv" data-admin-only>Investments</button>
     <button data-view="datos">Data</button>
     <span data-syncchip style="margin-left:auto;align-self:center;font-size:11.5px;font-weight:700;white-space:nowrap;padding-left:8px">●</span>
-    <button class="theme-switch mob-theme" data-theme-toggle aria-label="Cambiar tema" title="Cambiar tema" style="align-self:center;margin-left:8px">
+    <button class="theme-switch mob-theme" data-theme-toggle aria-label="Toggle theme" title="Toggle theme" style="align-self:center;margin-left:8px">
       <span class="ts-track">
         <span class="ts-hint ts-hint-sun"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg></span>
         <span class="ts-hint ts-hint-moon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg></span>
@@ -624,7 +642,12 @@ const STORES = [
   { id:"silver", name:"Silver" }
 ];
 const STORE_IDS = STORES.map(s=>s.id);
-function storeName(id){ const s=STORES.find(x=>x.id===id); return s?s.name:(id||"—"); }
+/* Investment vault = a hidden pseudo-store. Stock and FIFO cost layers moved
+   here LEAVE the sellable inventory (STORE_IDS) but keep full traceability.
+   It's deliberately NOT part of STORE_IDS, so it never counts as sellable
+   stock, never shows in selling views, and never inflates valuation. */
+const INV_STORE = "__inv";
+function storeName(id){ if(id===INV_STORE) return "Investment vault"; const s=STORES.find(x=>x.id===id); return s?s.name:(id||"—"); }
 function isStore(id){ return STORE_IDS.includes(id); }
 
 const ROLES = { ADMIN:"admin", SELLER:"seller" };
@@ -714,6 +737,22 @@ function migrate(d){
     } else {
       STORE_IDS.forEach(s=>{ if(!Array.isArray(p.lotes[s])) p.lotes[s]=[]; });
     }
+    // --- Investment vault bucket (points 2 & 4) ---
+    if(p.stockPorTienda[INV_STORE]==null) p.stockPorTienda[INV_STORE]=0;
+    if(!Array.isArray(p.lotes[INV_STORE])) p.lotes[INV_STORE]=[];
+    // Legacy migration: products flagged estado==="investment" used to hold their
+    // WHOLE stock as an investment. Move every store's units + FIFO layers into the
+    // vault bucket (value preserved) and clear the flag. Idempotent: once the flag
+    // is gone it won't run again. No kardex is fabricated for these legacy holds.
+    if(p.estado===PRODUCT_STATES.INVESTMENT){
+      STORE_IDS.forEach(s=>{
+        (p.lotes[s]||[]).forEach(L=> p.lotes[INV_STORE].push({ id:uid(), fecha:L.fecha||new Date().toISOString(), cantidad:L.cantidad, costoUnit:L.costoUnit, ref:"legacy hold · "+storeName(s) }));
+        p.lotes[s] = [];
+        p.stockPorTienda[INV_STORE] = r2((p.stockPorTienda[INV_STORE]||0) + (p.stockPorTienda[s]||0));
+        p.stockPorTienda[s] = 0;
+      });
+      p.estado = PRODUCT_STATES.SALE;
+    }
     // per-store sale price (point 4: detect who marks the same product up)
     if(p.precioVentaPorTienda==null){
       p.precioVentaPorTienda = {};
@@ -742,13 +781,24 @@ function perteneceAStore(p, store){
   return docs.some(d => d.store===store && (d.lineas||[]).some(l=>l.productoId===p.id));
 }
 function stockEnFoco(p){ return effectiveStores().reduce((a,s)=> a + stockDe(p,s), 0); }
-function stockTotalP(p){ return STORE_IDS.reduce((a,s)=> a + stockDe(p,s), 0); }
+function stockTotalP(p){ return STORE_IDS.reduce((a,s)=> a + stockDe(p,s), 0); }   // sellable only, excludes __inv
 function recalcStockMirror(p){ p.stock = stockTotalP(p); }
-function esInversion(p){ return p.estado===PRODUCT_STATES.INVESTMENT; }
+
+/* ---- Investment vault helpers (quantity-based, points 2 & 4) ---- */
+function invUnits(p){ return stockDe(p, INV_STORE); }                 // units held in the vault
+function invLayers(p){ return fifoLayers(p, INV_STORE); }             // FIFO cost layers in the vault
+function invValor(p){ return round2(invLayers(p).reduce((a,L)=> a + L.cantidad*L.costoUnit, 0)); }
+/* A product "has an investment position" if it holds units in the vault.
+   NOTE: this is now a *quantity* condition, not the old product-level flag —
+   a product can be partly sellable and partly held. */
+function esInversion(p){ return invUnits(p) > 0; }
+/* Fully held: something is in the vault AND has no sellable units left.
+   These (and only these) are hidden from selling/reorder views. */
+function soloEnVault(p){ return invUnits(p) > 0 && stockTotalP(p) === 0; }
 function esBloqueado(p){ return p.estado===PRODUCT_STATES.BLOCKED; }
-/* products visible for normal SELLING views: excludes the investment vault always,
+/* products visible for normal SELLING views: hides only the fully-held items,
    and (for sellers) is later intersected with their store's stock. */
-function productosVendibles(){ return db.productos.filter(p=> !esInversion(p)); }
+function productosVendibles(){ return db.productos.filter(p=> !soloEnVault(p)); }
 let db = load();
 function persistLocal(){ localStorage.setItem(KEY, JSON.stringify(db)); }
 
@@ -805,7 +855,7 @@ async function pullNow(){
     if(serverRev===syncMeta.syncedRev && !syncMeta.dirty){ setSyncState("idle"); return; }
     if(serverRev>syncMeta.syncedRev && !syncMeta.dirty){
       db=j.data; syncMeta.syncedRev=serverRev; syncMeta.dirty=false; saveSyncMeta(); persistLocal();
-      setSyncState("idle"); render(); toast("Datos actualizados desde el servidor"); return;
+      setSyncState("idle"); render(); toast("Data updated from the server"); return;
     }
     if(syncMeta.dirty && serverRev!==syncMeta.syncedRev){ conflictPayload=j; setSyncState("conflict"); if(view==="datos") render(); return; }
     if(syncMeta.dirty){ await pushNow(); return; }
@@ -827,18 +877,18 @@ function resolveConflict(keepLocal){
 
 function paintSync(){
   const map={
-    off:["●","Desconectado","var(--muted)"],
-    idle:["●","Sincronizado","var(--up)"],
-    saving:["◐","Guardando…","var(--accent)"],
-    offline:["●","Sin conexión","var(--down)"],
-    conflict:["▲","Conflicto","var(--alert)"]
+    off:["●","Offline","var(--muted)"],
+    idle:["●","Synced","var(--up)"],
+    saving:["◐","Saving…","var(--accent)"],
+    offline:["●","No connection","var(--down)"],
+    conflict:["▲","Conflict","var(--alert)"]
   };
   const [dot,txt,col]=map[syncState]||map.off;
   document.querySelectorAll("[data-syncchip]").forEach(el=>{ el.style.color=col; el.textContent=dot+" "+txt; });
   document.querySelectorAll("[data-syncicon]").forEach(el=>{
     el.style.color = (syncState==="idle"||syncState==="off") ? "" : col;
     el.classList.toggle("spin", syncState==="saving");
-    el.title = "Sincronizar · "+txt.toLowerCase();
+    el.title = "Sync · "+txt.toLowerCase();
   });
 }
 
@@ -849,13 +899,13 @@ async function doLogin(){
   const errEl=document.getElementById("loginErr");
   const btn=document.getElementById("loginBtn");
   errEl.textContent="";
-  if(!user||!pass){ errEl.textContent="Completá usuario y contraseña"; return; }
-  btn.disabled=true; btn.textContent="Entrando…";
+  if(!user||!pass){ errEl.textContent="Enter your username and password"; return; }
+  btn.disabled=true; btn.textContent="Signing in…";
   try{
     console.log("[login] POST", apiBase()+"/login", "user:", user);
     const res=await fetch(apiBase()+"/login",{ method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify({user,pass}) });
     console.log("[login] status", res.status);
-    if(res.status===401){ errEl.textContent="Usuario o contraseña incorrectos"; return; }
+    if(res.status===401){ errEl.textContent="Wrong username or password"; return; }
     if(!res.ok){
       let msg="Error "+res.status;
       try{ const ej=await res.json(); if(ej.error) msg=ej.error; if(ej.detalle) msg+=" — "+ej.detalle; }catch(_){}
@@ -876,11 +926,11 @@ async function doLogin(){
     setSyncState("idle");
     hideLogin(); render(); paintSync();
     await pullNow();
-  }catch(e){ console.error("[login] fallo:", e); errEl.textContent="No se pudo conectar con el servidor ("+(e&&e.message||e)+")"; }
-  finally{ btn.disabled=false; btn.textContent="Entrar"; }
+  }catch(e){ console.error("[login] fallo:", e); errEl.textContent="Couldn't reach the server ("+(e&&e.message||e)+")"; }
+  finally{ btn.disabled=false; btn.textContent="Sign in"; }
 }
 function logout(){
-  if(!confirm("Cerrar sesión en este dispositivo. Tus datos siguen en el servidor. ¿Seguir?")) return;
+  if(!confirm("Sign out on this device. Your data stays on the server. Continue?")) return;
   forceLogout();
 }
 /* Cierre forzado (token vencido / 401): sin confirmación, va derecho al login.
@@ -1003,7 +1053,7 @@ function valorizacion(){
 function unidadesTotales(){ return productosVendibles().reduce((a,p)=> a + stockEnFoco(p), 0); }
 function bajoStock(p){ const s=stockEnFoco(p); return p.puntoRepedido>0 && s>0 && s <= p.puntoRepedido; }
 function sinStock(p){ return stockEnFoco(p) <= 0; }
-function necesitaPedido(p){ return !esInversion(p) && (sinStock(p) || bajoStock(p)); }
+function necesitaPedido(p){ return !soloEnVault(p) && (sinStock(p) || bajoStock(p)); }
 
 /* ============================================================
    Numeración CORRELATIVA de facturas de VENTA
@@ -1139,6 +1189,52 @@ function fifoDevolver(prod, store, consumed){
 const round4 = n => Math.round((n||0)*10000)/10000;
 
 /* ============================================================
+   INVESTMENT TRANSFERS (points 2 & 4)
+   ------------------------------------------------------------
+   Moving stock to/from the vault is a REAL stock movement now, not a
+   product flag. Each transfer:
+     · consumes/creates FIFO layers so invested value is exact (at cost),
+     · leaves a kardex movement in the SOURCE (or destination) store, so
+       it shows up in Movements and in the product's kardex (point 2),
+     · lets you pick quantities per store: all, part of each, or one only
+       (point 4) — the caller passes an allocation map.
+   The vault side (store = "__inv") holds units + cost layers but does NOT
+   log its own kardex line, so the product's running balance stays equal to
+   its sellable stock (no phantom double-counting for an auditor's eye).
+   ============================================================ */
+function sendToInvestment(prod, alloc, obs){
+  let movedTotal = 0;
+  STORE_IDS.forEach(s=>{
+    const avail = stockDe(prod, s);
+    const q = Math.min(Math.max(0, +(alloc[s]||0)), avail);
+    if(q<=0) return;
+    // exact FIFO cost of the units leaving this store
+    const { unit, consumed } = fifoConsumir(prod, s, q);
+    // source store: decrement stock + log a "→ vault" OUT movement (visible in Movements)
+    moverStock(prod, -q, unit, "inversion", null, "→ Investment vault", { store:s, tipo:"inv-out", obs:obs||"" });
+    // vault side: carry the real cost layers in, bump the vault bucket (no extra kardex line)
+    consumed.forEach(c=>{ if(!c.synthetic) invLayers(prod).push({ id:uid(), fecha:new Date().toISOString(), cantidad:c.cantidad, costoUnit:c.costoUnit, ref:"from "+storeName(s) }); });
+    prod.stockPorTienda[INV_STORE] = round4((prod.stockPorTienda[INV_STORE]||0) + q);
+    movedTotal += q;
+  });
+  if(movedTotal>0) save();
+  return movedTotal;
+}
+function returnFromInvestment(prod, store, q, obs){
+  q = Math.min(Math.max(0, +q||0), invUnits(prod));
+  if(q<=0) return 0;
+  // consume vault layers FIFO to know the cost coming back
+  const { unit, consumed } = fifoConsumir(prod, INV_STORE, q);
+  prod.stockPorTienda[INV_STORE] = round4((prod.stockPorTienda[INV_STORE]||0) - q);
+  // destination store: put the exact cost layers back so it can be sold at its real cost
+  consumed.forEach(c=>{ if(!c.synthetic) fifoLayers(prod, store).push({ id:uid(), fecha:new Date().toISOString(), cantidad:c.cantidad, costoUnit:c.costoUnit, ref:"back from vault" }); });
+  // log an IN movement in the destination store (visible in Movements)
+  moverStock(prod, +q, unit, "inversion", null, "← from Investment vault", { store, tipo:"inv-return", obs:obs||"" });
+  save();
+  return q;
+}
+
+/* ============================================================
    Router de vistas
    ============================================================ */
 let view = "dash";
@@ -1255,7 +1351,7 @@ function filtrarProds(f){
   const cmin=f.cmin!==""&&f.cmin!=null?parseNum(f.cmin):null;
   const cmax=f.cmax!==""&&f.cmax!=null?parseNum(f.cmax):null;
   const out = db.productos.filter(p=>{
-    if(esInversion(p)) return false;             // vault lives in its own panel
+    if(soloEnVault(p)) return false;             // vault lives in its own panel
     // Punto 9: en vista de UN local, sólo productos que pertenecen a ese local
     if(activeStore!=="all" && !perteneceAStore(p, activeStore)) return false;
     const sf = stockEnFoco(p);                   // stock under the active store focus
@@ -1465,6 +1561,68 @@ function hbars(items, fmt, color){
   }).join("");
 }
 
+/* Donut interactivo (SVG puro, sin librerías). Click en un segmento o en la
+   leyenda -> el centro muestra ese importe y su %. `cid` debe ser único por
+   gráfico. Usa el truco de r=15.915 (circunferencia ≈ 100) para que el
+   stroke-dasharray sea directamente el porcentaje. */
+const DONUT_COLORS = ["#2563eb","#2dbd8f","#8a5cf6","#f0a935","#f16a68","#2b8fd9","#e069b6","#7c8b9a"];
+function donut(cid, items, fmt){
+  const data = items.filter(i=> i.value>0).sort((a,b)=> b.value-a.value);
+  if(!data.length) return `<div class="cempty">No data to chart.</div>`;
+  const total = data.reduce((a,i)=> a+i.value, 0);
+  let cum = 0;
+  const segs = data.map((i,idx)=>{
+    const pct = total>0 ? (i.value/total*100) : 0;
+    const off = 25 - cum;                 // recipe: arranca a las 12 en punto
+    cum += pct;
+    const col = DONUT_COLORS[idx % DONUT_COLORS.length];
+    const seg = `<circle class="donut-seg" cx="21" cy="21" r="15.915" fill="none" stroke="${col}" stroke-width="6"
+      stroke-dasharray="${pct.toFixed(3)} ${(100-pct).toFixed(3)}" stroke-dashoffset="${off.toFixed(3)}"
+      data-idx="${idx}" data-lbl="${esc(i.label)}" data-vfmt="${esc(fmt(i.value))}" data-pct="${pct.toFixed(1)}"></circle>`;
+    return { seg, col, pct, i, idx };
+  });
+  const svg = `<svg class="donut-svg" viewBox="0 0 42 42" data-donut="${esc(cid)}" data-totfmt="${esc(fmt(total))}">
+    <circle cx="21" cy="21" r="15.915" fill="none" stroke="var(--surface-2)" stroke-width="6"></circle>
+    ${segs.map(s=>s.seg).join("")}
+    <text x="21" y="20.4" text-anchor="middle" class="donut-ctr-val" data-ctrval>${esc(fmt(total))}</text>
+    <text x="21" y="25.2" text-anchor="middle" class="donut-ctr-lbl" data-ctrlbl>Total</text>
+  </svg>`;
+  const legend = `<div class="donut-legend">${segs.map(s=>`
+    <div class="donut-leg" data-donut="${esc(cid)}" data-idx="${s.idx}">
+      <span class="sw" style="background:${s.col}"></span>
+      <span class="lg-lbl" title="${esc(s.i.label)}">${esc(s.i.label)}</span>
+      <span class="lg-val">${esc(fmt(s.i.value))}</span>
+      <span class="lg-pct">${s.pct.toFixed(0)}%</span>
+    </div>`).join("")}</div>`;
+  return `<div class="donut-wrap">${svg}${legend}</div>`;
+}
+function wireDonuts(){
+  document.querySelectorAll('#main svg[data-donut]').forEach(svg=>{
+    const ctrVal = svg.querySelector('[data-ctrval]');
+    const ctrLbl = svg.querySelector('[data-ctrlbl]');
+    const totFmt = svg.dataset.totfmt;
+    const legend = svg.parentElement.querySelector('.donut-legend');
+    let active = null;
+    const apply = (idx)=>{
+      active = (active===idx) ? null : idx;
+      const hasActive = active!=null;
+      svg.classList.toggle('has-active', hasActive);
+      svg.querySelectorAll('.donut-seg').forEach(s=> s.classList.toggle('on', +s.dataset.idx===active));
+      if(legend) legend.querySelectorAll('.donut-leg').forEach(l=> l.classList.toggle('on', +l.dataset.idx===active));
+      if(hasActive){
+        const seg = svg.querySelector('.donut-seg[data-idx="'+active+'"]');
+        ctrVal.textContent = seg.dataset.vfmt;
+        ctrLbl.textContent = seg.dataset.pct + '% · ' + seg.dataset.lbl;
+      } else {
+        ctrVal.textContent = totFmt;
+        ctrLbl.textContent = 'Total';
+      }
+    };
+    svg.querySelectorAll('.donut-seg').forEach(s=> s.onclick=()=> apply(+s.dataset.idx));
+    if(legend) legend.querySelectorAll('.donut-leg').forEach(l=> l.onclick=()=> apply(+l.dataset.idx));
+  });
+}
+
 /* Analysis slicers (point 7). Store comes from the global switcher (activeStore). */
 let anFiltros = { saga:"", idioma:"", pais:"", desde:"", hasta:"" };
 let anMetric = "usd";   // "usd" | "units"  (punto 20: toggle de métrica en los gráficos)
@@ -1573,19 +1731,19 @@ function viewAnalisis(){
       ${rows.length ? hbars(topMargin, money, "var(--up)") : `<div class="cempty">No sales in this selection.</div>`}
     </div>
     <div class="panel chart">
-      <p class="ctitle">Revenue by store</p>
-      <p class="csub">Akira vs Silver in the current selection.</p>
-      ${rows.length ? hbars(top(byStore,mval), mfmt, "var(--accent-ink)") : `<div class="cempty">No sales.</div>`}
+      <p class="ctitle">${anMetric==="units"?"Units":"Revenue"} by store</p>
+      <p class="csub">Akira vs Silver. Click a slice for its ${anMetric==="units"?"units":"amount"}.</p>
+      ${rows.length ? donut("d-store", top(byStore,mval), mfmt) : `<div class="cempty">No sales.</div>`}
     </div>
     <div class="panel chart">
-      <p class="ctitle">Revenue by country</p>
-      <p class="csub">Buyer country on each sale.</p>
-      ${Object.keys(byPais).length ? hbars(top(byPais,mval), mfmt, "#2b8fd9") : `<div class="cempty">No country data — add it on the customer.</div>`}
+      <p class="ctitle">${anMetric==="units"?"Units":"Revenue"} by country</p>
+      <p class="csub">Buyer country on each sale. Click a slice for its ${anMetric==="units"?"units":"amount"}.</p>
+      ${Object.keys(byPais).length ? donut("d-pais", top(byPais,mval,8), mfmt) : `<div class="cempty">No country data — add it on the customer.</div>`}
     </div>
     <div class="panel chart">
-      <p class="ctitle">Revenue by language</p>
-      <p class="csub">JP vs SP/ESP.</p>
-      ${Object.keys(byLang).length ? hbars(top(byLang,mval), mfmt, "#8a5cf6") : `<div class="cempty">No language data.</div>`}
+      <p class="ctitle">${anMetric==="units"?"Units":"Revenue"} by language</p>
+      <p class="csub">JP vs SP/ESP. Click a slice for its ${anMetric==="units"?"units":"amount"}.</p>
+      ${Object.keys(byLang).length ? donut("d-lang", top(byLang,mval), mfmt) : `<div class="cempty">No language data.</div>`}
     </div>
     <div class="panel chart">
       <p class="ctitle">⚠ Same product, different price by store</p>
@@ -1625,6 +1783,8 @@ function wireAnalisis(){
     el.style.cursor="pointer"; el.title="Filter this line";
     el.onclick=()=>{ const sg=el.dataset.saga; anFiltros.saga = (anFiltros.saga===sg?"":sg); render(); };
   });
+  // Punto 5: donuts interactivos (revenue/units por local, país, idioma)
+  wireDonuts();
 }
 /* saga (línea/juego) a partir del nombre de producto mostrado en un gráfico */
 function sagaOfName(nombre){
@@ -1640,11 +1800,10 @@ function sagaOfName(nombre){
    ============================================================ */
 function viewInversiones(){
   const items = db.productos.filter(esInversion);
-  const costoDe = p => STORE_IDS.reduce((a,s)=> a + fifoLayers(p,s).reduce((x,L)=>x+L.cantidad*L.costoUnit,0), 0);
-  const totalCosto = items.reduce((a,p)=> a + costoDe(p), 0);
-  const totalUn = items.reduce((a,p)=> a + stockTotalP(p), 0);
+  const totalCosto = items.reduce((a,p)=> a + invValor(p), 0);
+  const totalUn = items.reduce((a,p)=> a + invUnits(p), 0);
   const rows = items.map(p=>{
-    const un = stockTotalP(p), cost = costoDe(p);
+    const un = invUnits(p), cost = invValor(p);
     return `<tr data-ficha="${p.id}" style="cursor:pointer">
       <td><span class="sku">${esc(p.sku||"—")}</span></td>
       <td>${esc(p.nombre)} <span class="pill inv">investment</span></td>
@@ -1652,12 +1811,12 @@ function viewInversiones(){
       <td class="r num">${qty(un)}</td>
       <td class="r num">${money(un>0?cost/un:0)}</td>
       <td class="r num">${money(cost)}</td>
-      <td class="r"><button class="btn ghost sm" data-editp="${p.id}">Edit</button></td>
+      <td class="r"><button class="btn ghost sm" data-invret="${p.id}">◈ Return</button></td>
     </tr>`;
   }).join("");
   return `
   <div class="head">
-    <div class="title"><h2>Investments</h2><p>Executive-hold vault. Booked as investment at purchase cost — outside the sellable inventory. Admin only.</p></div>
+    <div class="title"><h2>Investments</h2><p>Executive-hold vault. Booked at FIFO purchase cost — outside the sellable inventory. Admin only.</p></div>
   </div>
   <div class="kpis">
     <div class="kpi"><div class="lbl">Items in vault</div><div class="val">${items.length}</div><div class="sub">held SKUs</div></div>
@@ -1666,11 +1825,11 @@ function viewInversiones(){
     <div class="kpi"><div class="lbl">Portfolio link</div><div class="val">—</div><div class="sub">coming soon</div></div>
   </div>
   <div class="panel">
-    <div class="phead"><h3>Held products</h3><span class="hint">move a product here from its editor (Inventory status → Investment)</span></div>
+    <div class="phead"><h3>Held products</h3><span class="hint">open a product and use “◈ To investments” to move units here (pick the quantity per store)</span></div>
     ${items.length ? `<div class="table-scroll"><table>
       <thead><tr><th>SKU</th><th>Product</th><th class="c">Lang</th><th class="r">Units</th><th class="r">Avg cost</th><th class="r">Invested</th><th></th></tr></thead>
       <tbody>${rows}</tbody></table></div>`
-      : emptyState("The vault is empty","Open any product and set its Inventory status to “Investment” to move it here, out of the sellable stock.")}
+      : emptyState("The vault is empty","Open any product from the Dashboard and use “◈ To investments” to move units here, out of the sellable stock.")}
   </div>`;
 }
 
@@ -1703,7 +1862,7 @@ function viewProd(){
     ${total ? `
     ${filterBarHTML("p", prodFiltros)}
     <div class="table-scroll"><table>
-      <thead><tr>${selMode?`<th class="c"><input type="checkbox" id="selall"></th>`:""}${sortTh(prodFiltros,"sku","SKU","")}${sortTh(prodFiltros,"nombre","Name","")}<th class="c">Lang</th>${showCols?`<th class="r">Akira</th><th class="r">Silver</th>`:""}${sortTh(prodFiltros,"stock","Stock","r")}${sortTh(prodFiltros,"costo","Last cost","r")}${sortTh(prodFiltros,"pventa","Sale price","r")}<th></th></tr></thead>
+      <thead><tr>${selMode?`<th class="c"><input type="checkbox" id="selall"></th>`:""}${sortTh(prodFiltros,"sku","SKU","")}${sortTh(prodFiltros,"nombre","Name","")}<th class="c">Lang</th>${showCols?`<th class="r">Akira</th><th class="r">Silver</th>`:""}${sortTh(prodFiltros,"stock","Stock","r")}${sortTh(prodFiltros,"costo","Last cost","r")}${sortTh(prodFiltros,"pventa","List price","r")}<th></th></tr></thead>
       <tbody id="prodBody"></tbody></table></div>`
       : emptyState("The master is empty","Create your first product, or let them appear on their own when you import a purchase with new SKUs.")}
   </div>`;
@@ -1994,6 +2153,7 @@ function viewMov(){
         <option value="entrada" ${movFiltros.tipo==="entrada"?"selected":""}>Entries</option>
         <option value="salida" ${movFiltros.tipo==="salida"?"selected":""}>Exits</option>
         <option value="ajuste" ${movFiltros.tipo==="ajuste"?"selected":""}>Adjustments</option>
+        <option value="inv" ${movFiltros.tipo==="inv"?"selected":""}>Investments</option>
       </select>
       <select class="inp" id="msaga">
         <option value="">All lines</option>
@@ -2027,7 +2187,13 @@ function filtrarMovs(){
   const vmin=f.vmin!==""?parseNum(f.vmin):null, vmax=f.vmax!==""?parseNum(f.vmax):null;
   const out = db.movimientos.filter(m=>{
     if(m.store && !stores.includes(m.store)) return false;
-    if(f.tipo && m.tipo!==f.tipo) return false;
+    if(f.tipo){
+      const isInv = m.tipo==="inv-out" || m.tipo==="inv-return";
+      if(f.tipo==="inv"){ if(!isInv) return false; }
+      else if(f.tipo==="entrada"){ if(m.tipo!=="entrada" && m.tipo!=="inv-return") return false; }
+      else if(f.tipo==="salida"){ if(m.tipo!=="salida" && m.tipo!=="inv-out") return false; }
+      else if(m.tipo!==f.tipo) return false;
+    }
     if(q){ const hay=((m.nombre||"")+" "+(m.sku||"")+" "+(m.ref||"")).toLowerCase(); if(!hay.includes(q)) return false; }
     if(f.saga && sagaDe({nombre:m.nombre})!==f.saga) return false;
     const fch=(m.fecha||"").slice(0,10);
@@ -2067,11 +2233,14 @@ function renderMovRows(){
   const cols = showStore?8:7;
   body.innerHTML = list.map(m=>{
     const isAdj=m.tipo==="ajuste";
+    const isInv=m.tipo==="inv-out"||m.tipo==="inv-return";
     const signed=(m.delta!=null)?m.delta:(m.tipo==="entrada"?m.cantidad:-m.cantidad);
     const up=signed>=0;
     const d=new Date(m.fecha);
     const fecha=d.toLocaleDateString("en-US")+" "+d.toLocaleTimeString("en-US",{hour:"2-digit",minute:"2-digit",hour12:false});
-    const pill=isAdj?`<span class="pill adj">⇄ adjust</span>`:`<span class="pill ${up?'in':'out'}">${up?'↑ in':'↓ out'}</span>`;
+    const pill=isInv?`<span class="pill inv">◈ ${m.tipo==="inv-out"?"to vault":"from vault"}</span>`
+               :isAdj?`<span class="pill adj">⇄ adjust</span>`
+               :`<span class="pill ${up?'in':'out'}">${up?'↑ in':'↓ out'}</span>`;
     const deltaCls=isAdj?"flat":(up?'up':'down');
     const accion=isAdj?`<button class="btn ghost sm" data-delaj="${m.id}" style="color:var(--alert)" title="Delete adjustment">${ICO.trash}</button>`:"";
     return `<tr>
@@ -2228,6 +2397,7 @@ function wire(){
     el.onkeydown=e=>{ if(e.key==="Enter"||e.key===" "){ e.preventDefault(); irAPedidos(); } };
   });
   m.querySelectorAll("[data-editp]").forEach(b=> b.onclick=(e)=>{ e.stopPropagation(); openProd(b.dataset.editp); });
+  m.querySelectorAll("[data-invret]").forEach(b=> b.onclick=(e)=>{ e.stopPropagation(); openReturnFromInvestment(b.dataset.invret); });
   m.querySelectorAll("[data-import]").forEach(b=> b.onclick=()=> openImport());
   const adj=m.querySelector("[data-adjust]"); if(adj) adj.onclick=()=> openAjuste();
   m.querySelectorAll("[data-delaj]").forEach(b=> b.onclick=()=> deleteAjuste(b.dataset.delaj));
@@ -2299,9 +2469,9 @@ function openProd(id){
       <div class="field"><label>Inventory status</label><select class="inp" id="p_estado">
         <option value="sale" ${!p||p.estado==="sale"?"selected":""}>For sale</option>
         <option value="blocked" ${p&&p.estado==="blocked"?"selected":""}>Blocked / best-offer</option>
-        ${isAdmin()?`<option value="investment" ${p&&p.estado==="investment"?"selected":""}>Investment (vault)</option>`:""}
       </select></div>
     </div>
+    ${p&&isAdmin()?`<p class="hint" style="font-size:12px;margin:6px 0 0">To hold units as investment, open the product and use “◈ To investments” — you pick how many units per store.</p>`:""}
 
     <div class="phead" style="margin:16px 0 6px;padding:0"><h3 style="font-size:13px">Costo</h3>
       <label style="font-size:12px;color:var(--muted);display:flex;gap:6px;align-items:center;cursor:pointer">
@@ -2315,10 +2485,10 @@ function openProd(id){
       <div class="field" style="grid-column:1/4"><label>Total cost ${db.config.moneda}</label><input class="inp num" id="p_cos" value="${total}"></div>
     </div>
 
-    <div class="phead" style="margin:16px 0 6px;padding:0"><h3 style="font-size:13px">Sale price</h3></div>
+    <div class="phead" style="margin:16px 0 6px;padding:0"><h3 style="font-size:13px">List price</h3></div>
     <div class="grid-form" style="grid-template-columns:1fr 1fr;padding:0">
       <div class="field"><label>Markup % over total cost</label><input class="inp num" id="p_mk" value="${p&&p.ultimoCosto>0?round2((p.precioVenta/p.ultimoCosto-1)*100):0}"></div>
-      <div class="field"><label>Sale price</label><input class="inp num" id="p_pv" value="${p?p.precioVenta:0}"></div>
+      <div class="field"><label>List price</label><input class="inp num" id="p_pv" value="${p?p.precioVenta:0}"></div>
     </div>
     <p class="hint" id="p_mgReal" style="font-size:12px;margin:6px 0 0"></p>
 
@@ -2555,7 +2725,7 @@ function renderAjuste(){
   const p = prodById(adjDraft.productoId);
   const store = adjDraft.store;
   const opts = `<option value="">— pick —</option>` +
-    db.productos.filter(x=>!esInversion(x)||isAdmin()).map(x=>`<option value="${x.id}" ${x.id===adjDraft.productoId?"selected":""}>${esc(x.sku?("["+x.sku+"] "):"")}${esc(x.nombre)}</option>`).join("");
+    db.productos.filter(x=>!soloEnVault(x)||isAdmin()).map(x=>`<option value="${x.id}" ${x.id===adjDraft.productoId?"selected":""}>${esc(x.sku?("["+x.sku+"] "):"")}${esc(x.nombre)}</option>`).join("");
   const stockActual = p ? qty(stockDe(p, store)) : "—";
   const allowSt = allowedStores();
   const storeSel = allowSt.length>1
@@ -3113,7 +3283,7 @@ function confirmDoc(){
     }
     // --- SPECIAL STATE GUARDS on sale (point 5) ---
     if(!isC){
-      if(esInversion(p)){ toast(`"${p.nombre}" is in the investment vault and can't be sold`,"warn"); return; }
+      if(soloEnVault(p)){ toast(`"${p.nombre}" is in the investment vault and can't be sold`,"warn"); return; }
       if(esBloqueado(p)){ toast(`"${p.nombre}" is blocked (best-offer). It needs admin approval before selling`,"warn"); return; }
     }
     const costoSnap = isC ? l.precio : fifoCostoPeek(p, store, l.cantidad).unit;   // FIFO unit cost for the sold qty
@@ -3487,7 +3657,7 @@ function generarInvoicePDF(id){
 function exportListaPrecios(prods){
   if(!pdfReady()){ toast("Couldn't load the PDF generator (try once with internet)","warn"); return; }
   // Point 9: a customer price list must never leak blocked or investment items.
-  const clean = prods.filter(p=> !esInversion(p) && !esBloqueado(p) && (p.precioVenta||0)>0);
+  const clean = prods.filter(p=> !soloEnVault(p) && !esBloqueado(p) && (p.precioVenta||0)>0);
   const dropped = prods.length - clean.length;
   if(!clean.length){ toast("No sellable products with a price to export","warn"); return; }
   const { jsPDF } = window.jspdf;
@@ -3913,10 +4083,10 @@ function showImportEditor(fname, parsed){
     </div>
     ${meta.flete? `<div class="banner" style="white-space:normal">Detected a <b>freight/handling</b> charge of ${money(meta.flete)}. It's loaded in the purchase and will be <b>spread across all units</b> when you confirm (not added as stock).</div>`:""}
     <p style="font-size:12px;color:var(--muted);margin:0 0 8px">
-      <b>Cost</b> = what you pay (NET); updates last cost. <b>Sale price</b> = suggested (MSRP) for new products.
+      <b>Cost</b> = what you pay (NET); updates last cost. <b>List price</b> = suggested selling price (MSRP). Not a sale — just your catalog price.
     </p>
     <div class="table-scroll"><table class="line-tbl">
-      <thead><tr><th class="c">✓</th><th class="c">SKU</th><th>Description</th><th class="r">Qty</th><th class="r">Cost</th><th class="r">Sale price</th><th>Target product</th></tr></thead>
+      <thead><tr><th class="c">✓</th><th class="c">SKU</th><th>Description</th><th class="r">Qty</th><th class="r">Cost</th><th class="r">List price</th><th>Target product</th></tr></thead>
       <tbody>${rows}</tbody></table></div>
     <details><summary>View raw PDF text</summary><div class="rawbox">${esc(pdfLines.join("\n"))}</div></details>
     <div style="display:flex;justify-content:flex-end;margin-top:16px">
@@ -3973,7 +4143,10 @@ function openFicha(id){
     const origen = (m.refTipo==="compra"||m.refTipo==="venta") && m.refId
       ? `<button class="btn ghost sm" data-fdoc="${m.refTipo}:${m.refId}">${esc(m.ref||"ver factura")}</button>`
       : `<span style="color:var(--muted)">${esc(m.ref||"—")}</span>`;
-    const pill = isAdj ? `<span class="pill adj">⇄ adjust</span>` : `<span class="pill ${up?'in':'out'}">${up?'↑ in':'↓ out'}</span>`;
+    const isInv = m.tipo==="inv-out"||m.tipo==="inv-return";
+    const pill = isInv ? `<span class="pill inv">◈ ${m.tipo==="inv-out"?"to vault":"from vault"}</span>`
+               : isAdj ? `<span class="pill adj">⇄ adjust</span>`
+               : `<span class="pill ${up?'in':'out'}">${up?'↑ in':'↓ out'}</span>`;
     return `<tr>
       <td class="num">${fecha}</td>
       <td>${pill}${m.store?` <span class="pill" style="opacity:.7">${esc(storeName(m.store))}</span>`:""}</td>
@@ -3989,14 +4162,16 @@ function openFicha(id){
   const margen = (p.precioVenta||0)-(p.ultimoCosto||0);
   const margenPct = p.precioVenta>0 ? (margen/p.precioVenta*100) : 0;
   const totalStock = stockTotalP(p);
-  const perStore = STORE_IDS.map(s=>`${storeName(s)}: <b>${qty(stockDe(p,s))}</b>`).join(" · ");
+  const held = invUnits(p);
+  const perStore = STORE_IDS.map(s=>`${storeName(s)}: <b>${qty(stockDe(p,s))}</b>`).join(" · ")
+    + (held>0 ? ` · <span style="color:var(--accent-ink)">◈ vault: <b>${qty(held)}</b></span>` : "");
   const badge = esInversion(p)?' <span class="pill inv">investment</span>':(esBloqueado(p)?' <span class="pill blocked">blocked</span>':'');
 
   const body = `
     <div class="kpis" style="grid-template-columns:repeat(4,1fr);margin-bottom:18px">
       <div class="kpi"><div class="lbl">Total stock</div><div class="val" style="color:${totalStock<0?'var(--alert)':'inherit'}">${qty(totalStock)}</div><div class="sub">${esc(perStore)}</div></div>
       <div class="kpi"><div class="lbl">Last cost</div><div class="val">${money(p.ultimoCosto)}</div><div class="sub">FIFO valued ${money(valorFifoTotal(p))}</div></div>
-      <div class="kpi"><div class="lbl">Sale price</div><div class="val">${moneyOpt(p.precioVenta)}</div><div class="sub">${p.precioVenta>0?`margin ${nf0.format(margenPct)}%`:'no price'}${badge}</div></div>
+      <div class="kpi"><div class="lbl">List price</div><div class="val">${moneyOpt(p.precioVenta)}</div><div class="sub">${p.precioVenta>0?`margin ${nf0.format(margenPct)}%`:'no price'}${badge}</div></div>
       <div class="kpi"><div class="lbl">Bought / Sold</div><div class="val" style="font-size:20px"><span class="delta up">${qty(totComp)}</span> / <span class="delta down">${qty(totVend)}</span></div><div class="sub">lifetime</div></div>
     </div>
 
@@ -4015,15 +4190,80 @@ function openFicha(id){
 
   buildModal(`${p.sku?("["+esc(p.sku)+"] "):""}${esc(p.nombre)}`, body, [
     {label:"⇄ Adjust stock",cls:"btn",act:()=>{ closeModal(); openAjuste(id); }},
+    isAdmin() && totalStock>0 ? {label:"◈ To investments",cls:"btn",act:()=>{ closeModal(); openSendToInvestment(id); }} : null,
+    isAdmin() && held>0 ? {label:"◈ Return from vault",cls:"btn",act:()=>{ closeModal(); openReturnFromInvestment(id); }} : null,
     {label:"Edit product",cls:"btn",act:()=>{ closeModal(); openProd(id); }},
     {label:"Close",cls:"btn primary",act:closeModal}
-  ], true);
+  ].filter(Boolean), true);
 
   document.querySelectorAll("[data-fdoc]").forEach(b=> b.onclick=()=>{
     const [t,i]=b.dataset.fdoc.split(":"); verDoc(t,i);
   });
 }
 function valorFifoTotal(p){ return STORE_IDS.reduce((a,s)=> a + fifoLayers(p,s).reduce((x,L)=>x+L.cantidad*L.costoUnit,0), 0); }
+
+/* Point 4: pick quantities per store when moving stock to the vault
+   (all · part of each store · one store only). */
+function openSendToInvestment(id){
+  const p = prodById(id); if(!p) return;
+  const stores = STORE_IDS.filter(s=> stockDe(p,s) > 0);
+  if(!stores.length){ toast("No sellable stock to move","warn"); return; }
+  const rows = stores.map(s=>{
+    const av = stockDe(p,s);
+    return `<div style="display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid var(--line)">
+      <div style="flex:1"><b>${esc(storeName(s))}</b> <span style="color:var(--muted);font-size:12.5px">· ${qty(av)} available</span></div>
+      <input class="inp num" id="inv_alloc_${s}" data-max="${av}" value="0" style="width:110px">
+      <button class="btn ghost sm" data-allbtn="${s}">All</button>
+    </div>`;
+  }).join("");
+  const body = `
+    <p class="hint" style="margin:0 0 12px">Move units out of the sellable stock into the executive-hold vault, at their real FIFO cost. Each store gets an <b>out</b> movement in its kardex.</p>
+    ${rows}
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-top:14px">
+      <button class="btn ghost sm" id="inv_all_stores">Take every store's stock</button>
+      <div style="font-size:13px">Total to move: <b id="inv_total">0</b></div>
+    </div>
+    <div class="field" style="margin-top:14px"><label>Note (optional)</label><input class="inp" id="inv_obs" placeholder="e.g. hold for grading / long-term"></div>`;
+  buildModal("◈ Send to Investment vault", body, [
+    {label:"Cancel",cls:"btn",act:closeModal},
+    {label:"Send to vault",cls:"btn primary",act:()=>{
+       const alloc={}; stores.forEach(s=> alloc[s]=parseNum(document.getElementById("inv_alloc_"+s).value));
+       const moved = sendToInvestment(p, alloc, (document.getElementById("inv_obs").value||"").trim());
+       if(moved>0){ closeModal(); toast(`Moved ${qty(moved)} u to the vault`); render(); }
+       else toast("Nothing to move — set a quantity","warn");
+    }}
+  ], false);
+  const recalc=()=>{ let t=0; stores.forEach(s=>{ const el=document.getElementById("inv_alloc_"+s); let v=parseNum(el.value); const mx=+el.dataset.max; if(v>mx){ v=mx; el.value=mx; } if(v<0){ v=0; el.value=0; } t+=v; }); document.getElementById("inv_total").textContent=qty(t); };
+  stores.forEach(s=>{
+    document.getElementById("inv_alloc_"+s).oninput=recalc;
+    document.querySelector('[data-allbtn="'+s+'"]').onclick=()=>{ const el=document.getElementById("inv_alloc_"+s); el.value=el.dataset.max; recalc(); };
+  });
+  document.getElementById("inv_all_stores").onclick=()=>{ stores.forEach(s=>{ document.getElementById("inv_alloc_"+s).value=stockDe(p,s); }); recalc(); };
+  recalc();
+}
+/* Reverse: return held units from the vault to a chosen store's sellable stock. */
+function openReturnFromInvestment(id){
+  const p = prodById(id); if(!p) return;
+  const held = invUnits(p);
+  if(held<=0){ toast("Nothing held in the vault","warn"); return; }
+  const opts = STORE_IDS.map(s=>`<option value="${s}">${esc(storeName(s))}</option>`).join("");
+  const body = `
+    <p class="hint" style="margin:0 0 12px">Held in vault: <b>${qty(held)}</b> u · valued ${money(invValor(p))}. Returning puts the units back as sellable stock (at their original cost) and logs an <b>in</b> movement.</p>
+    <div class="grid-form" style="grid-template-columns:1fr 1fr;padding:0">
+      <div class="field"><label>Destination store</label><select class="inp" id="inv_ret_store">${opts}</select></div>
+      <div class="field"><label>Quantity</label><input class="inp num" id="inv_ret_q" value="${held}"></div>
+    </div>`;
+  buildModal("◈ Return from Investment vault", body, [
+    {label:"Cancel",cls:"btn",act:closeModal},
+    {label:"Return to stock",cls:"btn primary",act:()=>{
+       const st=document.getElementById("inv_ret_store").value;
+       const q=parseNum(document.getElementById("inv_ret_q").value);
+       const done=returnFromInvestment(p, st, q, "");
+       if(done>0){ closeModal(); toast(`Returned ${qty(done)} u to ${storeName(st)}`); render(); }
+       else toast("Set a valid quantity","warn");
+    }}
+  ], false);
+}
 
 /* Mini-gráfico de evolución (SVG, sin librerías) */
 function sparkline(vals){
