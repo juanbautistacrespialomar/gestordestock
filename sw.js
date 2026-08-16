@@ -7,7 +7,7 @@
    - pdf.js (CDN): cache-first para importar offline.
    Igual conviene subir este string al cambiar la app, por prolijidad.
    ============================================================ */
-const CACHE = "mayor-stock-v29";   // EN sync/logout labels, List price, quantity-based investment vault (kardex + per-store), interactive donut charts
+const CACHE = "mayor-stock-v30";   // custom themed dropdowns (no native white popup), custom calendar picker, donut deselect on outside-click / Esc
 
 const ASSETS = [
   "./",
