@@ -7,7 +7,7 @@
    - pdf.js (CDN): cache-first para importar offline.
    Igual conviene subir este string al cambiar la app, por prolijidad.
    ============================================================ */
-const CACHE = "mayor-stock-v36";   // v36: comision % por vendedor, alerta de compra duplicada, labels Society en kardex/ajuste
+const CACHE = "mayor-stock-v37";   // v37: limpieza de placeholders de ejemplo en alta de vendedor
 
 const ASSETS = [
   "./",
