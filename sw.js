@@ -13,7 +13,7 @@
    el mensaje {type:"SKIP_WAITING"} y ahí sí se activa y recarga. Así
    nadie pierde una carga a medias por un refresh sorpresa.
    ============================================================ */
-const CACHE = "mayor-stock-v41";   // v41: filtro por vendedor en la lista de ventas (admin)
+const CACHE = "mayor-stock-v42";   // v42: chequeo automatico de version nueva (el boton Update aparece solo, sin salir/entrar)
 
 const ASSETS = [
   "./",
