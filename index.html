@@ -632,7 +632,7 @@
     </div>
     <div id="loginErr" class="login-err"></div>
     <button class="btn primary login-btn" id="loginBtn">Sign in</button>
-    <p class="login-build">build v39</p>
+    <p class="login-build">build v40</p>
   </div>
 </div>
 <div class="topbar" id="topbar">
@@ -666,7 +666,7 @@
       <button data-view="compras" data-admin-only><span class="ico">+</span>Purchases</button>
       <button data-view="ventas"><span class="ico">−</span>Sales</button>
       <button data-view="clientes"><span class="ico">☺</span>Customers</button>
-      <button data-view="mov"><span class="ico">↕</span>Movements</button>
+      <button data-view="mov" data-admin-only><span class="ico">↕</span>Movements</button>
       <button data-view="inv" data-admin-only><span class="ico">◈</span>Investments</button>
       <button data-view="datos" data-admin-only><span class="ico">⤓</span>Data</button>
     </nav>
@@ -695,7 +695,7 @@
     <button data-view="compras" data-admin-only>Purchases</button>
     <button data-view="ventas">Sales</button>
     <button data-view="clientes">Cust.</button>
-    <button data-view="mov">Movem.</button>
+    <button data-view="mov" data-admin-only>Movem.</button>
     <button data-view="inv" data-admin-only>Investments</button>
     <button data-view="datos" data-admin-only>Data</button>
     <span class="mob-role" data-rolebadge style="align-self:center;margin-left:auto;font-size:10.5px;font-weight:800;letter-spacing:.4px;white-space:nowrap;padding:3px 8px;border-radius:999px;text-transform:uppercase"></span>
@@ -766,7 +766,7 @@ function isAdmin(){ return currentRole()===ROLES.ADMIN; }
 function isSeller(){ return currentRole()===ROLES.SELLER; }
 /* Vistas reservadas al admin. Un vendedor NO carga compras, no manda a inversión,
    no ve análisis/comisiones globales ni la exportación de datos. Sólo vende. */
-const ADMIN_VIEWS = ["compras","inv","analisis","datos"];
+const ADMIN_VIEWS = ["compras","inv","analisis","datos","mov"];
 /* Capacidades gateadas por rol (punto 3). El modo Local (sin sesión) = admin. */
 function puedeComprar(){ return isAdmin(); }        // cargar compras / recibir facturas
 function puedeInvertir(){ return isAdmin(); }       // enviar / traer de la bóveda de inversión
@@ -1644,7 +1644,7 @@ function render(){
   else if(view==="compras") m.innerHTML = bar+viewDocs("compra");
   else if(view==="ventas") m.innerHTML = bar+viewDocs("venta");
   else if(view==="clientes") m.innerHTML = viewClientes();
-  else if(view==="mov") m.innerHTML = bar+viewMov();
+  else if(view==="mov") m.innerHTML = isAdmin()? (bar+viewMov()) : viewDash();
   else if(view==="inv") m.innerHTML = isAdmin()? viewInversiones() : viewDash();
   else if(view==="datos") m.innerHTML = viewDatos();
   applyRoleUI();
