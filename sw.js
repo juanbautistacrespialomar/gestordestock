@@ -13,7 +13,7 @@
    el mensaje {type:"SKIP_WAITING"} y ahí sí se activa y recarga. Así
    nadie pierde una carga a medias por un refresh sorpresa.
    ============================================================ */
-const CACHE = "mayor-stock-v43";   // v43: fix orden asc/desc en todas las pestañas (wireClientes pisaba los headers) + barra de filtros de Compras/Ventas en una sola linea
+const CACHE = "mayor-stock-v44";   // v44: barra de sociedad solo en Productos/Compras; dashboard/ventas/movimientos consolidados; alertas de reposicion sobre el pool unico; tabla de costo y margen por sociedad en Analysis
 
 const ASSETS = [
   "./",

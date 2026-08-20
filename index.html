@@ -639,7 +639,7 @@
     </div>
     <div id="loginErr" class="login-err"></div>
     <button class="btn primary login-btn" id="loginBtn">Sign in</button>
-    <p class="login-build">build v43</p>
+    <p class="login-build">build v44</p>
   </div>
 </div>
 <div class="topbar" id="topbar">
@@ -791,9 +791,18 @@ function sociedadColsHead(f){ return showSociedadCols() ? STORE_IDS.map(s=> f ? 
 function sociedadColsCells(p, isT){ return showSociedadCols() ? STORE_IDS.map(s=>`<td class="r num">${stockDisplay(p, isT?transitoDe(p,s):stockDe(p,s))}</td>`).join("") : ""; }
 /* The store currently in focus. 'all' = consolidated (admin only). */
 let activeStore = "all";
+/* Vistas donde el SWITCHER de sociedad (foco de procedencia) aporta:
+   - prod / compras: procedencia del stock (quién lo compró) y foco de conteo.
+   Analysis NO usa el switcher: la venta no está atada a una sociedad (pool único),
+   así que los chips no filtrarían nada. En su lugar mostramos una tabla real de
+   costo/margen POR SOCIEDAD (procedencia del stock consumido). En dashboard, ventas
+   y movimientos el stock es un pool único -> consolidado, sin chips. */
+const SOCIETY_VIEWS = ["prod", "compras"];
+function viewUsesSociety(){ return SOCIETY_VIEWS.includes(view); }
 function effectiveStores(){
   const allow = allowedStores();
-  if(activeStore==="all") return allow;
+  // En vistas sin desglose por sociedad, o en "All", devolvemos el pool completo.
+  if(activeStore==="all" || !viewUsesSociety()) return allow;
   return allow.includes(activeStore) ? [activeStore] : allow;
 }
 
@@ -946,7 +955,7 @@ function stockEnFoco(p){ return effectiveStores().reduce((a,s)=> a + stockDe(p,s
    - En un local puntual, sólo los que PERTENECEN a alguno de los locales en foco.
    Misma regla que el maestro (perteneceAStore) para que dashboard y lista coincidan. */
 function enFocoActual(p){
-  if(activeStore==="all") return true;
+  if(activeStore==="all" || !viewUsesSociety()) return true;
   return effectiveStores().some(s=> perteneceAStore(p, s));
 }
 
@@ -1311,8 +1320,12 @@ function valorizacion(){
   return productosVendibles().reduce((a,p)=> a + valorFifoEnFoco(p), 0);
 }
 function unidadesTotales(){ return productosVendibles().reduce((a,p)=> a + stockEnFoco(p), 0); }
-function bajoStock(p){ const s=stockEnFoco(p); return p.puntoRepedido>0 && s>0 && s <= p.puntoRepedido; }
-function sinStock(p){ return stockEnFoco(p) <= 0; }
+/* Reposición sobre el POOL ÚNICO: el stock es uno solo, así que las alertas de
+   "sin stock" / "bajo mínimo" miran el total vendible cruzando TODAS las sociedades,
+   no el foco de tienda. Un producto agotado en Akira pero con stock en Silver NO
+   alerta: se despacha del pool común (FIFO cruza sociedades). */
+function bajoStock(p){ const s=stockTotalP(p); return p.puntoRepedido>0 && s>0 && s <= p.puntoRepedido; }
+function sinStock(p){ return stockTotalP(p) <= 0; }
 function necesitaPedido(p){ return !soloEnVault(p) && (sinStock(p) || bajoStock(p)); }
 
 /* ============================================================
@@ -1613,9 +1626,10 @@ function stockViewSwitchHTML(){
 }
 function storeBarHTML(){
   const sw = stockViewSwitchHTML();
-  // El desglose por sociedad (procedencia) es sólo para el admin. El vendedor ve el
-  // pool unificado y, si acaso, el toggle Units/Cases. Sin chips ni toggle -> sin barra.
-  const showChips = isAdmin() && STORE_IDS.length>1;
+  // El desglose por sociedad (procedencia) es sólo para el admin, con 2+ sociedades,
+  // y SÓLO en las vistas donde aporta (analisis, prod, compras). En dashboard, ventas
+  // y movimientos el stock es un pool único -> sin chips. Sin chips ni toggle -> sin barra.
+  const showChips = isAdmin() && STORE_IDS.length>1 && viewUsesSociety();
   if(!showChips && !sw) return "";
   const chips = [];
   if(showChips){
@@ -1853,7 +1867,8 @@ function viewDash(){
   const firma = firmaReposicion();
   if(!porPedir.length) limpiarMemoriaAlerta();
   const mostrarBanner = porPedir.length && !alertaDescartada(firma);
-  const foco = activeStore==="all" ? "consolidated" : storeName(activeStore);
+  const consolidado = !viewUsesSociety() || activeStore==="all";
+  const foco = consolidado ? "consolidated" : storeName(activeStore);
   const multi = allowedStores().length>1;
 
   return `
@@ -2099,6 +2114,8 @@ function ventasFiltradas(){
       const cogs = l.cogs!=null ? l.cogs : (l.costo||0)*l.cantidad;
       rows.push({ fecha:normISO(v.fecha)||v.fecha, vendedor:saleVendedorNombre(v), vendedorId:v.vendedorId||"", productoId:l.productoId, nombre:l.nombre, sku:l.sku,
         cantidad:l.cantidad, revenue:round2((l.precio||0)*l.cantidad), cogs:round2(cogs),
+        consumed: (Array.isArray(l.consumed) && l.consumed.length) ? l.consumed : null,
+        store: l.store || null,
         pais:(v.cliente&&v.cliente.pais)||"", saga:p?sagaDe(p):"", idioma:p?(p.idioma||""):"" });
     });
   });
@@ -2122,6 +2139,41 @@ function viewAnalisis(){
   const byVend = by(r=>r.vendedor);
   const byPais = by(r=>r.pais);
   const byLang = by(r=>langLabel(r.idioma));
+
+  /* --- Costo y margen POR SOCIEDAD (procedencia del stock vendido) ---
+     La venta sale del pool único, pero el consumo FIFO guarda de qué sociedad
+     salió cada unidad (l.consumed). Con eso reconstruimos, por sociedad:
+     unidades despachadas de su stock, COGS real, costo unitario promedio y el
+     margen (asignando el ingreso de cada línea a prorrata de las unidades que
+     aportó cada sociedad). El precio de venta es común al pool, así que la
+     diferencia de margen entre sociedades es, en esencia, diferencia de costo. */
+  const bySoc = {};
+  const addSoc = (soc, units, cogsv, rev)=>{
+    const k = isStore(soc) ? soc : "—";
+    const e = bySoc[k] = bySoc[k] || { units:0, cogs:0, revenue:0 };
+    e.units += units; e.cogs = round2(e.cogs + cogsv); e.revenue = round2(e.revenue + rev);
+  };
+  rows.forEach(r=>{
+    if(r.consumed){
+      const lineUnits = r.cantidad || r.consumed.reduce((a,c)=>a+(c.cantidad||0),0);
+      r.consumed.forEach(c=>{
+        const cCogs = round2((c.costoUnit||0)*(c.cantidad||0));
+        const cRev  = lineUnits>0 ? round2(r.revenue*((c.cantidad||0)/lineUnits)) : 0;
+        addSoc(c.sociedad, c.cantidad||0, cCogs, cRev);
+      });
+    } else {
+      // Ventas legacy sin desglose: caen a la sociedad de la línea si existe, o a "—".
+      addSoc(r.store || "—", r.cantidad, r.cogs, r.revenue);
+    }
+  });
+  const socOrder = STORE_IDS.concat(Object.keys(bySoc).filter(k=>!isStore(k)));
+  const socRows = socOrder.filter(k=>bySoc[k]).map(k=>{
+    const e = bySoc[k];
+    const mg = round2(e.revenue - e.cogs);
+    return { soc:k, nombre: k==="—"?"— (sin desglose)":storeName(k), units:e.units, cogs:e.cogs,
+             avg: e.units>0 ? round2(e.cogs/e.units) : 0, revenue:e.revenue, margin:mg,
+             marginPct: e.revenue>0 ? (mg/e.revenue*100) : 0 };
+  });
 
   // Punto 20: métrica activa (USD o unidades) para los gráficos comparativos
   const mval = anMetric==="units" ? (v=>v.units) : (v=>v.revenue);
@@ -2199,6 +2251,15 @@ function viewAnalisis(){
         <tbody>${vendPerf.map(r=>`<tr><td>${esc(r.nombre)}</td><td class="r num">${qty(r.units)}</td><td class="r num">${money(r.revenue)}</td><td class="r num">${money(r.margin)}</td><td class="r num">${r.revenue>0?nf0.format(r.marginPct)+"%":"—"}</td></tr>`).join("")}</tbody>
       </table></div>` : `<div class="cempty">No sales in this selection.</div>`}
     </div>
+    ${STORE_IDS.length>1 ? `<div class="panel chart" style="grid-column:1/-1">
+      <p class="ctitle">Cost &amp; margin by society (provenance)</p>
+      <p class="csub">Which society's stock was sold, its real FIFO cost and margin. Same pool price for all — the margin gap is the cost gap. Revenue allocated per unit shipped from each society.</p>
+      ${socRows.length ? `<div class="table-scroll"><table>
+        <thead><tr><th>Society</th><th class="r">Units sold</th><th class="r">COGS (FIFO)</th><th class="r">Avg unit cost</th><th class="r">Revenue*</th><th class="r">Margin</th><th class="r">Margin %</th></tr></thead>
+        <tbody>${socRows.map(r=>`<tr><td>${esc(r.nombre)}</td><td class="r num">${qty(r.units)}</td><td class="r num">${money(r.cogs)}</td><td class="r num">${money(r.avg)}</td><td class="r num">${money(r.revenue)}</td><td class="r num">${money(r.margin)}</td><td class="r num">${r.revenue>0?nf0.format(r.marginPct)+"%":"—"}</td></tr>`).join("")}</tbody>
+        <tfoot><tr><td><b>Total</b></td><td class="r num"><b>${qty(units)}</b></td><td class="r num"><b>${money(cogs)}</b></td><td class="r num">—</td><td class="r num"><b>${money(revenue)}</b></td><td class="r num"><b>${money(margin)}</b></td><td class="r num"><b>${revenue>0?nf0.format(marginPct)+"%":"—"}</b></td></tr></tfoot>
+      </table></div><p class="csub" style="margin-top:8px">*Revenue is pool-level; here it's split across societies pro-rata by units shipped, only to estimate each one's margin.</p>` : `<div class="cempty">No sales in this selection.</div>`}
+    </div>` : ""}
   </div>`;
 
   return `
