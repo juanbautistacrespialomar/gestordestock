@@ -390,6 +390,13 @@
   .pill{white-space:nowrap}
   .filtros{display:flex;flex-wrap:wrap;gap:8px;align-items:center;padding:12px 14px;border-bottom:1px solid var(--line)}
   .filtros .inp{padding:7px 9px;font-size:13px}
+  /* barra de filtros de Compras/Ventas: TODO en una sola línea. El buscador estira
+     y absorbe el sobrante; el resto queda a tamaño fijo. Si la pantalla es muy
+     angosta, se desliza al costado en vez de romper en varias filas. */
+  .filtros.docfilt{flex-wrap:nowrap;overflow-x:auto}
+  .filtros.docfilt > *{flex:0 0 auto}
+  .filtros.docfilt > #dq{flex:1 1 140px;min-width:110px}
+  .filtros.docfilt label{white-space:nowrap}
   /* filtros compactos (movimientos): entran en el ancho disponible y ENVUELVEN a una
      segunda fila si no caben, en vez de obligar a deslizar al costado. El buscador
      estira; los selects se dimensionan a su contenido (nada de min-widths arbitrarios). */
@@ -632,7 +639,7 @@
     </div>
     <div id="loginErr" class="login-err"></div>
     <button class="btn primary login-btn" id="loginBtn">Sign in</button>
-    <p class="login-build">build v42</p>
+    <p class="login-build">build v43</p>
   </div>
 </div>
 <div class="topbar" id="topbar">
@@ -2420,17 +2427,17 @@ function viewDocs(tipo){
   <div class="panel">
     <div class="phead"><h3>${isC?"Purchase invoices":"Sales invoices"}</h3><span class="hint" id="docCount">${list.length} documents</span></div>
     ${list.length ? `
-    <div class="filtros">
-      <input class="inp" id="dq" placeholder="${isC?'Search by supplier or #…':'Search by customer or #…'}" value="${esc(f.q)}" style="flex:2;min-width:180px">
-      ${(!isC && isAdmin()) ? `<select class="inp" id="dvend" style="min-width:150px" title="Filter by seller">
+    <div class="filtros docfilt">
+      <input class="inp" id="dq" placeholder="${isC?'Search by supplier or #…':'Search by customer or #…'}" value="${esc(f.q)}" style="flex:1 1 140px;min-width:110px">
+      ${(!isC && isAdmin()) ? `<select class="inp" id="dvend" style="min-width:130px;max-width:160px" title="Filter by seller">
         <option value="">All sellers</option>
         ${vendedores().map(v=>`<option value="${esc(v.id)}" ${f.vend===v.id?"selected":""}>${esc(v.nombre)}</option>`).join("")}
         <option value="__none" ${f.vend==="__none"?"selected":""}>— House (no seller) —</option>
       </select>` : ""}
-      <label style="font-size:12px;color:var(--muted)">From <input class="inp" id="ddesde" type="date" value="${esc(f.desde)}" style="width:150px"></label>
-      <label style="font-size:12px;color:var(--muted)">To <input class="inp" id="dhasta" type="date" value="${esc(f.hasta)}" style="width:150px"></label>
+      <label style="font-size:12px;color:var(--muted)">From <input class="inp" id="ddesde" type="date" value="${esc(f.desde)}" style="width:128px"></label>
+      <label style="font-size:12px;color:var(--muted)">To <input class="inp" id="dhasta" type="date" value="${esc(f.hasta)}" style="width:128px"></label>
       <button class="btn ghost sm" id="dclear">Clear</button>
-      <span class="hint" style="font-size:11.5px">Tap a header to sort ↑ ↓</span>
+      <span class="hint" style="font-size:11.5px;white-space:nowrap">Tap a header to sort ↑ ↓</span>
     </div>
     <div class="table-scroll"><table>
       <thead><tr>
@@ -3693,6 +3700,10 @@ function viewClientes(){
 }
 function wireClientes(){
   const m=document.getElementById("main");
+  // OJO: wireClientes() corre en CADA render (último en wire()). wireSortHeaders()
+  // agarra TODOS los #main th[data-sortk], así que sin este guard pisaba los
+  // handlers de orden de las demás pestañas con cliSort -> ninguna tabla ordenaba.
+  if(!m.querySelector("#cliSearch")) return;   // sólo cablear en la vista de Clientes
   wireSortHeaders(cliSort);
   const s=m.querySelector("#cliSearch"); if(s){ s.oninput=()=>{ cliFiltro=s.value; const b=m.querySelector(".table-scroll"); render(); const s2=document.getElementById("cliSearch"); if(s2){ s2.focus(); s2.setSelectionRange(s2.value.length,s2.value.length); } }; }
   const cc=m.querySelector("[data-cliclear]"); if(cc) cc.onclick=()=>{ cliFiltro=""; render(); };
