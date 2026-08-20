@@ -13,7 +13,7 @@
    el mensaje {type:"SKIP_WAITING"} y ahí sí se activa y recarga. Así
    nadie pierde una carga a medias por un refresh sorpresa.
    ============================================================ */
-const CACHE = "mayor-stock-v44";   // v44: barra de sociedad solo en Productos/Compras; dashboard/ventas/movimientos consolidados; alertas de reposicion sobre el pool unico; tabla de costo y margen por sociedad en Analysis
+const CACHE = "mayor-stock-v45";   // v45: el foco de sociedad (activeStore) se resetea a consolidado fuera de Productos/Compras -> el dashboard ya no arrastra un foco de tienda latente (Stock on hand mostraba 31 de 39)
 
 const ASSETS = [
   "./",

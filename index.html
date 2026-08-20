@@ -639,7 +639,7 @@
     </div>
     <div id="loginErr" class="login-err"></div>
     <button class="btn primary login-btn" id="loginBtn">Sign in</button>
-    <p class="login-build">build v44</p>
+    <p class="login-build">build v45</p>
   </div>
 </div>
 <div class="topbar" id="topbar">
@@ -1658,6 +1658,10 @@ function applyRoleUI(){
 }
 function render(){
   const m = document.getElementById("main");
+  // El foco de sociedad (activeStore) sólo vive en Productos/Compras. En cualquier
+  // otra vista el stock es un pool único: forzamos consolidado para que ni la tabla
+  // de stock, ni las columnas, ni los conteos arrastren un foco de tienda latente.
+  if(!viewUsesSociety()) activeStore = "all";
   const bar = storeBarHTML();
   if(view==="dash") m.innerHTML = bar+viewDash();
   else if(view==="analisis") m.innerHTML = bar+viewAnalisis();
