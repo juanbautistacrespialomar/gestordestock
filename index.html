@@ -632,7 +632,7 @@
     </div>
     <div id="loginErr" class="login-err"></div>
     <button class="btn primary login-btn" id="loginBtn">Sign in</button>
-    <p class="login-build">build v40</p>
+    <p class="login-build">build v41</p>
   </div>
 </div>
 <div class="topbar" id="topbar">
@@ -1662,7 +1662,7 @@ let selProd = new Set();                 // productos tildados en el maestro
 let selMode = false;                     // modo selección activado (muestra los tildes)
 let prodFiltros = { q:"", saga:"", idioma:"", estado:"", xstate:"", cmin:"", cmax:"", sortKey:"", sortDir:"" };
 let dashFiltros = { q:"", saga:"", idioma:"", estado:"", xstate:"", cmin:"", cmax:"", sortKey:"", sortDir:"" };
-let docFiltros = { compra:{q:"",desde:"",hasta:"",sortKey:"",sortDir:""}, venta:{q:"",desde:"",hasta:"",sortKey:"",sortDir:""} };
+let docFiltros = { compra:{q:"",desde:"",hasta:"",sortKey:"",sortDir:""}, venta:{q:"",desde:"",hasta:"",vend:"",sortKey:"",sortDir:""} };
 let movFiltros = { q:"", desde:"", hasta:"", tipo:"", saga:"", vmin:"", vmax:"", sortKey:"", sortDir:"" };
 /* "Saga" = línea/juego, derivada del nombre del producto.
    Se normaliza fuerte para que NO se dupliquen por basura de formato:
@@ -2422,6 +2422,11 @@ function viewDocs(tipo){
     ${list.length ? `
     <div class="filtros">
       <input class="inp" id="dq" placeholder="${isC?'Search by supplier or #…':'Search by customer or #…'}" value="${esc(f.q)}" style="flex:2;min-width:180px">
+      ${(!isC && isAdmin()) ? `<select class="inp" id="dvend" style="min-width:150px" title="Filter by seller">
+        <option value="">All sellers</option>
+        ${vendedores().map(v=>`<option value="${esc(v.id)}" ${f.vend===v.id?"selected":""}>${esc(v.nombre)}</option>`).join("")}
+        <option value="__none" ${f.vend==="__none"?"selected":""}>— House (no seller) —</option>
+      </select>` : ""}
       <label style="font-size:12px;color:var(--muted)">From <input class="inp" id="ddesde" type="date" value="${esc(f.desde)}" style="width:150px"></label>
       <label style="font-size:12px;color:var(--muted)">To <input class="inp" id="dhasta" type="date" value="${esc(f.hasta)}" style="width:150px"></label>
       <button class="btn ghost sm" id="dclear">Clear</button>
@@ -2518,6 +2523,11 @@ function filtrarDocs(tipo){
     if(q){ const hay=((d.contraparte||"")+" "+(d.numero||"")).toLowerCase(); if(!hay.includes(q)) return false; }
     if(f.desde && (d.fecha||"") < f.desde) return false;
     if(f.hasta && (d.fecha||"") > f.hasta) return false;
+    // filtro por vendedor (sólo ventas): id puntual, o "__none" = ventas sin vendedor (house)
+    if(tipo==="venta" && f.vend){
+      if(f.vend==="__none"){ if(d.vendedorId) return false; }
+      else if((d.vendedorId||"")!==f.vend) return false;
+    }
     return true;
   });
   // Orden: si no hay columna activa, default = fecha ↓ (más reciente primero)
@@ -2614,9 +2624,12 @@ function wireDocFiltros(){
   document.getElementById("dq").oninput=e=>upd("q",e.target);
   document.getElementById("ddesde").onchange=e=>upd("desde",e.target);
   document.getElementById("dhasta").onchange=e=>upd("hasta",e.target);
+  const dvend=document.getElementById("dvend"); if(dvend) dvend.onchange=e=>{ f.vend=e.target.value; render(); };   // render completo: actualiza filas + KPIs (comisión)
   document.getElementById("dclear").onclick=()=>{
-    docFiltros[tipo]={q:"",desde:"",hasta:"",sortKey:"",sortDir:""};
-    ["dq","ddesde","dhasta"].forEach(id=>{const el=document.getElementById(id); if(el)el.value="";});
+    docFiltros[tipo]= tipo==="venta"
+      ? {q:"",desde:"",hasta:"",vend:"",sortKey:"",sortDir:""}
+      : {q:"",desde:"",hasta:"",sortKey:"",sortDir:""};
+    ["dq","ddesde","dhasta","dvend"].forEach(id=>{const el=document.getElementById(id); if(el)el.value="";});
     render();   // re-render para resetear también las flechas de los headers
   };
   // Orden por columna: clic cicla desc -> asc -> sin orden (default fecha ↓)

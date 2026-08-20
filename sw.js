@@ -13,7 +13,7 @@
    el mensaje {type:"SKIP_WAITING"} y ahí sí se activa y recarga. Así
    nadie pierde una carga a medias por un refresh sorpresa.
    ============================================================ */
-const CACHE = "mayor-stock-v40";   // v40: Movements pasa a admin-only (el vendedor no ve ventas de otros)
+const CACHE = "mayor-stock-v41";   // v41: filtro por vendedor en la lista de ventas (admin)
 
 const ASSETS = [
   "./",
