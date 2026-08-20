@@ -7,7 +7,7 @@
    - pdf.js (CDN): cache-first para importar offline.
    Igual conviene subir este string al cambiar la app, por prolijidad.
    ============================================================ */
-const CACHE = "mayor-stock-v34";   // v34: stock unificado (FIFO global cross-sociedad), perfiles vendedor (Teo/Tonio), gates admin, fechas US, vista mobile
+const CACHE = "mayor-stock-v35";   // v35: fechas del picker en MM/DD/YYYY (texto propio sobre el input nativo)
 
 const ASSETS = [
   "./",

@@ -586,6 +586,16 @@
   input[data-cdate]::-webkit-calendar-picker-indicator{display:none}
   input[data-cdate]{cursor:pointer;position:relative}
   .cdate-wrap{position:relative;display:inline-flex;align-items:center}
+  /* El input date nativo muestra su valor en formato REGIONAL del navegador
+     (dd/mm/aaaa en AR). Lo hacemos transparente y pintamos NOSOTROS el texto
+     en formato americano MM/DD/YYYY encima, para que sea consistente en toda
+     la app sin depender de la config del sistema operativo. El valor interno
+     del input sigue siendo ISO (YYYY-MM-DD), así que la lógica no cambia. */
+  .cdate-wrap input[type="date"]{color:transparent!important;-webkit-text-fill-color:transparent}
+  :root[data-theme="dark"] .cdate-wrap input[type="date"]{color:transparent!important}
+  .cdate-text{position:absolute;left:12px;top:50%;transform:translateY(-50%);pointer-events:none;
+    font-size:14px;color:var(--text);font-variant-numeric:tabular-nums;white-space:nowrap;overflow:hidden}
+  .cdate-text.ph{color:var(--muted)}
   .cdate-ico{position:absolute;right:9px;top:50%;transform:translateY(-50%);pointer-events:none;
     color:var(--muted);display:flex}
   .cdate-ico svg{width:15px;height:15px}
@@ -612,7 +622,7 @@
     </div>
     <div id="loginErr" class="login-err"></div>
     <button class="btn primary login-btn" id="loginBtn">Sign in</button>
-    <p class="login-build">build v34</p>
+    <p class="login-build">build v35</p>
   </div>
 </div>
 <div class="topbar" id="topbar">
@@ -5202,24 +5212,44 @@ document.addEventListener("visibilitychange", ()=>{ if(!document.hidden && sessi
     document.addEventListener('scroll', onDocScroll, true);
   }
 
+  // Formatea un valor ISO (YYYY-MM-DD) a MM/DD/YYYY para el texto visible.
+  function fmtUSDate(iso){
+    if(!iso || !/^\d{4}-\d{2}-\d{2}$/.test(iso)) return "";
+    const [y,mo,d] = iso.split("-");
+    return mo+"/"+d+"/"+y;
+  }
   function enhanceDates(root){
     (root||document).querySelectorAll('input[type="date"]:not([data-cdate])').forEach(inp=>{
       inp.dataset.cdate = '1';
       // ícono de calendario propio (el nativo lo ocultamos por CSS). Medimos el
       // ancho REAL ya renderizado y se lo fijamos al wrapper, así el input pasa
       // a 100% sin que se desacomode ninguna columna del filtro/modal.
+      let wrap;
       if(!inp.parentElement.classList.contains('cdate-wrap')){
         const w = inp.getBoundingClientRect().width;
-        const wrap = document.createElement('span');
+        wrap = document.createElement('span');
         wrap.className = 'cdate-wrap';
         if(w) wrap.style.width = w + 'px';
         inp.parentNode.insertBefore(wrap, inp);
         wrap.appendChild(inp);
+        // texto propio en MM/DD/YYYY encima del input (el nativo va transparente)
+        const txt = document.createElement('span');
+        txt.className = 'cdate-text';
+        wrap.appendChild(txt);
         const ico = document.createElement('span');
         ico.className = 'cdate-ico'; ico.innerHTML = CAL_ICON;
         wrap.appendChild(ico);
         inp.style.width = '100%';
         inp.style.paddingRight = '28px';
+        // pinta/actualiza el texto visible según el valor ISO del input
+        const paint = ()=>{
+          const us = fmtUSDate(inp.value);
+          txt.textContent = us || 'mm/dd/yyyy';
+          txt.classList.toggle('ph', !us);
+        };
+        paint();
+        inp.addEventListener('change', paint);
+        inp.addEventListener('input', paint);
       }
       inp.addEventListener('mousedown', (e)=>{ e.preventDefault(); (openPop && openPop.__forDate===inp) ? closeOpen() : openCalendar(inp); });
       inp.addEventListener('keydown', (e)=>{ e.preventDefault(); if(e.key==='Enter'||e.key===' '||e.key==='ArrowDown') openCalendar(inp); });
