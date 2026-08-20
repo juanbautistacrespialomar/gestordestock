@@ -7,7 +7,7 @@
    - pdf.js (CDN): cache-first para importar offline.
    Igual conviene subir este string al cambiar la app, por prolijidad.
    ============================================================ */
-const CACHE = "mayor-stock-v37";   // v37: limpieza de placeholders de ejemplo en alta de vendedor
+const CACHE = "mayor-stock-v38";   // v38: el valor central del donut ajusta su tamaño para no desbordar el agujero
 
 const ASSETS = [
   "./",

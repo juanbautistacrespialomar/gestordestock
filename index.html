@@ -622,7 +622,7 @@
     </div>
     <div id="loginErr" class="login-err"></div>
     <button class="btn primary login-btn" id="loginBtn">Sign in</button>
-    <p class="login-build">build v37</p>
+    <p class="login-build">build v38</p>
   </div>
 </div>
 <div class="topbar" id="topbar">
@@ -1972,10 +1972,11 @@ function donut(cid, items, fmt){
       data-idx="${idx}" data-lbl="${esc(i.label)}" data-vfmt="${esc(fmt(i.value))}" data-pct="${pct.toFixed(1)}"></circle>`;
     return { seg, col, pct, i, idx };
   });
-  const svg = `<svg class="donut-svg" viewBox="0 0 42 42" data-donut="${esc(cid)}" data-totfmt="${esc(fmt(total))}">
+  const totStr = fmt(total);
+  const svg = `<svg class="donut-svg" viewBox="0 0 42 42" data-donut="${esc(cid)}" data-totfmt="${esc(totStr)}">
     <circle cx="21" cy="21" r="15.915" fill="none" stroke="var(--surface-2)" stroke-width="6"></circle>
     ${segs.map(s=>s.seg).join("")}
-    <text x="21" y="20.6" text-anchor="middle" font-size="3.6" class="donut-ctr-val" data-ctrval="1">${esc(fmt(total))}</text>
+    <text x="21" y="20.6" text-anchor="middle" font-size="${donutFit(totStr)}" class="donut-ctr-val" data-ctrval="1">${esc(totStr)}</text>
     <text x="21" y="24.4" text-anchor="middle" font-size="2.1" class="donut-ctr-lbl" data-ctrlbl="1">Total</text>
   </svg>`;
   const legend = `<div class="donut-legend">${segs.map(s=>`
@@ -1986,6 +1987,17 @@ function donut(cid, items, fmt){
       <span class="lg-pct">${s.pct.toFixed(0)}%</span>
     </div>`).join("")}</div>`;
   return `<div class="donut-wrap">${svg}${legend}</div>`;
+}
+/* El texto del centro del donut vive en un viewBox de 42u y el agujero tiene ~22u
+   de ancho útil. Un font-size fijo hace que valores largos ("USD 13.470,00") se
+   desborden. Este helper calcula el tamaño para que SIEMPRE entre: estima el ancho
+   del texto (~0.58u por caracter a font-size 1) y lo ajusta al ancho disponible. */
+function donutFit(str){
+  const s = String(str||"");
+  const AVAIL = 21;            // ancho útil dentro del agujero (deja aire a los lados)
+  const CHARW = 0.58;         // ancho aprox. de un caracter, relativo al font-size
+  const ideal = AVAIL / (Math.max(1, s.length) * CHARW);
+  return Math.max(1.7, Math.min(3.6, ideal)).toFixed(2);   // nunca más chico de 1.7 ni más grande de 3.6
 }
 /* Cada render rearma la lista de "limpiadores": funciones que devuelven un
    donut a su estado neutro (centro = total, sin segmento activo). El listener
@@ -1999,6 +2011,7 @@ function wireDonuts(){
     const totFmt = svg.dataset.totfmt;
     const legend = svg.parentElement.querySelector('.donut-legend');
     let active = null;
+    const setCtr = (txt)=>{ ctrVal.textContent = txt; ctrVal.setAttribute('font-size', donutFit(txt)); };
     const paint = ()=>{
       const hasActive = active!=null;
       svg.classList.toggle('has-active', hasActive);
@@ -2006,10 +2019,10 @@ function wireDonuts(){
       if(legend) legend.querySelectorAll('.donut-leg').forEach(l=> l.classList.toggle('on', +l.dataset.idx===active));
       if(hasActive){
         const seg = svg.querySelector('.donut-seg[data-idx="'+active+'"]');
-        ctrVal.textContent = seg.dataset.vfmt;
+        setCtr(seg.dataset.vfmt);
         ctrLbl.textContent = seg.dataset.pct + '% · ' + seg.dataset.lbl;
       } else {
-        ctrVal.textContent = totFmt;
+        setCtr(totFmt);
         ctrLbl.textContent = 'Total';
       }
     };
