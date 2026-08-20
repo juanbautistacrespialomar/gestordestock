@@ -5,9 +5,15 @@
    - iconos y estáticos: cache-first.
    - API (workers.dev): sin intervención (siempre a la red).
    - pdf.js (CDN): cache-first para importar offline.
-   Igual conviene subir este string al cambiar la app, por prolijidad.
+
+   ACTUALIZACIÓN CONTROLADA (v39+):
+   Ya NO auto-activamos la versión nueva con skipWaiting en install.
+   Cuando hay una versión nueva, el SW queda "waiting" y la app muestra
+   un botón "Update". Recién cuando el usuario lo toca, la app le manda
+   el mensaje {type:"SKIP_WAITING"} y ahí sí se activa y recarga. Así
+   nadie pierde una carga a medias por un refresh sorpresa.
    ============================================================ */
-const CACHE = "mayor-stock-v38";   // v38: el valor central del donut ajusta su tamaño para no desbordar el agujero
+const CACHE = "mayor-stock-v39";   // v39: orden en todas las columnas + botón propio de actualización
 
 const ASSETS = [
   "./",
@@ -23,9 +29,9 @@ const ASSETS = [
 const CDN = "https://cdnjs.cloudflare.com/ajax/libs/";   // pdf.js + jsPDF: cache-first offline
 
 self.addEventListener("install", e => {
-  e.waitUntil(
-    caches.open(CACHE).then(c => c.addAll(ASSETS)).then(() => self.skipWaiting())
-  );
+  // Precargamos el cache nuevo, pero NO llamamos skipWaiting: quedamos "waiting"
+  // hasta que el usuario apriete "Update" en la app.
+  e.waitUntil(caches.open(CACHE).then(c => c.addAll(ASSETS)));
 });
 
 self.addEventListener("activate", e => {
@@ -34,6 +40,11 @@ self.addEventListener("activate", e => {
       Promise.all(keys.filter(k => k !== CACHE).map(k => caches.delete(k)))
     ).then(() => self.clients.claim())
   );
+});
+
+// La app pide activarse cuando el usuario toca "Update".
+self.addEventListener("message", e => {
+  if (e.data && e.data.type === "SKIP_WAITING") self.skipWaiting();
 });
 
 self.addEventListener("fetch", e => {

@@ -596,6 +596,16 @@
   .cdate-text{position:absolute;left:12px;top:50%;transform:translateY(-50%);pointer-events:none;
     font-size:14px;color:var(--text);font-variant-numeric:tabular-nums;white-space:nowrap;overflow:hidden}
   .cdate-text.ph{color:var(--muted)}
+  /* Botón flotante de actualización de la PWA */
+  #pwaUpdate{position:fixed;left:50%;bottom:22px;transform:translateX(-50%);z-index:9999;
+    display:flex;align-items:center;gap:12px;padding:10px 12px 10px 16px;border-radius:999px;
+    background:var(--surface);border:1px solid var(--border);box-shadow:0 8px 30px rgba(0,0,0,.28);
+    font-size:13.5px;font-weight:600;color:var(--text);animation:pwaUp .25s ease}
+  #pwaUpdate button{border:0;cursor:pointer;padding:7px 16px;border-radius:999px;font-weight:800;
+    font-size:13px;background:var(--accent);color:#fff}
+  #pwaUpdate button:hover{filter:brightness(1.06)}
+  @keyframes pwaUp{from{opacity:0;transform:translate(-50%,10px)}to{opacity:1;transform:translate(-50%,0)}}
+  @media(max-width:860px){ #pwaUpdate{left:12px;right:12px;bottom:76px;transform:none;justify-content:space-between} @keyframes pwaUp{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}} }
   .cdate-ico{position:absolute;right:9px;top:50%;transform:translateY(-50%);pointer-events:none;
     color:var(--muted);display:flex}
   .cdate-ico svg{width:15px;height:15px}
@@ -622,7 +632,7 @@
     </div>
     <div id="loginErr" class="login-err"></div>
     <button class="btn primary login-btn" id="loginBtn">Sign in</button>
-    <p class="login-build">build v38</p>
+    <p class="login-build">build v39</p>
   </div>
 </div>
 <div class="topbar" id="topbar">
@@ -770,7 +780,7 @@ function allowedStores(){ return STORE_IDS.slice(); }
 /* Desglose por sociedad (procedencia). Admin, vista consolidada, 2+ sociedades.
    Genérico: una columna por sociedad, así escala a futuras sociedades sin tocar código. */
 function showSociedadCols(){ return isAdmin() && activeStore==="all" && STORE_IDS.length>1; }
-function sociedadColsHead(){ return showSociedadCols() ? STORE_IDS.map(s=>`<th class="r">${esc(storeName(s))}</th>`).join("") : ""; }
+function sociedadColsHead(f){ return showSociedadCols() ? STORE_IDS.map(s=> f ? sortTh(f, "soc_"+s, storeName(s), "r") : `<th class="r">${esc(storeName(s))}</th>`).join("") : ""; }
 function sociedadColsCells(p, isT){ return showSociedadCols() ? STORE_IDS.map(s=>`<td class="r num">${stockDisplay(p, isT?transitoDe(p,s):stockDe(p,s))}</td>`).join("") : ""; }
 /* The store currently in focus. 'all' = consolidated (admin only). */
 let activeStore = "all";
@@ -1737,10 +1747,13 @@ function filtrarProds(f){
   const dir=f.sortKey ? (f.sortDir==="asc"?1:-1) : -1;
   const valOf = p => {
     const sf = stockEnFoco(p);
+    // columnas de sociedad (dinámicas): key = "soc_<id>" -> stock de esa sociedad
+    if(key.indexOf("soc_")===0){ const s=key.slice(4); return stockDe(p, s)||0; }
     switch(key){
       case "sku":    return String(p.sku||"");
       case "nombre": return String(p.nombre||"");
       case "unidad": return String(p.unidad||"u");
+      case "lang":   return String(langLabel(p.idioma||"")||"");   // Lang (products)
       case "stock":  return sf;
       case "costo":  return p.ultimoCosto||0;
       case "pventa": return p.precioVenta||0;
@@ -1866,7 +1879,7 @@ function viewDash(){
       <thead><tr>
         ${sortTh(dashFiltros,"sku","SKU","")}
         ${sortTh(dashFiltros,"nombre","Product","")}
-        ${sociedadColsHead()}
+        ${sociedadColsHead(dashFiltros)}
         ${sortTh(dashFiltros,"stock",stockView==="cases"?"Stock (cases)":"Stock","r")}
         ${sortTh(dashFiltros,"costo","Last cost","r")}
         ${sortTh(dashFiltros,"valor","Valued","r")}
@@ -2288,7 +2301,7 @@ function viewProd(){
     ${total ? `
     ${filterBarHTML("p", prodFiltros)}
     <div class="table-scroll"><table>
-      <thead><tr>${selMode?`<th class="c"><input type="checkbox" id="selall"></th>`:""}${sortTh(prodFiltros,"sku","SKU","")}${sortTh(prodFiltros,"nombre","Name","")}<th class="c">Lang</th>${sociedadColsHead()}${sortTh(prodFiltros,"stock",stockView==="cases"?"Stock (cases)":"Stock","r")}${sortTh(prodFiltros,"costo","Last cost","r")}${sortTh(prodFiltros,"pventa","List price","r")}<th></th></tr></thead>
+      <thead><tr>${selMode?`<th class="c"><input type="checkbox" id="selall"></th>`:""}${sortTh(prodFiltros,"sku","SKU","")}${sortTh(prodFiltros,"nombre","Name","")}${sortTh(prodFiltros,"lang","Lang","c")}${sociedadColsHead(prodFiltros)}${sortTh(prodFiltros,"stock",stockView==="cases"?"Stock (cases)":"Stock","r")}${sortTh(prodFiltros,"costo","Last cost","r")}${sortTh(prodFiltros,"pventa","List price","r")}<th></th></tr></thead>
       <tbody id="prodBody"></tbody></table></div>`
       : emptyState("The master is empty","Create your first product, or let them appear on their own when you import a purchase with new SKUs.")}
   </div>`;
@@ -2418,13 +2431,13 @@ function viewDocs(tipo){
       <thead><tr>
         ${sortTh(f,"numero","#","")}
         ${sortTh(f,"fecha","Date","")}
-        ${showSocCol?`<th>Society</th>`:""}
-        ${showVendCol?`<th>Sold by</th>`:""}
+        ${showSocCol?sortTh(f,"store","Society",""):""}
+        ${showVendCol?sortTh(f,"vendedor","Sold by",""):""}
         ${sortTh(f,"contraparte",isC?"Supplier":"Customer","")}
         ${sortTh(f,"items","Items","c")}
         ${sortTh(f,"total","Total","r")}
-        ${isC?`<th class="c">Status</th>`:""}
-        ${(!isC && isAdmin())?`<th class="r">Commission</th>`:""}
+        ${isC?sortTh(f,"status","Status","c"):""}
+        ${(!isC && isAdmin())?sortTh(f,"commission","Commission","r"):""}
         <th></th>
       </tr></thead>
       <tbody id="docBody"></tbody></table></div>`
@@ -2516,6 +2529,10 @@ function filtrarDocs(tipo){
       case "contraparte": return String(d.contraparte||"");
       case "items":       return (d.lineas||[]).reduce((a,l)=>a+(l.cantidad||0),0);
       case "total":       return d.total||0;
+      case "store":       return String(storeName(d.store||"")||"");        // Society (compra)
+      case "status":      return String(d.status||"");                        // Status (compra)
+      case "vendedor":    return String(saleVendedorNombre(d)||"");           // Sold by (venta)
+      case "commission":  return saleCommission(d);                           // Commission (venta)
       case "fecha":
       default:            return String(d.fecha||"");
     }
@@ -2654,7 +2671,7 @@ function viewMov(){
       <thead><tr>
         ${sortTh(movFiltros,"fecha","Date","")}
         ${sortTh(movFiltros,"tipo","Type","")}
-        ${showStore?`<th>Society</th>`:""}
+        ${showStore?sortTh(movFiltros,"store","Society",""):""}
         ${sortTh(movFiltros,"nombre","Product","")}
         ${sortTh(movFiltros,"cant","Qty","r")}
         ${sortTh(movFiltros,"valor","Unit value","r")}
@@ -2699,6 +2716,7 @@ function filtrarMovs(){
       case "cant":   return signed(m);
       case "valor":  return m.valorUnit||0;
       case "ref":    return String(m.ref||"");
+      case "store":  return String(storeName(m.store||"")||"");   // Society
       case "fecha":
       default:       return String(m.fecha||"");
     }
@@ -3611,11 +3629,26 @@ function saveCliente(id){
    cuántas ventas tiene asociadas antes de borrar.
    ============================================================ */
 let cliFiltro = "";
+let cliSort = { sortKey:"", sortDir:"" };   // ordenamiento de la tabla de clientes
 function ventasDeCliente(id){ return (db.ventas||[]).filter(v=>v.clienteId===id); }
 function viewClientes(){
   const q = cliFiltro.trim().toLowerCase();
-  let list = (db.clientes||[]).slice().sort((a,b)=>String(a.nombre||"").localeCompare(String(b.nombre||""),"en",{numeric:true}));
+  let list = (db.clientes||[]).slice();
   if(q) list = list.filter(c=> ((c.nombre||"")+" "+(c.empresa||"")+" "+(c.email||"")+" "+(c.ciudad||"")+" "+(c.pais||"")).toLowerCase().includes(q));
+  // Orden por columna. Sin columna activa: nombre ascendente (A→Z).
+  const key = cliSort.sortKey || "nombre";
+  const dir = cliSort.sortKey ? (cliSort.sortDir==="asc"?1:-1) : 1;
+  const valOf = c => {
+    switch(key){
+      case "email":   return String(c.email||"");
+      case "ciudad":  return String([c.ciudad,c.estado].filter(Boolean).join(", "));
+      case "pais":    return String(c.pais||"");
+      case "ventas":  return ventasDeCliente(c.id).length;
+      case "nombre":
+      default:        return String(c.nombre||"");
+    }
+  };
+  list.sort((a,b)=>{ const va=valOf(a), vb=valOf(b); if(typeof va==="number") return dir*(va-vb); return dir*va.localeCompare(vb,"en",{numeric:true}); });
   const rows = list.map(c=>{
     const nv = ventasDeCliente(c.id).length;
     return `<tr>
@@ -3632,7 +3665,7 @@ function viewClientes(){
   }).join("");
   const body = list.length
     ? `<div class="table-scroll"><table>
-        <thead><tr><th>Customer</th><th>Email</th><th>City</th><th>Country</th><th class="r">Sales</th><th class="r">Actions</th></tr></thead>
+        <thead><tr>${sortTh(cliSort,"nombre","Customer","")}${sortTh(cliSort,"email","Email","")}${sortTh(cliSort,"ciudad","City","")}${sortTh(cliSort,"pais","Country","")}${sortTh(cliSort,"ventas","Sales","r")}<th class="r">Actions</th></tr></thead>
         <tbody>${rows}</tbody></table></div>`
     : emptyState("No customers yet","Create one from a sale, or add it here with “New customer”.");
   return `
@@ -3647,6 +3680,7 @@ function viewClientes(){
 }
 function wireClientes(){
   const m=document.getElementById("main");
+  wireSortHeaders(cliSort);
   const s=m.querySelector("#cliSearch"); if(s){ s.oninput=()=>{ cliFiltro=s.value; const b=m.querySelector(".table-scroll"); render(); const s2=document.getElementById("cliSearch"); if(s2){ s2.focus(); s2.setSelectionRange(s2.value.length,s2.value.length); } }; }
   const cc=m.querySelector("[data-cliclear]"); if(cc) cc.onclick=()=>{ cliFiltro=""; render(); };
   const nw=m.querySelector("[data-clinew]"); if(nw) nw.onclick=()=> openClienteStandalone(null);
@@ -5368,9 +5402,46 @@ document.addEventListener("visibilitychange", ()=>{ if(!document.hidden && sessi
 })();
 
 /* ---------- Service worker (PWA offline) ---------- */
+/* ============================================================
+   Actualización controlada de la PWA (botón propio "Update").
+   Cuando GitHub Pages publica una versión nueva, el navegador instala
+   el SW nuevo pero lo deja en estado "waiting" (no lo activa solo).
+   Detectamos ese estado y mostramos un botón flotante; al tocarlo, le
+   mandamos SKIP_WAITING al SW y recargamos con la versión nueva.
+   ============================================================ */
+function mostrarBotonUpdate(sw){
+  if(document.getElementById("pwaUpdate")) return;   // ya está en pantalla
+  const bar = document.createElement("div");
+  bar.id = "pwaUpdate";
+  bar.innerHTML = `<span>New version available</span><button id="pwaUpdateBtn">Update</button>`;
+  document.body.appendChild(bar);
+  document.getElementById("pwaUpdateBtn").onclick = ()=>{
+    if(sw) sw.postMessage({ type:"SKIP_WAITING" });   // pedile al SW que se active
+    // cuando el nuevo SW tome control, recargamos una sola vez
+    bar.querySelector("button").textContent = "Updating…";
+  };
+}
 if ("serviceWorker" in navigator) {
+  let recargando = false;
+  // cuando el SW nuevo toma control (tras SKIP_WAITING), recargar la página una vez
+  navigator.serviceWorker.addEventListener("controllerchange", ()=>{
+    if(recargando) return; recargando = true; window.location.reload();
+  });
   window.addEventListener("load", () => {
-    navigator.serviceWorker.register("sw.js").catch(err => console.warn("SW no registrado:", err));
+    navigator.serviceWorker.register("sw.js").then(reg=>{
+      // si ya hay uno esperando al cargar (versión nueva lista), mostramos el botón
+      if(reg.waiting && navigator.serviceWorker.controller) mostrarBotonUpdate(reg.waiting);
+      // si aparece uno nuevo mientras la app está abierta, esperamos a que instale
+      reg.addEventListener("updatefound", ()=>{
+        const nuevo = reg.installing;
+        if(!nuevo) return;
+        nuevo.addEventListener("statechange", ()=>{
+          if(nuevo.state==="installed" && navigator.serviceWorker.controller){
+            mostrarBotonUpdate(reg.waiting || nuevo);
+          }
+        });
+      });
+    }).catch(err => console.warn("SW no registrado:", err));
   });
 }
 
