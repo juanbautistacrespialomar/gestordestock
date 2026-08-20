@@ -1,6 +1,6 @@
 # Gestor de Stock
 
-Gestor de inventario en **vanilla HTML/CSS/JS**, sin frameworks ni build. Todo vive en un único `index.html`. Las **compras suman** stock y fijan el **último costo**; las **ventas restan** con validación de existencias; los **ajustes** corrigen a mano. Cada movimiento queda trazado en un **kardex**. Importa facturas en **PDF** (parser en el navegador con pdf.js) y sincroniza entre dispositivos contra un backend opcional en **Cloudflare Worker + D1**. Es una **PWA** instalable y usable offline.
+Gestor de inventario en **vanilla HTML/CSS/JS**, sin frameworks ni build. Todo vive en un único `index.html`. Las **compras suman** stock (por sociedad) y fijan el **último costo**; las **ventas restan** desde un **pool unificado** con costeo **FIFO global por fecha**; los **ajustes** corrigen a mano. Cada movimiento queda trazado en un **kardex**. Importa facturas en **PDF** (OCR con Gemini vía el Worker) y sincroniza entre dispositivos contra un backend en **Cloudflare Worker + D1**. Es una **PWA** instalable y usable offline.
 
 ---
 
@@ -15,6 +15,39 @@ Gestor de inventario en **vanilla HTML/CSS/JS**, sin frameworks ni build. Todo v
 - **Kardex:** cada entrada/salida/ajuste queda con fecha, cantidad, valor unitario, saldo y documento de origen. La ficha de cada producto muestra su kardex individual y una evolución del stock.
 - **Sagas:** el sistema deriva la "línea/juego" desde el nombre del producto y la normaliza (unifica alias tipo *One Piece TCG* == *One Piece Card Game*) para filtrar sin duplicados.
 - **Alertas:** un producto entra en la lista de reposición si está en **cero/negativo** o por debajo de su **punto de repedido**.
+
+---
+
+## Sociedades, stock unificado y FIFO global
+
+El proveedor pone un **tope de compra por sociedad**, así que se compra con **varias sociedades** (Akira, Silver, y las que se sumen). Pero **el stock es uno solo para la venta**:
+
+- Cada **compra** elige la **sociedad** que la hizo → eso define la **procedencia** de cada lote (podés ver cuánto vino por Akira y cuánto por Silver).
+- La **venta NO elige sociedad**: sale del **pool unificado**. El costo se toma **FIFO global por fecha de entrada**, cruzando sociedades. Ejemplo: 10u compradas por Akira el día 1 + 40u por Silver el día 5; vendés 20 → toma 10 de Akira y 10 de Silver (COGS FIFO real). Akira queda en 0, Silver en 30.
+- El **desglose por sociedad** (columnas en Dashboard/Productos) es sólo informativo y **admin-only**. El vendedor ve únicamente el stock total vendible.
+- Escala solo a **más sociedades**: las columnas y el motor iteran la lista de sociedades, no están hardcodeadas.
+
+## Perfiles y permisos
+
+Dos roles, más el **modo Local** (sin login = acceso total):
+
+| Capacidad | Admin | Vendedor (Teo, Tonio…) |
+|---|---|---|
+| Vender desde el pool unificado | ✓ | ✓ |
+| Que la venta quede a su nombre (comisión) | ✓ (elige a quién) | ✓ (fijado a sí mismo) |
+| Cargar compras / importar facturas | ✓ | — |
+| Enviar/traer de Inversión | ✓ | — |
+| Ajustes de inventario / ABM de productos | ✓ | — |
+| Ver Análisis, P&L, Datos y comisiones de todos | ✓ | — |
+| Ver sus propias ventas | ✓ (ve todas) | ✓ (sólo las suyas) |
+
+- Los **vendedores son personas** (Teo, Tonio), **no sociedades** — se gestionan en **Data → Sellers**.
+- En el listado de ventas (admin) la columna **"Sold by"** muestra quién vendió cada factura (punto 6).
+- El control de permisos es **a nivel UI**: todos comparten el mismo token e inventario (`space: "main"`). Es suficiente para un equipo chico de confianza; no es un control criptográfico por usuario.
+
+## Fechas
+
+Todo el display de fechas usa **formato americano MM/DD/YYYY** (incluido el calendario y el kardex).
 
 ---
 
@@ -47,7 +80,7 @@ Gestor de inventario en **vanilla HTML/CSS/JS**, sin frameworks ni build. Todo v
 Cada vez que tocás `index.html`, **subí el string de versión** en `sw.js` y pusheá los dos juntos:
 
 ```js
-const CACHE = "mayor-stock-v23";  // -> "mayor-stock-v24", etc.
+const CACHE = "mayor-stock-v34";  // -> "mayor-stock-v35", etc.
 ```
 
 Si no, `index.html` es *network-first* (trae la última si hay internet), pero conviene bumpear igual por prolijidad y para invalidar el cache de estáticos. También está el `build vNN` en la pantalla de login como referencia visual rápida de qué versión estás corriendo.
@@ -71,7 +104,8 @@ Por defecto todo vive en `localStorage` (modo **Local**, offline). Para tener **
 
 | Método | Ruta | Qué hace |
 |---|---|---|
-| `POST` | `/login` `{user, pass}` | Valida contra `ADMIN_USER`/`ADMIN_PASS` y devuelve `{token, space}`. |
+| `POST` | `/login` `{user, pass}` | Valida el usuario y devuelve `{token, space, role, vendedorId, name}`. |
+| `POST` | `/parse-invoice` `{pdf, mime}` | OCR de una factura de compra con Gemini (requiere Bearer y `GEMINI_KEY`). |
 | `GET` | `/state?space=…` | Lee el estado (requiere `Authorization: Bearer <token>`). |
 | `PUT` | `/state?space=…` | Guarda con control de `rev`; si cambió en el servidor, responde **409 Conflicto**. |
 
@@ -79,9 +113,27 @@ Por defecto todo vive en `localStorage` (modo **Local**, offline). Para tener **
 
 | Secret | Para qué |
 |---|---|
-| `ADMIN_USER` | Usuario del login. |
-| `ADMIN_PASS` | Contraseña del login. |
 | `TOKEN` | Bearer interno que la app usa para leer/escribir el estado. |
+| `ADMIN_USER` | Usuario admin (login legacy, sigue funcionando). |
+| `ADMIN_PASS` | Contraseña del admin. |
+| `USERS` *(opcional)* | JSON con los **vendedores** (y admins extra). Ver abajo. |
+| `GEMINI_KEY` *(opcional)* | Key de Google AI para el OCR de facturas (`/parse-invoice`). |
+
+### Vendedores (perfiles Teo/Tonio)
+
+Los **vendedores son personas, no sociedades**. Para que Teo y Tonio inicien sesión en su propio celu, definí el secret `USERS` como un JSON. Cada seller lleva un `id` que debe **coincidir** con el id del vendedor en **Data → Sellers** (ahí se le atribuye la comisión):
+
+```json
+[
+  { "user": "tonio", "pass": "…", "role": "admin" },
+  { "user": "teo",   "pass": "…", "role": "seller", "id": "teo",   "name": "Teo" },
+  { "user": "tonio-v","pass": "…", "role": "seller", "id": "tonio", "name": "Tonio" }
+]
+```
+
+- `role: "admin"` → acceso total (compras, inversión, análisis, ve comisiones de todos).
+- `role: "seller"` → vende desde el pool unificado; cada venta queda a su nombre; **no** carga compras ni manda a inversión, y sólo ve **sus** ventas.
+- Todos comparten el mismo token e inventario (`space: "main"`): **el stock es uno solo**. Los permisos se aplican a nivel UI.
 
 ### `wrangler.toml` mínimo
 
@@ -111,6 +163,8 @@ wrangler d1 create mayor-stock
 wrangler secret put TOKEN
 wrangler secret put ADMIN_USER
 wrangler secret put ADMIN_PASS
+wrangler secret put USERS         # opcional: vendedores Teo/Tonio (JSON)
+wrangler secret put GEMINI_KEY    # opcional: OCR de facturas
 
 # 3) Publicar
 wrangler deploy

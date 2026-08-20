@@ -612,7 +612,7 @@
     </div>
     <div id="loginErr" class="login-err"></div>
     <button class="btn primary login-btn" id="loginBtn">Sign in</button>
-    <p class="login-build">build v28</p>
+    <p class="login-build">build v34</p>
   </div>
 </div>
 <div class="topbar" id="topbar">
@@ -641,14 +641,14 @@
     </div>
     <nav class="nav" id="nav">
       <button data-view="dash" class="on"><span class="ico">▤</span>Dashboard</button>
-      <button data-view="analisis"><span class="ico">◔</span>Analysis</button>
+      <button data-view="analisis" data-admin-only><span class="ico">◔</span>Analysis</button>
       <button data-view="prod"><span class="ico">▦</span>Products</button>
-      <button data-view="compras"><span class="ico">+</span>Purchases</button>
+      <button data-view="compras" data-admin-only><span class="ico">+</span>Purchases</button>
       <button data-view="ventas"><span class="ico">−</span>Sales</button>
       <button data-view="clientes"><span class="ico">☺</span>Customers</button>
       <button data-view="mov"><span class="ico">↕</span>Movements</button>
       <button data-view="inv" data-admin-only><span class="ico">◈</span>Investments</button>
-      <button data-view="datos"><span class="ico">⤓</span>Data</button>
+      <button data-view="datos" data-admin-only><span class="ico">⤓</span>Data</button>
     </nav>
     <div class="foot">
       <div class="side-actions">
@@ -670,21 +670,25 @@
   <div class="mobtop" id="navMob">
     <img src="icon-192.png" alt="" class="brand-m-logo" width="24" height="24">
     <button data-view="dash" class="on">Dashboard</button>
-    <button data-view="analisis">Analysis</button>
+    <button data-view="analisis" data-admin-only>Analysis</button>
     <button data-view="prod">Products</button>
-    <button data-view="compras">Purchases</button>
+    <button data-view="compras" data-admin-only>Purchases</button>
     <button data-view="ventas">Sales</button>
     <button data-view="clientes">Cust.</button>
     <button data-view="mov">Movem.</button>
     <button data-view="inv" data-admin-only>Investments</button>
-    <button data-view="datos">Data</button>
-    <span data-syncchip style="margin-left:auto;align-self:center;font-size:11.5px;font-weight:700;white-space:nowrap;padding-left:8px">●</span>
+    <button data-view="datos" data-admin-only>Data</button>
+    <span class="mob-role" data-rolebadge style="align-self:center;margin-left:auto;font-size:10.5px;font-weight:800;letter-spacing:.4px;white-space:nowrap;padding:3px 8px;border-radius:999px;text-transform:uppercase"></span>
+    <span data-syncchip style="align-self:center;font-size:11.5px;font-weight:700;white-space:nowrap;padding-left:8px">●</span>
     <button class="theme-switch mob-theme" data-theme-toggle aria-label="Toggle theme" title="Toggle theme" style="align-self:center;margin-left:8px">
       <span class="ts-track">
         <span class="ts-hint ts-hint-sun"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg></span>
         <span class="ts-hint ts-hint-moon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg></span>
         <span class="ts-thumb"><span data-themeicon></span></span>
       </span>
+    </button>
+    <button class="mob-logout" data-logout-side aria-label="Sign out" title="Sign out" style="align-self:center;margin-left:6px;background:none;border:0;color:var(--nav-ink);padding:6px;border-radius:6px">
+      <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="M16 17l5-5-5-5"/><path d="M21 12H9"/></svg>
     </button>
   </div>
 
@@ -739,12 +743,25 @@ function isStore(id){ return STORE_IDS.includes(id); }
 const ROLES = { ADMIN:"admin", SELLER:"seller" };
 function currentRole(){ return (session && session.role) || ROLES.ADMIN; }  // Local mode (no session) = full access
 function isAdmin(){ return currentRole()===ROLES.ADMIN; }
-/* Stores this session is allowed to see. Admin => all; seller => just their own. */
-function allowedStores(){
-  if(isAdmin()) return STORE_IDS.slice();
-  const s = session && session.store;
-  return isStore(s) ? [s] : [];
-}
+function isSeller(){ return currentRole()===ROLES.SELLER; }
+/* Vistas reservadas al admin. Un vendedor NO carga compras, no manda a inversión,
+   no ve análisis/comisiones globales ni la exportación de datos. Sólo vende. */
+const ADMIN_VIEWS = ["compras","inv","analisis","datos"];
+/* Capacidades gateadas por rol (punto 3). El modo Local (sin sesión) = admin. */
+function puedeComprar(){ return isAdmin(); }        // cargar compras / recibir facturas
+function puedeInvertir(){ return isAdmin(); }       // enviar / traer de la bóveda de inversión
+function puedeAjustar(){ return isAdmin(); }        // ajustes de inventario
+function puedeEditarProductos(){ return isAdmin(); }// ABM de productos
+/* SOCIEDADES: akira/silver (y futuras) son las entidades que COMPRAN. Definen la
+   procedencia de cada lote, NO un local de venta. El stock es un pool único: para
+   VENDER no se elige sociedad. Todos ven el mismo pool; el desglose por sociedad
+   (columnas Akira/Silver) es info de procedencia y se muestra sólo al admin. */
+function allowedStores(){ return STORE_IDS.slice(); }
+/* Desglose por sociedad (procedencia). Admin, vista consolidada, 2+ sociedades.
+   Genérico: una columna por sociedad, así escala a futuras sociedades sin tocar código. */
+function showSociedadCols(){ return isAdmin() && activeStore==="all" && STORE_IDS.length>1; }
+function sociedadColsHead(){ return showSociedadCols() ? STORE_IDS.map(s=>`<th class="r">${esc(storeName(s))}</th>`).join("") : ""; }
+function sociedadColsCells(p, isT){ return showSociedadCols() ? STORE_IDS.map(s=>`<td class="r num">${stockDisplay(p, isT?transitoDe(p,s):stockDe(p,s))}</td>`).join("") : ""; }
 /* The store currently in focus. 'all' = consolidated (admin only). */
 let activeStore = "all";
 function effectiveStores(){
@@ -788,6 +805,11 @@ function migrate(d){
   if(d.config.facturaInicio==null) d.config.facturaInicio = 101;   // numeración US
   if(d.config.emisor==null) d.config.emisor = { nombre:"", direccion:"", email:"", tel:"" };
   if(d.config.commissionRate==null) d.config.commissionRate = 0.10;  // comisión del vendedor sobre el MARGEN (0.10 = 10%). Editable en Settings.
+  // Vendedores: perfiles a los que se les atribuye la venta (y su comisión). NO son
+  // sociedades: son las personas que venden. Default Teo/Tonio; editable en Settings.
+  if(!Array.isArray(d.config.vendedores) || !d.config.vendedores.length){
+    d.config.vendedores = [ { id:"teo", nombre:"Teo" }, { id:"tonio", nombre:"Tonio" } ];
+  }
   d.productos = d.productos || [];
   d.compras = d.compras || [];
   d.ventas = d.ventas || [];
@@ -801,7 +823,17 @@ function migrate(d){
   d.compras.forEach(c=>{ if(c.status==null) c.status = INVOICE_STATUS.RECEIVED; });
   // Ventas: snapshot de la tasa de comisión vigente al momento de la venta, para
   // que un cambio futuro de tasa no reescriba comisiones ya devengadas.
-  d.ventas.forEach(v=>{ if(v.commissionRate==null) v.commissionRate = d.config.commissionRate; });
+  d.ventas.forEach(v=>{
+    if(v.commissionRate==null) v.commissionRate = d.config.commissionRate;
+    // Vendedor de la venta (para comisión y columna "Sold by"). Las ventas viejas no
+    // lo tienen: quedan como null y se muestran como "—" (sin vendedor atribuido).
+    if(v.vendedorId===undefined) v.vendedorId = null;
+    if(v.vendedor===undefined)   v.vendedor   = null;
+    // storeVenta: las ventas viejas nacieron atadas a UNA sociedad (v.store). Lo
+    // conservamos SÓLO como fallback para revertir su consumo FIFO si se editan/borran.
+    // Las ventas nuevas ya no eligen sociedad (consumo global), así que no lo usan.
+    if(v.storeVenta===undefined) v.storeVenta = v.store || null;
+  });
   const r2 = n => Math.round((n||0)*100)/100;
   const DEF_STORE = STORE_IDS[0];   // "akira": target for legacy (store-less) stock
   d.productos.forEach(p=>{
@@ -959,6 +991,19 @@ function saleCogs(d){
 function saleMargin(d){ return round2(saleRevenueProd(d) - saleCogs(d)); }
 function saleCommissionRate(d){ return (d && d.commissionRate!=null) ? d.commissionRate : (db.config.commissionRate||0); }
 function saleCommission(d){ return round2(saleMargin(d) * saleCommissionRate(d)); }
+/* ---- Vendedores (perfiles a los que se atribuye la venta) ---- */
+function vendedores(){ return (db.config && Array.isArray(db.config.vendedores)) ? db.config.vendedores : []; }
+function vendedorById(id){ if(!id) return null; return vendedores().find(v=>v.id===id) || null; }
+function vendedorNombre(id){ const v=vendedorById(id); return v ? v.nombre : (id||"—"); }
+/* Vendedor de la sesión actual (si el que entró es un seller). El admin no está
+   atado a un vendedor: elige a nombre de quién carga la venta. */
+function currentVendedorId(){ return (session && session.vendedorId) || null; }
+/* Nombre a mostrar en "Sold by" para una venta ya guardada. */
+function saleVendedorNombre(d){
+  if(d && d.vendedorId) return vendedorNombre(d.vendedorId);
+  if(d && d.vendedor)   return d.vendedor;   // snapshot histórico
+  return "—";
+}
 function stockTotalP(p){ return STORE_IDS.reduce((a,s)=> a + stockDe(p,s), 0); }   // sellable only, excludes __inv
 function recalcStockMirror(p){ p.stock = stockTotalP(p); }
 
@@ -1093,10 +1138,13 @@ async function doLogin(){
     const j=await res.json();
     console.log("[login] ok, entrando como", j.user, "role:", j.role);
     const switching = !session || session.user!==j.user;
-    session={ user:j.user, token:j.token, space:j.space||"main", role:j.role||"admin", store:j.store||"" }; saveSession();
-    // seller starts locked to their store; admin starts consolidated
-    activeStore = (session.role==="seller" && isStore(session.store)) ? session.store : "all";
+    session={ user:j.user, token:j.token, space:j.space||"main", role:j.role||"admin", vendedorId:j.vendedorId||"", name:j.name||j.user }; saveSession();
+    // El stock es UNO SOLO: todos (admin y vendedores) arrancan en la vista
+    // consolidada. Las sociedades son sólo procedencia, no locales de venta.
+    activeStore = "all";
     if(view==="inv" && !isAdmin()) view="dash";
+    // Si un vendedor entra a una vista admin-only (compras/inversión/análisis/datos), lo mandamos al panel.
+    if(!isAdmin() && ADMIN_VIEWS.includes(view)) view="dash";
     if(switching){
       db={ config:{ moneda:(db.config&&db.config.moneda)||"$" }, productos:[], compras:[], ventas:[], movimientos:[], clientes:[], solicitudes:[] };
       persistLocal(); syncMeta={ syncedRev:0, dirty:false }; saveSyncMeta();
@@ -1164,11 +1212,12 @@ function normISO(s){
   if(m){ const y=m[3].length===2?"20"+m[3]:m[3]; return `${y}-${m[2].padStart(2,"0")}-${m[1].padStart(2,"0")}`; }
   return "";
 }
+/* Formato de display: SIEMPRE americano MM/DD/YYYY en toda la app. */
 function fmtDate(s){
   const iso = normISO(s);
   if(!iso) return s || "—";
   const [y,mo,d] = iso.split("-");
-  return `${d}-${_MONTHS3[(+mo)-1]||mo}-${y}`;
+  return `${mo}/${d}/${y}`;
 }
 
 /* Parseo tolerante de números en formato AR (1.234,56) o US (1,234.56) */
@@ -1367,6 +1416,96 @@ function fifoDevolver(prod, store, consumed){
 const round4 = n => Math.round((n||0)*10000)/10000;
 
 /* ============================================================
+   FIFO GLOBAL (stock unificado para la VENTA) — punto 1
+   ------------------------------------------------------------
+   El stock es UNO SOLO para vender. Akira/Silver (y futuras
+   sociedades) sólo dicen QUIÉN compró cada lote (procedencia): a
+   la hora de vender NO se elige sociedad. El costo se toma FIFO
+   por FECHA DE ENTRADA del lote, cruzando todas las sociedades.
+   Ej: 10 comprados por Akira (día 1) + 40 por Silver (día 5); vendo
+   20 -> consume 10 de Akira y 10 de Silver; Akira queda en 0, Silver 30.
+   La bóveda de inversión (__inv) NO participa: está fuera del pool.
+   ============================================================ */
+/* Stock vendible total de un producto = suma de todas las sociedades (sin bóveda). */
+function stockVendibleTotal(p){ return round4(STORE_IDS.reduce((a,s)=> a + stockDe(p,s), 0)); }
+/* Todas las capas FIFO vendibles, cada una etiquetada con su sociedad, ordenadas
+   por fecha de entrada ascendente (más viejo primero). Referencia a los objetos
+   reales para poder mutarlos. `_ord` desempata capas con la misma fecha por su
+   orden de inserción, para que el FIFO sea estable. */
+function capasVendiblesOrdenadas(prod){
+  const out = [];
+  STORE_IDS.forEach(s=>{
+    fifoLayers(prod, s).forEach((L, i)=> out.push({ sociedad:s, L, _ord:i }));
+  });
+  out.sort((a,b)=>{
+    const fa = a.L.fecha||"", fb = b.L.fecha||"";
+    if(fa<fb) return -1; if(fa>fb) return 1;
+    return a._ord - b._ord;
+  });
+  return out;
+}
+/* Peek del costo FIFO global de consumir `cantidad` SIN mutar (previews/margen). */
+function fifoCostoPeekGlobal(prod, cantidad){
+  let need = cantidad, cogs = 0;
+  for(const c of capasVendiblesOrdenadas(prod)){
+    if(need<=0) break;
+    const take = Math.min(c.L.cantidad, need);
+    cogs += take * c.L.costoUnit; need -= take;
+  }
+  if(need>0) cogs += need * (prod.ultimoCosto||0);   // faltante -> último costo conocido
+  return { cogs:round2(cogs), unit: cantidad>0 ? round2(cogs/cantidad) : 0, short: need>0 };
+}
+/* Consume capas FIFO GLOBAL (cruza sociedades), MUTANDO los lotes reales. Devuelve
+   {cogs, unit, consumed:[{sociedad,costoUnit,cantidad}], porSociedad:{soc:{cantidad,cogs}}}.
+   NO toca stockPorTienda: el llamador registra el kardex por sociedad con moverStock,
+   que es quien decrementa el stock de cada sociedad (evita doble descuento). */
+function fifoConsumirGlobal(prod, cantidad){
+  let need = cantidad, cogs = 0; const consumed = []; const porSoc = {};
+  // trabajamos sobre una lista ordenada; al vaciar una capa la quitamos de su array real
+  let capas = capasVendiblesOrdenadas(prod);
+  for(const c of capas){
+    if(need<=0) break;
+    const take = Math.min(c.L.cantidad, need);
+    if(take<=0) continue;
+    cogs += take * c.L.costoUnit;
+    consumed.push({ sociedad:c.sociedad, costoUnit:c.L.costoUnit, cantidad:take });
+    (porSoc[c.sociedad] = porSoc[c.sociedad] || { cantidad:0, cogs:0 });
+    porSoc[c.sociedad].cantidad += take;
+    porSoc[c.sociedad].cogs = round2(porSoc[c.sociedad].cogs + take*c.L.costoUnit);
+    c.L.cantidad = round4(c.L.cantidad - take);
+    need -= take;
+  }
+  // limpiar capas agotadas de sus arrays reales
+  STORE_IDS.forEach(s=>{ prod.lotes[s] = fifoLayers(prod, s).filter(L=> L.cantidad>0.00001); });
+  if(need>0){ // faltante (no debería pasar por la validación): valuar a último costo
+    const cst = prod.ultimoCosto||0;
+    cogs += need*cst;
+    consumed.push({ sociedad:STORE_IDS[0], costoUnit:cst, cantidad:need, synthetic:true });
+    (porSoc[STORE_IDS[0]] = porSoc[STORE_IDS[0]] || { cantidad:0, cogs:0 });
+    porSoc[STORE_IDS[0]].cantidad += need;
+    porSoc[STORE_IDS[0]].cogs = round2(porSoc[STORE_IDS[0]].cogs + need*cst);
+    need = 0;
+  }
+  return { cogs:round2(cogs), unit: cantidad>0 ? round2(cogs/cantidad) : 0, consumed, porSociedad:porSoc };
+}
+/* Deshace una venta global: repone cada tramo consumido en la capa FIFO de SU
+   sociedad (al frente, para conservar el orden). `fallbackSoc` cubre ventas viejas
+   cuyo `consumed` no tiene etiqueta de sociedad (nacieron atadas a v.store).
+   Devuelve el mapa {sociedad: unidades} repuesto, para reajustar el stock. */
+function fifoDevolverGlobal(prod, consumed, fallbackSoc){
+  const repuesto = {};
+  if(!consumed || !consumed.length) return repuesto;
+  for(let i=consumed.length-1;i>=0;i--){
+    const c = consumed[i];
+    if(c.synthetic) continue;   // el faltante sintético no era stock real
+    const soc = isStore(c.sociedad) ? c.sociedad : (isStore(fallbackSoc)?fallbackSoc:STORE_IDS[0]);
+    fifoLayers(prod, soc).unshift({ id:uid(), fecha:new Date().toISOString(), cantidad:c.cantidad, costoUnit:c.costoUnit, ref:"revert" });
+    repuesto[soc] = round4((repuesto[soc]||0) + c.cantidad);
+  }
+  return repuesto;
+}
+
+/* ============================================================
    INVESTMENT TRANSFERS (points 2 & 4)
    ------------------------------------------------------------
    Moving stock to/from the vault is a REAL stock movement now, not a
@@ -1420,8 +1559,8 @@ document.querySelectorAll("#nav button, #navMob button").forEach(b=>{
   b.addEventListener("click", ()=> setView(b.dataset.view));
 });
 function setView(v){
-  // gate: investments vault is admin-only
-  if(v==="inv" && !isAdmin()) v="dash";
+  // gate: admin-only views (purchases, investment, analysis, data) fall back to dashboard for sellers
+  if(!isAdmin() && ADMIN_VIEWS.includes(v)) v="dash";
   view = v;
   document.querySelectorAll("#nav button, #navMob button").forEach(b=>{
     b.classList.toggle("on", b.dataset.view===v);
@@ -1440,17 +1579,17 @@ function stockViewSwitchHTML(){
     <button class="chip-btn ${stockView==="cases"?"on":""}" data-stockview="cases">Cases</button></div>`;
 }
 function storeBarHTML(){
-  const allow = allowedStores();
   const sw = stockViewSwitchHTML();
-  // Un seller con un único local no necesita el selector de tienda, pero SÍ
-  // puede querer el toggle Units/Cases. Si no hay ni uno ni otro, no hay barra.
-  if(allow.length<=1 && !sw) return "";
+  // El desglose por sociedad (procedencia) es sólo para el admin. El vendedor ve el
+  // pool unificado y, si acaso, el toggle Units/Cases. Sin chips ni toggle -> sin barra.
+  const showChips = isAdmin() && STORE_IDS.length>1;
+  if(!showChips && !sw) return "";
   const chips = [];
-  if(allow.length>1){
+  if(showChips){
     chips.push(`<button class="chip-btn ${activeStore==="all"?"on":""}" data-store="all">All (consolidated)</button>`);
-    allow.forEach(s=> chips.push(`<button class="chip-btn ${activeStore===s?"on":""}" data-store="${s}">${esc(storeName(s))}</button>`));
+    STORE_IDS.forEach(s=> chips.push(`<button class="chip-btn ${activeStore===s?"on":""}" data-store="${s}">${esc(storeName(s))}</button>`));
   }
-  const left = chips.length ? `<span class="sb-label">Store</span>${chips.join("")}` : "";
+  const left = chips.length ? `<span class="sb-label" title="Society = who bought the stock (provenance). Selling always uses the unified pool.">Society</span>${chips.join("")}` : "";
   return `<div class="storebar">${left}${sw}</div>`;
 }
 function wireStoreBar(){
@@ -1460,6 +1599,15 @@ function wireStoreBar(){
 function applyRoleUI(){
   // hide admin-only nav entries for sellers
   document.querySelectorAll("[data-admin-only]").forEach(el=> el.style.display = isAdmin()?"":"none");
+  // role badge (mobile top bar): shows who is logged in and their role
+  const admin = isAdmin();
+  const nombre = (session && session.name) || (session && session.user) || "";
+  const txt = session ? (admin ? "Admin" : ("Seller · "+(nombre||"—"))) : "Local";
+  document.querySelectorAll("[data-rolebadge]").forEach(el=>{
+    el.textContent = txt;
+    el.style.background = admin ? "color-mix(in srgb, var(--accent) 16%, transparent)" : "color-mix(in srgb, var(--up) 18%, transparent)";
+    el.style.color = admin ? "var(--accent-ink, var(--accent))" : "var(--up)";
+  });
 }
 function render(){
   const m = document.getElementById("main");
@@ -1676,7 +1824,7 @@ function viewDash(){
   <div class="head">
     <div class="title"><h2>Dashboard</h2><p>Sellable stock valued at FIFO cost${multi?` · <b>${esc(foco)}</b>`:""}.</p></div>
     <div class="actions">
-      <button class="btn up" data-open="compra">+ New purchase</button>
+      ${puedeComprar()?`<button class="btn up" data-open="compra">+ New purchase</button>`:""}
       <button class="btn down" data-open="venta">− New sale</button>
     </div>
   </div>
@@ -1702,7 +1850,7 @@ function viewDash(){
       <thead><tr>
         ${sortTh(dashFiltros,"sku","SKU","")}
         ${sortTh(dashFiltros,"nombre","Product","")}
-        ${activeStore==="all"&&multi?`<th class="r">Akira</th><th class="r">Silver</th>`:""}
+        ${sociedadColsHead()}
         ${sortTh(dashFiltros,"stock",stockView==="cases"?"Stock (cases)":"Stock","r")}
         ${sortTh(dashFiltros,"costo","Last cost","r")}
         ${sortTh(dashFiltros,"valor","Valued","r")}
@@ -1731,8 +1879,8 @@ function stockRowset(list, f){
 function renderDashRows(){
   const body=document.getElementById("dashBody"); if(!body) return;
   const list=filteredDashProds();
-  const showCols = activeStore==="all" && allowedStores().length>1;
-  const colspan = showCols ? 7 : 5;
+  const showCols = showSociedadCols();
+  const colspan = 5 + (showCols ? STORE_IDS.length : 0);
   const rowset = stockRowset(list, dashFiltros);
   body.innerHTML = rowset.map(({p,kind})=>{
     const isT = kind==="transit";
@@ -1746,7 +1894,7 @@ function renderDashRows(){
                : esBloqueado(p) ? '<span class="pill blocked">blocked</span>'
                : units<0 ? '<span class="pill low">negative</span>'
                : bajoStock(p) ? '<span class="pill low">reorder</span>' : "";
-    const perStore = showCols ? `<td class="r num">${stockDisplay(p, isT?transitoDe(p,"akira"):stockDe(p,"akira"))}</td><td class="r num">${stockDisplay(p, isT?transitoDe(p,"silver"):stockDe(p,"silver"))}</td>` : "";
+    const perStore = sociedadColsCells(p, isT);
     return `<tr data-ficha="${p.id}" class="${isT?'row-transit':''}" style="cursor:pointer">
       <td><span class="sku">${esc(p.sku||"—")}</span></td>
       <td>${esc(p.nombre)} ${flag}</td>
@@ -1873,7 +2021,7 @@ if(!window.__donutOutsideWired){
 }
 
 /* Analysis slicers (point 7). Store comes from the global switcher (activeStore). */
-let anFiltros = { saga:"", idioma:"", pais:"", desde:"", hasta:"" };
+let anFiltros = { vend:"", saga:"", idioma:"", pais:"", desde:"", hasta:"" };
 let anMetric = "usd";   // "usd" | "units"  (punto 20: toggle de métrica en los gráficos)
 /* Distinct customer countries seen in sales (for the country slicer). */
 function paisesVentas(){
@@ -1884,12 +2032,13 @@ function paisesVentas(){
 /* Sales filtered by the active store focus + analysis slicers. Returns rows
    flattened to the line level with product, store, price, COGS and margin. */
 function ventasFiltradas(){
-  const stores = effectiveStores();
   const desde = anFiltros.desde ? new Date(anFiltros.desde+"T00:00:00") : null;
   const hasta = anFiltros.hasta ? new Date(anFiltros.hasta+"T23:59:59") : null;
   const rows=[];
   db.ventas.forEach(v=>{
-    if(!stores.includes(v.store)) return;
+    // Análisis es admin-only: se ven todas las ventas (el stock es un pool único,
+    // la venta ya no está atada a una sociedad).
+    if(anFiltros.vend && (v.vendedorId||"")!==anFiltros.vend) return;
     if(anFiltros.pais && ((v.cliente&&v.cliente.pais)||"")!==anFiltros.pais) return;
     const f=new Date(v.fecha+"T12:00:00");
     if(desde && f<desde) return;
@@ -1899,7 +2048,7 @@ function ventasFiltradas(){
       if(anFiltros.saga && (p? sagaDe(p): "")!==anFiltros.saga) return;
       if(anFiltros.idioma && (p? (p.idioma||""):"" )!==anFiltros.idioma) return;
       const cogs = l.cogs!=null ? l.cogs : (l.costo||0)*l.cantidad;
-      rows.push({ fecha:normISO(v.fecha)||v.fecha, store:v.store, productoId:l.productoId, nombre:l.nombre, sku:l.sku,
+      rows.push({ fecha:normISO(v.fecha)||v.fecha, vendedor:saleVendedorNombre(v), vendedorId:v.vendedorId||"", productoId:l.productoId, nombre:l.nombre, sku:l.sku,
         cantidad:l.cantidad, revenue:round2((l.precio||0)*l.cantidad), cogs:round2(cogs),
         pais:(v.cliente&&v.cliente.pais)||"", saga:p?sagaDe(p):"", idioma:p?(p.idioma||""):"" });
     });
@@ -1921,7 +2070,7 @@ function viewAnalisis(){
   const byProd = by(r=>r.nombre);
   const topRev = top(byProd, v=>v.revenue);
   const topMargin = top(byProd, v=>round2(v.revenue-v.cogs));
-  const byStore = by(r=>storeName(r.store));
+  const byVend = by(r=>r.vendedor);
   const byPais = by(r=>r.pais);
   const byLang = by(r=>langLabel(r.idioma));
 
@@ -1935,13 +2084,11 @@ function viewAnalisis(){
   const monthsSorted = Object.keys(byMonth).sort();
   const trend = monthsSorted.map(k=>{ const [y,m]=k.split("-"); return { label:`${_MONTHS3[(+m)-1]} ${y.slice(2)}`, value: anMetric==="units"?byMonth[k].units:byMonth[k].revenue }; });
 
-  // --- point 4: same product marked up differently across stores ---
-  const cmp = {};   // prodId -> { nombre, akira:{rev,units}, silver:{rev,units} }
-  rows.forEach(r=>{ const e=cmp[r.productoId]=cmp[r.productoId]||{nombre:r.nombre,akira:{rev:0,u:0},silver:{rev:0,u:0}}; if(e[r.store]){ e[r.store].rev+=r.revenue; e[r.store].u+=r.cantidad; } });
-  const cmpRows = Object.values(cmp)
-    .filter(e=> e.akira.u>0 && e.silver.u>0)          // sold in BOTH stores
-    .map(e=>{ const pa=e.akira.rev/e.akira.u, ps=e.silver.rev/e.silver.u; return { nombre:e.nombre, pa, ps, diff:pa-ps, diffPct: ps>0?((pa/ps-1)*100):0 }; })
-    .sort((a,b)=>Math.abs(b.diffPct)-Math.abs(a.diffPct)).slice(0,10);
+  // --- Punto 2/6: rendimiento por vendedor (unidades, revenue, margen FIFO) ---
+  const vendPerf = Object.entries(byVend)
+    .map(([k,v])=>({ nombre:k, units:v.units, revenue:round2(v.revenue), margin:round2(v.revenue-v.cogs),
+                     marginPct: v.revenue>0 ? ((v.revenue-v.cogs)/v.revenue*100) : 0 }))
+    .sort((a,b)=>b.revenue-a.revenue);
 
   const kpis = `
   <div class="kpis">
@@ -1954,6 +2101,7 @@ function viewAnalisis(){
   const sagas=sagasUnicas(), paises=paisesVentas();
   const slicers = `
   <div class="slicers">
+    <div class="slicer"><span>Seller</span><select id="an_vend"><option value="">All</option>${vendedores().map(v=>`<option value="${esc(v.id)}" ${anFiltros.vend===v.id?"selected":""}>${esc(v.nombre)}</option>`).join("")}</select></div>
     <div class="slicer"><span>Line</span><select id="an_saga"><option value="">All</option>${sagas.map(s=>`<option value="${esc(s)}" ${anFiltros.saga===s?"selected":""}>${esc(s)}</option>`).join("")}</select></div>
     <div class="slicer"><span>Language</span><select id="an_idioma"><option value="">All</option>${LANGS.map(([v,l])=>`<option value="${v}" ${anFiltros.idioma===v?"selected":""}>${esc(l)}</option>`).join("")}</select></div>
     <div class="slicer"><span>Country</span><select id="an_pais"><option value="">All</option>${paises.map(c=>`<option value="${esc(c)}" ${anFiltros.pais===c?"selected":""}>${esc(c)}</option>`).join("")}</select></div>
@@ -1980,9 +2128,9 @@ function viewAnalisis(){
       ${rows.length ? hbars(topMargin, money, "var(--up)") : `<div class="cempty">No sales in this selection.</div>`}
     </div>
     <div class="panel chart">
-      <p class="ctitle">${anMetric==="units"?"Units":"Revenue"} by store</p>
-      <p class="csub">Akira vs Silver. Click a slice for its ${anMetric==="units"?"units":"amount"}.</p>
-      ${rows.length ? donut("d-store", top(byStore,mval), mfmt) : `<div class="cempty">No sales.</div>`}
+      <p class="ctitle">${anMetric==="units"?"Units":"Revenue"} by seller</p>
+      <p class="csub">Who's selling. Click a slice for its ${anMetric==="units"?"units":"amount"}.</p>
+      ${rows.length ? donut("d-vend", top(byVend,mval), mfmt) : `<div class="cempty">No sales.</div>`}
     </div>
     <div class="panel chart">
       <p class="ctitle">${anMetric==="units"?"Units":"Revenue"} by country</p>
@@ -1995,17 +2143,17 @@ function viewAnalisis(){
       ${Object.keys(byLang).length ? donut("d-lang", top(byLang,mval), mfmt) : `<div class="cempty">No language data.</div>`}
     </div>
     <div class="panel chart">
-      <p class="ctitle">⚠ Same product, different price by store</p>
-      <p class="csub">Point 4: spot who marks the same product up. Avg selling price per store.</p>
-      ${cmpRows.length ? `<div class="table-scroll"><table>
-        <thead><tr><th>Product</th><th class="r">Akira avg</th><th class="r">Silver avg</th><th class="r">Δ</th></tr></thead>
-        <tbody>${cmpRows.map(r=>`<tr><td>${esc(r.nombre)}</td><td class="r num">${money(r.pa)}</td><td class="r num">${money(r.ps)}</td><td class="r num" style="color:${Math.abs(r.diffPct)>15?'var(--down)':'var(--muted)'}">${r.diff>=0?'+':''}${nf0.format(r.diffPct)}%</td></tr>`).join("")}</tbody>
-      </table></div>` : `<div class="cempty">Need the same product sold in both stores to compare.</div>`}
+      <p class="ctitle">Seller performance</p>
+      <p class="csub">Units, revenue and FIFO gross margin per seller in the current selection.</p>
+      ${vendPerf.length ? `<div class="table-scroll"><table>
+        <thead><tr><th>Seller</th><th class="r">Units</th><th class="r">Revenue</th><th class="r">Margin</th><th class="r">Margin %</th></tr></thead>
+        <tbody>${vendPerf.map(r=>`<tr><td>${esc(r.nombre)}</td><td class="r num">${qty(r.units)}</td><td class="r num">${money(r.revenue)}</td><td class="r num">${money(r.margin)}</td><td class="r num">${r.revenue>0?nf0.format(r.marginPct)+"%":"—"}</td></tr>`).join("")}</tbody>
+      </table></div>` : `<div class="cempty">No sales in this selection.</div>`}
     </div>
   </div>`;
 
   return `
-  <div class="head"><div class="title"><h2>Analysis</h2><p>Sales, FIFO margin and store comparison. Filter with the slicers.</p></div>
+  <div class="head"><div class="title"><h2>Analysis</h2><p>Sales, FIFO margin and seller performance. Filter with the slicers.</p></div>
     <div class="actions" style="gap:8px">
       <div class="seg"><button class="seg-btn ${anMetric==="usd"?"on":""}" data-metric="usd">USD</button><button class="seg-btn ${anMetric==="units"?"on":""}" data-metric="units">Units</button></div>
       ${isAdmin()?`<button class="btn primary" id="an_pnl">⤓ Export P&amp;L (Excel)</button>`:""}
@@ -2018,12 +2166,13 @@ function viewAnalisis(){
 function wireAnalisis(){
   const s=document.getElementById("an_saga"); if(!s) return;
   const upd=(k,el)=>{ anFiltros[k]=el.value; render(); };
+  const vsel=document.getElementById("an_vend"); if(vsel) vsel.onchange=e=>upd("vend",e.target);
   s.onchange=e=>upd("saga",e.target);
   document.getElementById("an_idioma").onchange=e=>upd("idioma",e.target);
   document.getElementById("an_pais").onchange=e=>upd("pais",e.target);
   document.getElementById("an_desde").onchange=e=>upd("desde",e.target);
   document.getElementById("an_hasta").onchange=e=>upd("hasta",e.target);
-  document.getElementById("an_clear").onclick=()=>{ anFiltros={saga:"",idioma:"",pais:"",desde:"",hasta:""}; render(); };
+  document.getElementById("an_clear").onclick=()=>{ anFiltros={vend:"",saga:"",idioma:"",pais:"",desde:"",hasta:""}; render(); };
   const pnl=document.getElementById("an_pnl"); if(pnl) pnl.onclick=openPnLExport;
   // Punto 20: toggle USD/Units
   document.querySelectorAll("[data-metric]").forEach(b=> b.onclick=()=>{ anMetric=b.dataset.metric; render(); });
@@ -2074,7 +2223,7 @@ function viewInversiones(){
     <div class="kpi"><div class="lbl">Portfolio link</div><div class="val">—</div><div class="sub">coming soon</div></div>
   </div>
   <div class="panel">
-    <div class="phead"><h3>Held products</h3><span class="hint">open a product and use “◈ To investments” to move units here (pick the quantity per store)</span></div>
+    <div class="phead"><h3>Held products</h3><span class="hint">open a product and use “◈ To investments” to move units here (pick the quantity per society)</span></div>
     ${items.length ? `<div class="table-scroll"><table>
       <thead><tr><th>SKU</th><th>Product</th><th class="c">Lang</th><th class="r">Units</th><th class="r">Avg cost</th><th class="r">Invested</th><th></th></tr></thead>
       <tbody>${rows}</tbody></table></div>`
@@ -2087,14 +2236,13 @@ function viewInversiones(){
    ============================================================ */
 function viewProd(){
   const total = productosVendibles().length;
-  const showCols = activeStore==="all" && allowedStores().length>1;
   return `
   <div class="head">
     <div class="title"><h2>Products</h2><p>Item master. Cost updates with each purchase (last landed cost); COGS is FIFO.</p></div>
     <div class="actions">
       ${total?`<button class="btn" id="btnExpPrecios">⤓ Price list</button>`:""}
-      ${total?`<button class="btn" id="btnSel">${selMode?ICO.x+"Cancel":ICO.select+"Select"}</button>`:""}
-      <button class="btn primary" data-newp>+ New product</button>
+      ${(total&&isAdmin())?`<button class="btn" id="btnSel">${selMode?ICO.x+"Cancel":ICO.select+"Select"}</button>`:""}
+      ${puedeEditarProductos()?`<button class="btn primary" data-newp>+ New product</button>`:""}
     </div>
   </div>
   <div class="panel">
@@ -2111,7 +2259,7 @@ function viewProd(){
     ${total ? `
     ${filterBarHTML("p", prodFiltros)}
     <div class="table-scroll"><table>
-      <thead><tr>${selMode?`<th class="c"><input type="checkbox" id="selall"></th>`:""}${sortTh(prodFiltros,"sku","SKU","")}${sortTh(prodFiltros,"nombre","Name","")}<th class="c">Lang</th>${showCols?`<th class="r">Akira</th><th class="r">Silver</th>`:""}${sortTh(prodFiltros,"stock",stockView==="cases"?"Stock (cases)":"Stock","r")}${sortTh(prodFiltros,"costo","Last cost","r")}${sortTh(prodFiltros,"pventa","List price","r")}<th></th></tr></thead>
+      <thead><tr>${selMode?`<th class="c"><input type="checkbox" id="selall"></th>`:""}${sortTh(prodFiltros,"sku","SKU","")}${sortTh(prodFiltros,"nombre","Name","")}<th class="c">Lang</th>${sociedadColsHead()}${sortTh(prodFiltros,"stock",stockView==="cases"?"Stock (cases)":"Stock","r")}${sortTh(prodFiltros,"costo","Last cost","r")}${sortTh(prodFiltros,"pventa","List price","r")}<th></th></tr></thead>
       <tbody id="prodBody"></tbody></table></div>`
       : emptyState("The master is empty","Create your first product, or let them appear on their own when you import a purchase with new SKUs.")}
   </div>`;
@@ -2119,8 +2267,8 @@ function viewProd(){
 function renderProdRows(){
   const body=document.getElementById("prodBody"); if(!body) return;
   const list=filtrarProds(prodFiltros);
-  const showCols = activeStore==="all" && allowedStores().length>1;
-  const cols = (selMode?1:0)+7+(showCols?2:0);
+  const showCols = showSociedadCols();
+  const cols = (selMode?1:0)+7+(showCols?STORE_IDS.length:0);
   body.innerHTML = stockRowset(list, prodFiltros).map(({p,kind})=>{
     const isT = kind==="transit";
     const units = isT ? transitoEnFoco(p) : stockEnFoco(p);
@@ -2131,7 +2279,7 @@ function renderProdRows(){
     const chk = selMode ? (isT ? `<td class="c"></td>` : `<td class="c" data-nofic><input type="checkbox" class="selchk" data-selp="${p.id}" ${selProd.has(p.id)?"checked":""}></td>`) : "";
     const flag = isT ? ' <span class="inv-badge transit">⋯ in transit</span>' : (esBloqueado(p) ? ' <span class="pill blocked">blocked</span>' : "");
     const cost = isT ? (transitoEnFoco(p)>0 ? round2(transitoValorEnFoco(p)/transitoEnFoco(p)) : (p.ultimoCosto||0)) : (p.ultimoCosto||0);
-    const perStore = showCols ? `<td class="r num">${stockDisplay(p, isT?transitoDe(p,"akira"):stockDe(p,"akira"))}</td><td class="r num">${stockDisplay(p, isT?transitoDe(p,"silver"):stockDe(p,"silver"))}</td>` : "";
+    const perStore = sociedadColsCells(p, isT);
     return `<tr data-ficha="${p.id}" class="${isT?'row-transit':''}" style="cursor:pointer">
       ${chk}
       <td><span class="sku">${esc(p.sku||"—")}</span></td>
@@ -2210,19 +2358,19 @@ function deleteSelProd(){
    ============================================================ */
 function viewDocs(tipo){
   const isC = tipo==="compra";
-  const stores = effectiveStores();
-  const list = (tipo==="compra" ? db.compras : db.ventas).filter(d=> stores.includes(d.store||STORE_IDS[0]));
+  const list = docsVisibles(tipo);
   const f = docFiltros[tipo];
-  const showStore = allowedStores().length>1;
+  const showSocCol  = isC && isAdmin() && STORE_IDS.length>1;   // qué sociedad compró
+  const showVendCol = !isC && isAdmin();                        // quién vendió (punto 6)
   return `
   <div class="head">
     <div class="title">
       <h2>${isC?"Purchases":"Sales"}</h2>
       <p>${isC?"Add stock and set each product's last cost. COGS stays FIFO."
-              :"Reduce stock. Availability is validated per store before confirming."}</p>
+              :"Reduce stock from the unified pool (FIFO across societies)."}</p>
     </div>
     <div class="actions">
-      ${isC?`<button class="btn" data-import>⤒ Import PDF</button>`:""}
+      ${(isC&&puedeComprar())?`<button class="btn" data-import>⤒ Import PDF</button>`:""}
       <button class="btn ${isC?'up':'down'}" data-open="${tipo}">${isC?"+ Manual purchase":"− New sale"}</button>
     </div>
   </div>
@@ -2241,7 +2389,8 @@ function viewDocs(tipo){
       <thead><tr>
         ${sortTh(f,"numero","#","")}
         ${sortTh(f,"fecha","Date","")}
-        ${showStore?`<th>Store</th>`:""}
+        ${showSocCol?`<th>Society</th>`:""}
+        ${showVendCol?`<th>Sold by</th>`:""}
         ${sortTh(f,"contraparte",isC?"Supplier":"Customer","")}
         ${sortTh(f,"items","Items","c")}
         ${sortTh(f,"total","Total","r")}
@@ -2254,6 +2403,20 @@ function viewDocs(tipo){
           isC?"Import an invoice PDF or load it by hand. Each line adds stock and updates the cost."
              :"Build a sales invoice: pick products, quantities and price, and stock drops on confirm.")}
   </div>`;
+}
+/* Documentos visibles según rol/foco:
+   - compras: se filtran por la sociedad en foco (el admin puede mirar una sola).
+   - ventas: un vendedor ve SÓLO las suyas; el admin ve todas. */
+function docsVisibles(tipo){
+  if(tipo==="compra"){
+    const stores = effectiveStores();
+    return db.compras.filter(d=> stores.includes(d.store||STORE_IDS[0]));
+  }
+  if(isSeller()){
+    const vid = currentVendedorId();
+    return db.ventas.filter(v=> (v.vendedorId||"")===vid);
+  }
+  return db.ventas.slice();
 }
 /* Encabezado ordenable: muestra ↑ (asc), ↓ (desc) o ↕ (inactivo, "sin flecha") */
 function sortTh(f, key, label, align){
@@ -2306,7 +2469,7 @@ function docKpisHTML(tipo, list){
 }
 
 function filtrarDocs(tipo){
-  const list = tipo==="compra" ? db.compras : db.ventas;
+  const list = docsVisibles(tipo);
   const f = docFiltros[tipo];
   const q=(f.q||"").trim().toLowerCase();
   let out = list.filter(d=>{
@@ -2338,12 +2501,12 @@ function filtrarDocs(tipo){
 function renderDocRows(tipo){
   const body=document.getElementById("docBody"); if(!body) return;
   const isC = tipo==="compra";
-  const stores=effectiveStores();
-  const all=(tipo==="compra"?db.compras:db.ventas).filter(d=>stores.includes(d.store||STORE_IDS[0]));
-  const list=filtrarDocs(tipo).filter(d=>stores.includes(d.store||STORE_IDS[0])), total=all.length;
-  const showStore = allowedStores().length>1;
+  const all=docsVisibles(tipo);
+  const list=filtrarDocs(tipo), total=all.length;
+  const showSocCol  = isC && isAdmin() && STORE_IDS.length>1;
+  const showVendCol = !isC && isAdmin();
   const showComm = !isC && isAdmin();
-  const cols = (showStore?7:6) + (isC?1:0) + (showComm?1:0);
+  const cols = 6 + (showSocCol?1:0) + (showVendCol?1:0) + (isC?1:0) + (showComm?1:0);
   body.innerHTML = list.map(d=>{
     const items=d.lineas.reduce((a,l)=>a+l.cantidad,0);
     const received = d.status===INVOICE_STATUS.RECEIVED;
@@ -2352,13 +2515,14 @@ function renderDocRows(tipo){
     return `<tr>
       <td class="num">${esc(d.numero||"—")}</td>
       <td>${esc(fmtDate(d.fecha))}</td>
-      ${showStore?`<td>${esc(storeName(d.store))}</td>`:""}
+      ${showSocCol?`<td>${esc(storeName(d.store))}</td>`:""}
+      ${showVendCol?`<td>${esc(saleVendedorNombre(d))}</td>`:""}
       <td>${esc(d.contraparte||"—")}</td>
       <td class="c num">${qty(items)}</td>
       <td class="r num">${money(d.total)}</td>
       ${statusCell}
       ${commCell}
-      <td class="r" style="white-space:nowrap">${isC?`<button class="btn ghost sm" data-invstatus="${d.id}">${received?'Mark in transit':'Mark received'}</button>`:""}<button class="btn ghost sm" data-vdoc="${tipo}:${d.id}">View</button>${tipo==="venta"?`<button class="btn ghost sm" data-copydoc="${tipo}:${d.id}">Copy</button>`:""}<button class="btn ghost sm" data-editdoc="${tipo}:${d.id}">Edit</button><button class="btn ghost sm" data-deldoc="${tipo}:${d.id}" style="color:var(--alert)">Delete</button></td>
+      <td class="r" style="white-space:nowrap">${(isC&&puedeComprar())?`<button class="btn ghost sm" data-invstatus="${d.id}">${received?'Mark in transit':'Mark received'}</button>`:""}<button class="btn ghost sm" data-vdoc="${tipo}:${d.id}">View</button>${tipo==="venta"?`<button class="btn ghost sm" data-copydoc="${tipo}:${d.id}">Copy</button>`:""}<button class="btn ghost sm" data-editdoc="${tipo}:${d.id}">Edit</button><button class="btn ghost sm" data-deldoc="${tipo}:${d.id}" style="color:var(--alert)">Delete</button></td>
     </tr>`;
   }).join("") || `<tr><td colspan="${cols}" style="text-align:center;color:var(--muted);padding:22px">No document matches the filters.</td></tr>`;
   const cnt=document.getElementById("docCount");
@@ -2432,8 +2596,8 @@ function viewMov(){
   const showStore = allowedStores().length>1;
   return `
   <div class="head">
-    <div class="title"><h2>Movements</h2><p>Traceability of every entry, exit and adjustment, with its source document and store.</p></div>
-    <div class="actions"><button class="btn" data-adjust>⇄ Inventory adjustment</button></div>
+    <div class="title"><h2>Movements</h2><p>Traceability of every entry, exit and adjustment, with its source document and society.</p></div>
+    <div class="actions">${puedeAjustar()?`<button class="btn" data-adjust>⇄ Inventory adjustment</button>`:""}</div>
   </div>
   <div class="panel">
     <div class="phead"><h3>Kardex</h3><span class="hint" id="movCount">${movs.length} entries</span></div>
@@ -2583,12 +2747,12 @@ function deleteAjuste(id){
   const p=prodById(m.productoId);
   const d=(m.delta!=null)?m.delta:0;
   const msg = p
-    ? `¿Borrar este ajuste?\n\n${p.nombre}\nRevierte ${d>=0?'+':'−'}${qty(Math.abs(d))} u → stock ${qty(p.stock)} pasa a ${qty(+((p.stock||0)-d).toFixed(4))}.`
-    : `¿Borrar este ajuste? (el producto ya no existe en el maestro)`;
+    ? `Delete this adjustment?\n\n${p.nombre}\nReverts ${d>=0?'+':'−'}${qty(Math.abs(d))} u → stock ${qty(p.stock)} becomes ${qty(+((p.stock||0)-d).toFixed(4))}.`
+    : `Delete this adjustment? (the product no longer exists in the master)`;
   if(!confirm(msg)) return;
   if(p) p.stock = +((p.stock||0) - d).toFixed(4);
   db.movimientos = db.movimientos.filter(x=>x.id!==id);
-  save(); toast("Ajuste borrado","warn"); render();
+  save(); toast("Adjustment deleted","warn"); render();
 }
 
 /* ============================================================
@@ -2596,7 +2760,7 @@ function deleteAjuste(id){
    ============================================================ */
 function viewDatos(){
   const conf = syncState==="conflict";
-  const roleLbl = isAdmin() ? "Admin (master)" : `Seller · ${storeName(session?session.store:"")}`;
+  const roleLbl = isAdmin() ? "Admin (master)" : `Seller · ${esc((session&&session.name)||"—")}`;
   return `
   <div class="head"><div class="title"><h2>Data</h2><p>Account, backup and settings.</p></div></div>
 
@@ -2647,6 +2811,25 @@ function viewDatos(){
       <button class="btn" data-savecfg style="justify-self:start;margin-top:4px">Save</button>
     </div>
   </div>
+
+  ${isAdmin()?`<div class="panel">
+    <div class="phead"><h3>Sellers</h3><span class="hint">who a sale can be credited to (commission)</span></div>
+    <div class="grid-form">
+      <p style="margin:0;color:var(--muted);font-size:13px">These are the people who sell (Teo, Tonio…). They're <b>not</b> societies: the stock is one shared pool. To let a seller sign in on their own device, also add them to the Worker's <code>USERS</code> secret with the same id.</p>
+      <div id="vendList" style="display:flex;flex-direction:column;gap:8px">
+        ${vendedores().map(v=>`<div class="vend-row" data-vrow="${esc(v.id)}" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+          <span class="sku" style="min-width:70px">${esc(v.id)}</span>
+          <input class="inp" data-vname="${esc(v.id)}" value="${esc(v.nombre)}" style="max-width:220px" placeholder="Display name">
+          <button class="btn ghost sm" data-vdel="${esc(v.id)}" style="color:var(--alert)">Remove</button>
+        </div>`).join("") || `<p class="hint">No sellers yet — add one below.</p>`}
+      </div>
+      <div style="display:flex;gap:8px;align-items:end;flex-wrap:wrap;margin-top:4px">
+        <div class="field"><label>New seller id <span class="hint" style="font-weight:400">· e.g. teo</span></label><input class="inp" id="vNewId" placeholder="teo" style="max-width:160px"></div>
+        <div class="field"><label>Display name</label><input class="inp" id="vNewName" placeholder="Teo" style="max-width:200px"></div>
+        <button class="btn" id="vAdd" style="margin-bottom:2px">+ Add seller</button>
+      </div>
+    </div>
+  </div>`:""}
 
   <div class="panel">
     <div class="phead"><h3>Issuer details</h3><span class="hint">shown on the invoice PDF</span></div>
@@ -2727,6 +2910,25 @@ function wire(){
   const cl=m.querySelector("[data-conflocal]"); if(cl) cl.onclick=()=>resolveConflict(true);
   const cs=m.querySelector("[data-confserver]"); if(cs) cs.onclick=()=>resolveConflict(false);
 
+  // --- vendedores (ABM, admin) ---
+  m.querySelectorAll("[data-vname]").forEach(inp=> inp.onchange=()=>{
+    const v=vendedorById(inp.dataset.vname); if(v){ v.nombre=(inp.value||"").trim()||v.id; save(); toast("Seller renamed"); }
+  });
+  m.querySelectorAll("[data-vdel]").forEach(b=> b.onclick=()=>{
+    const id=b.dataset.vdel;
+    if(!confirm(`Remove seller "${vendedorNombre(id)}"?\n\nPast sales already credited to them keep their name. New sales just won't offer this seller.`)) return;
+    db.config.vendedores = vendedores().filter(v=>v.id!==id);
+    save(); toast("Seller removed","warn"); render();
+  });
+  const vAdd=m.querySelector("#vAdd"); if(vAdd) vAdd.onclick=()=>{
+    let id=(document.getElementById("vNewId").value||"").trim().toLowerCase().replace(/[^a-z0-9_-]/g,"");
+    const nombre=(document.getElementById("vNewName").value||"").trim();
+    if(!id){ toast("Enter a seller id (e.g. teo)","warn"); return; }
+    if(vendedorById(id)){ toast("That id already exists","warn"); return; }
+    db.config.vendedores = vendedores().concat([{ id, nombre: nombre||id }]);
+    save(); toast("Seller added"); render();
+  };
+
   paintSync();
 }
 
@@ -2767,7 +2969,7 @@ function openProd(id){
         <option value="blocked" ${p&&p.estado==="blocked"?"selected":""}>Blocked / best-offer</option>
       </select></div>
     </div>
-    ${p&&isAdmin()?`<p class="hint" style="font-size:12px;margin:6px 0 0">To hold units as investment, open the product and use “◈ To investments” — you pick how many units per store.</p>`:""}
+    ${p&&isAdmin()?`<p class="hint" style="font-size:12px;margin:6px 0 0">To hold units as investment, open the product and use “◈ To investments” — you pick how many units per society.</p>`:""}
 
     <div class="phead" style="margin:16px 0 6px;padding:0"><h3 style="font-size:13px">Costo</h3>
       <label style="font-size:12px;color:var(--muted);display:flex;gap:6px;align-items:center;cursor:pointer">
@@ -2881,7 +3083,7 @@ function delProd(id){
   const p=prodById(id);
   if(!confirm(`Delete "${p.nombre}"? Its historical movements are kept.`)) return;
   db.productos = db.productos.filter(x=>x.id!==id);
-  save(); closeModal(); toast("Producto eliminado","warn"); render();
+  save(); closeModal(); toast("Product deleted","warn"); render();
 }
 
 /* ============================================================
@@ -2890,6 +3092,8 @@ function delProd(id){
 let draft = null;  // { tipo, contraparte, fecha, numero, lineas:[{key,productoId,sku,nombre,cantidad,precio}] }
 
 function openDoc(tipo, pre){
+  // Punto 3: un vendedor no puede cargar compras.
+  if(tipo==="compra" && !puedeComprar()){ toast("Only admins can load purchases","warn"); return; }
   draft = pre || {
     tipo, contraparte:"", fecha:new Date().toISOString().slice(0,10),
     numero: tipo==="venta" ? nextFacturaVenta() : "",
@@ -2901,10 +3105,19 @@ function openDoc(tipo, pre){
   if(!draft.envio) draft.envio = { tipo:"free", monto:0 };
   if(draft.handling==null) draft.handling = 0;
   if(draft.flete==null) draft.flete = 0;
-  // which store the document hits: seller => their store; admin => active store, or first if consolidated
-  if(!draft.store || !allowedStores().includes(draft.store)){
-    const allow = allowedStores();
-    draft.store = (activeStore!=="all" && allow.includes(activeStore)) ? activeStore : (allow[0]||STORE_IDS[0]);
+  if(tipo==="compra"){
+    // La compra elige SOCIEDAD (quién compra). Default: la sociedad en foco, o la primera.
+    if(!draft.store || !STORE_IDS.includes(draft.store)){
+      draft.store = (activeStore!=="all" && STORE_IDS.includes(activeStore)) ? activeStore : STORE_IDS[0];
+    }
+  } else {
+    // La venta NO elige sociedad (pool unificado). Elige VENDEDOR (para la comisión).
+    // Vendedor logueado => fijado a sí mismo. Admin => elige (o "— none —").
+    if(isSeller()){
+      draft.vendedorId = currentVendedorId() || "";
+    } else if(draft.vendedorId===undefined){
+      draft.vendedorId = "";   // admin arranca sin vendedor; lo elige en el combo
+    }
   }
   renderDocModal();
 }
@@ -2922,16 +3135,30 @@ function renderDocModal(){
       ${cli?`<div class="hint" style="font-size:11px;margin-top:4px">${esc(clienteDireccion(cli)||cli.email||"")}</div>`:""}
     </div>`;
   const allowSt = allowedStores();
-  // Punto 10: sí permitimos mover el documento de local al editar; confirmDoc
-  // revierte el stock en el local original y lo aplica en el nuevo (circuito completo).
-  const lockStore = false;
-  const storeSel = (allowSt.length>1 && !lockStore)
-    ? `<div class="field" style="grid-column:1/3"><label>Store</label>
-         <select class="inp" id="d_store">${allowSt.map(s=>`<option value="${s}" ${s===draft.store?"selected":""}>${esc(storeName(s))}</option>`).join("")}</select></div>`
-    : `<div class="field" style="grid-column:1/3"><label>Store</label>
-         <input class="inp" value="${esc(storeName(draft.store))}" disabled></div>`;
+  let topSel;
+  if(isC){
+    // COMPRA: elegir la sociedad que compra (procedencia del lote).
+    topSel = (allowSt.length>1)
+      ? `<div class="field" style="grid-column:1/3"><label>Society <span class="hint" style="font-weight:400">· who buys this stock</span></label>
+           <select class="inp" id="d_store">${allowSt.map(s=>`<option value="${s}" ${s===draft.store?"selected":""}>${esc(storeName(s))}</option>`).join("")}</select></div>`
+      : `<div class="field" style="grid-column:1/3"><label>Society</label>
+           <input class="inp" value="${esc(storeName(draft.store))}" disabled></div>`;
+  } else {
+    // VENTA: no se elige sociedad (pool unificado). Se elige VENDEDOR (para la comisión).
+    if(isSeller()){
+      topSel = `<div class="field" style="grid-column:1/3"><label>Seller</label>
+           <input class="inp" value="${esc((session&&session.name)||vendedorNombre(draft.vendedorId))}" disabled></div>`;
+    } else {
+      const vends = vendedores();
+      topSel = `<div class="field" style="grid-column:1/3"><label>Seller <span class="hint" style="font-weight:400">· whose commission</span></label>
+           <select class="inp" id="d_vend">
+             <option value="" ${!draft.vendedorId?"selected":""}>— none (house) —</option>
+             ${vends.map(v=>`<option value="${esc(v.id)}" ${v.id===draft.vendedorId?"selected":""}>${esc(v.nombre)}</option>`).join("")}
+           </select></div>`;
+    }
+  }
   const body = `
-    <div class="grid-form" style="grid-template-columns:1fr 1fr;padding:0;margin-bottom:10px">${storeSel}</div>
+    <div class="grid-form" style="grid-template-columns:1fr 1fr;padding:0;margin-bottom:10px">${topSel}</div>
     ${isC?`<div class="banner ok" style="justify-content:space-between;align-items:center">
       <span>Got the invoice as PDF? Import it and I'll fill the lines.</span>
       <button class="btn sm" id="d_import" style="white-space:nowrap">⤒ Import PDF</button>
@@ -2974,7 +3201,8 @@ function renderDocModal(){
     `<div class="totrow"><span style="color:var(--muted)">Document total</span><span class="num" id="docTotal">${money(docTotal())}</span></div>`
   );
   renderLines();
-  const dst=document.getElementById("d_store"); if(dst) dst.onchange=e=>{ draft.store=e.target.value; renderDocModal(); };
+  const dst=document.getElementById("d_store"); if(dst) dst.onchange=e=>{ draft.store=e.target.value; };
+  const dvend=document.getElementById("d_vend"); if(dvend) dvend.onchange=e=>{ draft.vendedorId=e.target.value; };
   const cp=document.getElementById("d_cp"); if(cp) cp.oninput=e=>draft.contraparte=e.target.value;
   document.getElementById("d_fe").oninput=e=>draft.fecha=e.target.value;
   document.getElementById("d_nu").oninput=e=>draft.numero=e.target.value;
@@ -3015,6 +3243,7 @@ function pintarProrateo(){
    ============================================================ */
 let adjDraft = null;
 function openAjuste(prodId){
+  if(!puedeAjustar()){ toast("Only admins can adjust inventory","warn"); return; }
   adjDraft = { productoId: prodId||"", store: effectiveStores()[0]||STORE_IDS[0], modo:"delta", cantidad:"", fecha:new Date().toISOString().slice(0,10), obs:"" };
   renderAjuste();
 }
@@ -3127,8 +3356,8 @@ function totalLineas(arr){ return round2((arr||[]).reduce((a,x)=> a + round2((x.
    ============================================================ */
 function stockBaseVenta(prodId){
   const p = prodById(prodId); if(!p) return 0;
-  // Punto 15: la venta descuenta del LOCAL del documento, no del consolidado
-  let s = stockDe(p, (draft && draft.store) || STORE_IDS[0]) || 0;
+  // La venta descuenta del POOL UNIFICADO (todas las sociedades), no de un local
+  let s = stockVendibleTotal(p) || 0;
   // si estamos EDITando una venta, el stock "vuelve" antes de re-validar
   if(draft && draft.editingId){
     const old = (draft.tipo==="compra"?db.compras:db.ventas).find(x=>x.id===draft.editingId);
@@ -3179,9 +3408,10 @@ function pickerItemsHTML(i, q){
   const isC = draft.tipo==="compra";
   const cur = draft.lineas[i].productoId;
   q = (q||"").trim().toLowerCase();
-  const vstore = (draft && draft.store) || STORE_IDS[0];
+  const vstore = (draft && draft.store) || STORE_IDS[0];   // sólo relevante en COMPRA
+  // COMPRA: todos los productos. VENTA: los que tengan stock en el POOL unificado.
   let lista = isC ? db.productos.slice()
-                  : db.productos.filter(p=> stockDe(p, vstore)>0 || p.id===cur);
+                  : db.productos.filter(p=> stockVendibleTotal(p)>0 || p.id===cur);
   // orden alfabético SIEMPRE (task 2), por nombre
   lista.sort((a,b)=> String(a.nombre||"").localeCompare(String(b.nombre||""),"es",{numeric:true}));
   if(q) lista = lista.filter(p=> ((p.nombre||"")+" "+(p.sku||"")).toLowerCase().includes(q));
@@ -3193,8 +3423,8 @@ function pickerItemsHTML(i, q){
     return `<button type="button" class="ppick-item${sel}" data-pick="${p.id}">${sku}<span class="pi-name">${esc(p.nombre)}</span>${disp}</button>`;
   }).join("");
   if(!lista.length){
-    const hayStock = db.productos.some(p=>stockDe(p, vstore)>0);
-    html = `<div class="ppick-empty">${isC ? "No products match." : (hayStock?"No product with stock matches.":`No stock available in ${esc(storeName(vstore))}.`)}</div>`;
+    const hayStock = db.productos.some(p=> isC ? true : stockVendibleTotal(p)>0);
+    html = `<div class="ppick-empty">${isC ? "No products match." : (hayStock?"No product with stock matches.":"No stock available to sell.")}</div>`;
   }
   if(isC) html += `<button type="button" class="ppick-item new" data-pick="__new">＋ Create new product…</button>`;
   return html;
@@ -3552,7 +3782,9 @@ function nuevoProductoBase(sku, nombre, precioVenta){
 }
 function confirmDoc(){
   const isC = draft.tipo==="compra";
-  const store = draft.store || STORE_IDS[0];
+  // Punto 3: sólo el admin carga compras.
+  if(isC && !puedeComprar()){ toast("Only admins can load purchases","warn"); return; }
+  const store = draft.store || STORE_IDS[0];   // sólo relevante para COMPRA (sociedad que compra)
   // Sale: require a customer before generating the invoice
   if(!isC && !clienteById(draft.clienteId)){
     toast("Pick (or create) a customer before generating the sale","warn"); return;
@@ -3583,7 +3815,7 @@ function confirmDoc(){
       if(soloEnVault(p)){ toast(`"${p.nombre}" is in the investment vault and can't be sold`,"warn"); return; }
       if(esBloqueado(p)){ toast(`"${p.nombre}" is blocked (best-offer). It needs admin approval before selling`,"warn"); return; }
     }
-    const costoSnap = isC ? l.precio : fifoCostoPeek(p, store, l.cantidad).unit;   // FIFO unit cost for the sold qty
+    const costoSnap = isC ? l.precio : fifoCostoPeekGlobal(p, l.cantidad).unit;   // FIFO unit cost across the unified pool
     resolved.push({ prod:p, cantidad:l.cantidad, precio:l.precio, costo:costoSnap });
   }
   if(!resolved.length){ toast("Add at least one valid line","warn"); return; }
@@ -3611,23 +3843,21 @@ function confirmDoc(){
     }
   }
 
-  // Stock validation on sales, PER STORE: never allow negative stock (hard block).
+  // Validación de venta contra el POOL UNIFICADO (suma de todas las sociedades).
+  // Nunca stock negativo. Si estoy editando, el stock del doc original "vuelve" al
+  // pool (revertMap) y se puede revalidar contra ese total.
   if(!isC){
     const pedido={};
     resolved.forEach(r=>{ pedido[r.prod.id]=(pedido[r.prod.id]||0)+r.cantidad; });
     const faltantes=[];
-    // Si estamos editando y NO cambiamos de local, el stock del doc original "vuelve"
-    // y podemos revalidarlo. Si movimos el doc a OTRO local, ese revert pertenece al
-    // local viejo, no al nuevo -> no lo acreditamos acá (punto 10).
-    const sameStore = editing && oldDoc && (oldDoc.store===store);
     Object.keys(pedido).forEach(id=>{
       const p=prodById(id);
-      const eff = stockDe(p, store) + (sameStore ? (revertMap[id]||0) : 0);
-      if(pedido[id]>eff) faltantes.push(`• ${p.nombre}: available ${qty(eff)} in ${storeName(store)}, you asked ${qty(pedido[id])}`);
+      const eff = stockVendibleTotal(p) + (editing ? (revertMap[id]||0) : 0);
+      if(pedido[id]>eff) faltantes.push(`• ${p.nombre}: available ${qty(eff)}, you asked ${qty(pedido[id])}`);
     });
     if(faltantes.length){
       toast("Not enough stock","warn");
-      alert("Can't sell more than what's in stock at "+storeName(store)+":\n\n"+faltantes.join("\n")+"\n\nAdjust the quantities. Stock can't go negative.");
+      alert("Can't sell more than the total stock on hand:\n\n"+faltantes.join("\n")+"\n\nAdjust the quantities. Stock can't go negative.");
       return;
     }
   }
@@ -3638,7 +3868,7 @@ function confirmDoc(){
   const totalDoc = isC ? round2(subtotalLineas + (draft.handling||0) + (draft.flete||0))
                        : round2(subtotalLineas + envioMonto);
   const doc = {
-    id: editing ? draft.editingId : uid(), tipo:draft.tipo, store, contraparte:draft.contraparte.trim(),
+    id: editing ? draft.editingId : uid(), tipo:draft.tipo, contraparte:draft.contraparte.trim(),
     fecha:normISO(draft.fecha) || new Date().toISOString().slice(0,10), numero:draft.numero.trim(),
     lineas: resolved.map(r=>{
       const base = { productoId:r.prod.id, sku:r.prod.sku, nombre:r.prod.nombre, cantidad:r.cantidad, precio:r.precio, costo:r.costo };
@@ -3652,6 +3882,7 @@ function confirmDoc(){
     total: totalDoc
   };
   if(isC){
+    doc.store = store;   // sociedad que compra (procedencia del lote)
     doc.handling = draft.handling||0; doc.flete = draft.flete||0;
     // preservar el estado de envío al editar; una compra nueva arranca "in transit"
     doc.status = (editing && oldDoc && oldDoc.status) ? oldDoc.status : INVOICE_STATUS.IN_TRANSIT;
@@ -3663,6 +3894,12 @@ function confirmDoc(){
     doc.contraparte = cli ? clienteLinea(cli) : draft.contraparte.trim();
     // congelar la tasa de comisión vigente (o mantener la de la venta si se edita)
     doc.commissionRate = (editing && oldDoc && oldDoc.commissionRate!=null) ? oldDoc.commissionRate : (db.config.commissionRate||0);
+    // Vendedor: un seller queda fijado a sí mismo; el admin usa el que eligió (o ninguno).
+    // El nombre se snapshotea para que sobreviva aunque después se renombre/borre el vendedor.
+    let vid = isSeller() ? (currentVendedorId()||"") : (draft.vendedorId||"");
+    doc.vendedorId = vid || null;
+    doc.vendedor   = vid ? vendedorNombre(vid) : (isSeller() ? ((session&&session.name)||null) : null);
+    if(!doc.vendedorId && isSeller() && session && session.name) doc.vendedor = session.name;
   }
   const refTxt = (isC?"Purchase":"Sale") + (doc.numero?(" "+doc.numero):"") + (doc.contraparte?(" · "+doc.contraparte):"");
 
@@ -3682,14 +3919,19 @@ function confirmDoc(){
         r.prod.ultimoCosto = landed;        // last landed cost (reference only; COGS is FIFO)
       }
     } else {
-      const res = fifoConsumir(r.prod, store, r.cantidad);            // consume FIFO layers -> real COGS
-      doc.lineas[idx].costo = res.unit;                              // store the FIFO unit cost on the line
-      doc.lineas[idx].cogs = res.cogs;                               // and the total COGS
-      doc.lineas[idx].consumed = res.consumed;                       // to allow an exact revert later
-      moverStock(r.prod, -r.cantidad, res.unit, "venta", doc.id, refTxt, { store });
-      if(!r.prod.precioVentaPorTienda) r.prod.precioVentaPorTienda={};
-      r.prod.precioVentaPorTienda[store] = r.precio;                 // per-store last sale price (point 4)
-      r.prod.precioVenta = r.precio;                                 // legacy mirror
+      // Venta desde el POOL UNIFICADO: consumo FIFO global por fecha, cruzando sociedades.
+      const res = fifoConsumirGlobal(r.prod, r.cantidad);
+      doc.lineas[idx].costo = res.unit;                              // costo FIFO unitario (mezcla real)
+      doc.lineas[idx].cogs = res.cogs;                               // COGS total
+      doc.lineas[idx].consumed = res.consumed;                       // desglose por sociedad -> revert exacto
+      // Kardex: una línea por sociedad tocada, con su costo, para que el saldo por
+      // sociedad (procedencia) quede coherente. moverStock es quien decrementa el stock.
+      Object.keys(res.porSociedad).forEach(soc=>{
+        const t = res.porSociedad[soc];
+        const unit = t.cantidad>0 ? round2(t.cogs/t.cantidad) : res.unit;
+        moverStock(r.prod, -t.cantidad, unit, "venta", doc.id, refTxt, { store:soc });
+      });
+      r.prod.precioVenta = r.precio;                                 // último precio de venta (mirror)
     }
   });
 
@@ -3751,6 +3993,7 @@ function unreceiveInvoice(doc){
 function revertDoc(doc){
   const isC = doc.tipo==="compra";
   const store = doc.store || STORE_IDS[0];
+  const fallbackSoc = doc.storeVenta || doc.store || STORE_IDS[0];   // ventas viejas: sociedad única original
   // Una compra en tránsito nunca impactó stock/FIFO: al borrarla sólo se quita el
   // documento, sin revertir inventario (no hay nada que revertir).
   const compraSinImpacto = isC && doc.status===INVOICE_STATUS.IN_TRANSIT;
@@ -3760,11 +4003,20 @@ function revertDoc(doc){
       if(isC){
         fifoQuitarCompra(p, store, doc.id);                 // drop the FIFO layer this purchase created
         p.stockPorTienda[store] = round4((stockDe(p,store)) - l.cantidad);
+        recalcStockMirror(p);
       } else {
-        fifoDevolver(p, store, l.consumed);                 // put the exact consumed units back
-        p.stockPorTienda[store] = round4((stockDe(p,store)) + l.cantidad);
+        // Devolución al POOL: repone cada tramo en la capa de SU sociedad y reajusta
+        // el stock por sociedad. Ventas viejas (consumed sin etiqueta) caen a fallbackSoc.
+        if(l.consumed && l.consumed.length){
+          const repuesto = fifoDevolverGlobal(p, l.consumed, fallbackSoc);
+          Object.keys(repuesto).forEach(soc=>{ p.stockPorTienda[soc] = round4((stockDe(p,soc)) + repuesto[soc]); });
+        } else {
+          // Venta muy vieja sin desglose: reponer todo en la sociedad de fallback al costo de la línea.
+          fifoLayers(p, fallbackSoc).unshift({ id:uid(), fecha:new Date().toISOString(), cantidad:l.cantidad, costoUnit:(l.costo||p.ultimoCosto||0), ref:"revert" });
+          p.stockPorTienda[fallbackSoc] = round4((stockDe(p,fallbackSoc)) + l.cantidad);
+        }
+        recalcStockMirror(p);
       }
-      recalcStockMirror(p);
     });
   }
   db.movimientos = db.movimientos.filter(m=> m.refId!==doc.id);
@@ -3780,7 +4032,7 @@ function deleteDoc(tipo,id){
   const items=d.lineas.reduce((a,l)=>a+l.cantidad,0);
   const msg = tipo==="compra"
     ? `Delete this purchase?\n\n${qty(items)} u are REMOVED from ${storeName(d.store)} stock and its FIFO layer is dropped.`
-    : `Delete this sale?\n\n${qty(items)} u are RETURNED to ${storeName(d.store)} stock (back into their FIFO layers).`;
+    : `Delete this sale?\n\n${qty(items)} u are RETURNED to stock (back into their FIFO layers).`;
   if(!confirm(msg)) return;
   revertDoc(d); save();
   if(document.getElementById("scrim")) closeModal();
@@ -3790,7 +4042,9 @@ function editDoc(tipo,id){
   const list = tipo==="compra"?db.compras:db.ventas;
   const d=list.find(x=>x.id===id); if(!d) return;
   draft = {
-    tipo, editingId:id, store:d.store||STORE_IDS[0], storeOrig:d.store||STORE_IDS[0], contraparte:d.contraparte||"", fecha:normISO(d.fecha), numero:d.numero||"",
+    tipo, editingId:id, store:d.store||STORE_IDS[0], storeOrig:d.store||STORE_IDS[0],
+    vendedorId: (tipo==="venta") ? (d.vendedorId||"") : "",
+    contraparte:d.contraparte||"", fecha:normISO(d.fecha), numero:d.numero||"",
     clienteId:d.clienteId||"", envio: d.envio ? {tipo:d.envio.tipo, monto:d.envio.monto||0} : {tipo:"free",monto:0},
     handling:d.handling||0, flete:d.flete||0,
     lineas: d.lineas.map(l=>({ key:uid(), productoId:l.productoId, sku:l.sku, nombre:l.nombre, cantidad:l.cantidad, precio:l.precio,
@@ -3799,7 +4053,7 @@ function editDoc(tipo,id){
   };
   renderDocModal();
 }
-/* Copy a sale as a NEW document. Re-validates current stock IN THE SAME STORE. */
+/* Copy a sale as a NEW document. Re-validates against the CURRENT unified pool. */
 function copyDoc(tipo,id){
   const list = tipo==="compra"?db.compras:db.ventas;
   const d=list.find(x=>x.id===id); if(!d) return;
@@ -3807,6 +4061,7 @@ function copyDoc(tipo,id){
   const store = d.store||STORE_IDS[0];
   draft = {
     tipo, editingId:null, store,
+    vendedorId: (tipo==="venta") ? (isSeller() ? (currentVendedorId()||"") : (d.vendedorId||"")) : "",
     contraparte: tipo==="compra"?(d.contraparte||""):"",
     fecha:new Date().toISOString().slice(0,10),
     numero: tipo==="venta" ? nextFacturaVenta() : "",
@@ -3824,8 +4079,8 @@ function copyDoc(tipo,id){
     const usado={};
     draft.lineas.forEach(l=>{
       const p=prodById(l.productoId); if(!p) return;
-      const disp=Math.max(0, stockDe(p,store)-(usado[l.productoId]||0));
-      if(l.cantidad>disp){ recortes.push(`• ${p.nombre}: asked ${qty(l.cantidad)}, ${qty(disp)} in ${storeName(store)}`); l.cantidad=disp; }
+      const disp=Math.max(0, stockVendibleTotal(p)-(usado[l.productoId]||0));
+      if(l.cantidad>disp){ recortes.push(`• ${p.nombre}: asked ${qty(l.cantidad)}, ${qty(disp)} in stock`); l.cantidad=disp; }
       usado[l.productoId]=(usado[l.productoId]||0)+l.cantidad;
     });
   }
@@ -3859,6 +4114,8 @@ function verDoc(tipo,id){
         <span class="inv-badge ${received?'received':'transit'}">${received?'✓ Received':'⋯ In transit'}</span>
         <button class="btn ghost sm" data-invstatus-modal="${d.id}">${received?'Mark in transit':'Mark received'}</button>
       </span></div>` : "";
+  // Punto 6: quién vendió (sólo ventas, sólo admin)
+  const vendBlock = (!isC && isAdmin()) ? `<div class="totrow"><span style="color:var(--muted)">Sold by</span><span class="num">${esc(saleVendedorNombre(d))}</span></div>` : "";
   // Punto 4: comisión (sólo ventas y sólo admin/master)
   const commBlock = (!isC && isAdmin()) ? `
     <div class="totrow"><span style="color:var(--muted)">Margin (FIFO)</span><span class="num">${money(saleMargin(d))}</span></div>
@@ -3873,13 +4130,14 @@ function verDoc(tipo,id){
     ${extras}
     <div class="totrow" style="font-weight:700"><span>Total</span><span class="num">${money(d.total)}</span></div>
     ${statusBlock}
+    ${vendBlock}
     ${commBlock}
   `,[
-    {label:"Borrar",cls:"btn danger",act:()=>deleteDoc(tipo,id)},
-    ...(isC?[]:[{label:"⤓ Descargar PDF",cls:"btn",act:()=>generarInvoicePDF(id)},
-              {label:"Copiar",cls:"btn",act:()=>copyDoc(tipo,id)}]),
+    {label:"Delete",cls:"btn danger",act:()=>deleteDoc(tipo,id)},
+    ...(isC?[]:[{label:"⤓ Download PDF",cls:"btn",act:()=>generarInvoicePDF(id)},
+              {label:"Copy",cls:"btn",act:()=>copyDoc(tipo,id)}]),
     {label:"Edit",cls:"btn",act:()=>{ closeModal(); editDoc(tipo,id); }},
-    {label:"Cerrar",cls:"btn",act:closeModal}
+    {label:"Close",cls:"btn",act:closeModal}
   ]);
   // Punto 1: el botón de estado dentro del detalle re-abre el modal ya actualizado.
   const sb=document.querySelector("[data-invstatus-modal]");
@@ -4049,10 +4307,12 @@ function exportListaPrecios(prods){
 }
 
 /* ============================================================
-   P&L EXPORT (point 8) — preliminary, Excel with per-store sheets
-   + a consolidated sheet, so it plugs into the structure-cost model.
-   Built from sales in the selected period: Revenue, COGS (FIFO),
-   Gross margin, per product and totals.
+   P&L EXPORT (point 8) — preliminary income statement (Excel)
+   ------------------------------------------------------------
+   El stock es un pool único y la venta ya no está atada a una
+   sociedad, así que el estado es CONSOLIDADO. Se agrega una hoja
+   de rendimiento POR VENDEDOR (revenue, COGS FIFO, margen, comisión)
+   y el detalle por producto. Built from sales in the selected period.
    ============================================================ */
 function exportPnL(desde, hasta){
   if(!window.XLSX){ toast("Couldn't load the Excel engine (try once with internet)","warn"); return; }
@@ -4060,116 +4320,101 @@ function exportPnL(desde, hasta){
   const d1 = hasta ? new Date(hasta+"T23:59:59") : null;
   const inRange = v=>{ const f=new Date((normISO(v.fecha)||v.fecha)+"T12:00:00"); if(d0&&f<d0) return false; if(d1&&f>d1) return false; return true; };
 
-  // ---- Aggregations ----
-  // Por local: ingresos por producto, flete cobrado al cliente, COGS (FIFO real),
-  //            y detalle por producto (para las hojas de análisis).
-  const stTot = {};                 // store -> {sales, shipping, cogs}
-  const detail = {};                // store -> prodKey -> {sku,nombre,units,revenue,cogs}
-  STORE_IDS.forEach(s=>{ stTot[s]={sales:0,shipping:0,cogs:0}; detail[s]={}; });
+  // ---- Aggregations (consolidated) ----
+  const consol = { sales:0, shipping:0, cogs:0 };
+  const detail = {};                 // prodKey -> {sku,nombre,units,revenue,cogs}
+  const perVend = {};                // vendedorId|"" -> {nombre, sales, cogs, commission}
+  const ventasPeriodo = db.ventas.filter(inRange);
 
-  db.ventas.filter(inRange).forEach(v=>{
-    const st = v.store || STORE_IDS[0];
-    if(!stTot[st]){ stTot[st]={sales:0,shipping:0,cogs:0}; detail[st]={}; }
+  ventasPeriodo.forEach(v=>{
+    const vid = v.vendedorId || "";
+    const pv = perVend[vid] = perVend[vid] || { nombre: saleVendedorNombre(v), sales:0, cogs:0, commission:0 };
     (v.lineas||[]).forEach(l=>{
       const rev = round2((l.precio||0)*l.cantidad);
       const cogs = round2(l.cogs!=null ? l.cogs : (l.costo||0)*l.cantidad);
-      stTot[st].sales += rev; stTot[st].cogs += cogs;
+      consol.sales += rev; consol.cogs += cogs;
+      pv.sales += rev; pv.cogs += cogs;
       const k = l.productoId||l.sku||l.nombre;
-      const e = detail[st][k] = detail[st][k] || { sku:l.sku||"", nombre:l.nombre||"", units:0, revenue:0, cogs:0 };
+      const e = detail[k] = detail[k] || { sku:l.sku||"", nombre:l.nombre||"", units:0, revenue:0, cogs:0 };
       e.units += l.cantidad; e.revenue += rev; e.cogs += cogs;
     });
-    if(v.envio && v.envio.tipo==="monto") stTot[st].shipping += round2(v.envio.monto||0);
+    if(v.envio && v.envio.tipo==="monto") consol.shipping += round2(v.envio.monto||0);
+    pv.commission += saleCommission(v);
   });
-  STORE_IDS.forEach(s=>{ stTot[s].sales=round2(stTot[s].sales); stTot[s].shipping=round2(stTot[s].shipping); stTot[s].cogs=round2(stTot[s].cogs); });
-
-  const consol = { sales:0, shipping:0, cogs:0 };
-  STORE_IDS.forEach(s=>{ consol.sales+=stTot[s].sales; consol.shipping+=stTot[s].shipping; consol.cogs+=stTot[s].cogs; });
   consol.sales=round2(consol.sales); consol.shipping=round2(consol.shipping); consol.cogs=round2(consol.cogs);
 
-  // ---- Formatos de celda (SheetJS CE sólo soporta number formats, no negrita) ----
-  const MFMT = '"$"#,##0.00;("$"#,##0.00)';   // moneda, negativos entre paréntesis (estilo contable)
+  // ---- Formatos de celda ----
+  const MFMT = '"$"#,##0.00;("$"#,##0.00)';
   const PFMT = '0.0%';
   const setFmt = (ws, ref, z)=>{ const c=ws[ref]; if(c && typeof c.v==="number") c.z=z; };
-  const colLetters = ["A","B","C","D","E","F","G","H"];
 
   const period = `Period: ${desde?fmtDate(desde):"start"}  →  ${hasta?fmtDate(hasta):"today"}`;
   const wb = XLSX.utils.book_new();
 
-  /* ---------- HOJA 1: Income Statement (multi-step + análisis vertical) ---------- */
-  // Columnas: Concept | Akira | Silver | Consolidated | % of revenue
-  const netA = round2(stTot.akira.sales + stTot.akira.shipping);
-  const netS = round2(stTot.silver.sales + stTot.silver.shipping);
-  const netC = round2(consol.sales + consol.shipping);
-  const gpA = round2(netA - stTot.akira.cogs);
-  const gpS = round2(netS - stTot.silver.cogs);
-  const gpC = round2(netC - consol.cogs);
-  const pct = (n)=> netC>0 ? (n/netC) : 0;   // vertical analysis sobre net revenue consolidado
-
+  /* ---------- HOJA 1: Income Statement (consolidado, multi-step) ---------- */
+  const net = round2(consol.sales + consol.shipping);
+  const gp  = round2(net - consol.cogs);
+  const pct = (n)=> net>0 ? (n/net) : 0;
   const IS = [
     ["Income Statement (Preliminary)"],
     [period],
     [""],
-    ["Concept", storeName("akira"), storeName("silver"), "Consolidated", "% of revenue"],
-    ["Product sales", stTot.akira.sales, stTot.silver.sales, consol.sales, pct(consol.sales)],
-    ["Shipping billed to customers", stTot.akira.shipping, stTot.silver.shipping, consol.shipping, pct(consol.shipping)],
-    ["Net revenue", netA, netS, netC, pct(netC)],
-    ["Cost of goods sold (FIFO)", -stTot.akira.cogs, -stTot.silver.cogs, -consol.cogs, pct(-consol.cogs)],
-    ["Gross profit", gpA, gpS, gpC, pct(gpC)],
-    ["Gross margin %", (netA>0?gpA/netA:0), (netS>0?gpS/netS:0), (netC>0?gpC/netC:0), ""],
+    ["Concept", "Consolidated", "% of revenue"],
+    ["Product sales", consol.sales, pct(consol.sales)],
+    ["Shipping billed to customers", consol.shipping, pct(consol.shipping)],
+    ["Net revenue", net, pct(net)],
+    ["Cost of goods sold (FIFO)", -consol.cogs, pct(-consol.cogs)],
+    ["Gross profit", gp, pct(gp)],
+    ["Gross margin %", (net>0?gp/net:0), ""],
     [""],
-    ["Operating expenses", "n/a", "n/a", "n/a", ""],
+    ["Operating expenses", "n/a", ""],
     ["  (rent, payroll, marketing, fees — not tracked in this system)"],
-    ["Operating income", gpA, gpS, gpC, pct(gpC)],
+    ["Operating income", gp, pct(gp)],
     [""],
     ["Notes:"],
-    ["• COGS uses actual FIFO cost layers (not last cost)."],
+    ["• Stock is a single pool; COGS uses actual FIFO cost layers across societies (not last cost)."],
     ["• Inbound freight/handling is capitalized into landed cost, so it is already inside COGS."],
+    ["• Sales are not split by society (Akira/Silver): those only record who bought each lot."],
     ["• Operating expenses are not captured here — plug them into your structure-cost model."],
   ];
   const ws1 = XLSX.utils.aoa_to_sheet(IS);
-  ws1["!cols"]=[{wch:44},{wch:14},{wch:14},{wch:16},{wch:13}];
-  ws1["!merges"]=[
-    {s:{r:0,c:0},e:{r:0,c:4}},
-    {s:{r:1,c:0},e:{r:1,c:4}},
-  ];
-  // aplicar formatos: filas de datos 5..14 (0-indexed r=4..13), cols B..D moneda, E %
-  for(let r=4;r<=13;r++){
-    ["B","C","D"].forEach(col=> setFmt(ws1, col+(r+1), MFMT));
-    setFmt(ws1, "E"+(r+1), PFMT);
-  }
-  // fila 10 (Gross margin %) las cols B..D son porcentaje, no moneda
-  ["B","C","D"].forEach(col=> setFmt(ws1, col+"10", PFMT));
+  ws1["!cols"]=[{wch:46},{wch:16},{wch:13}];
+  ws1["!merges"]=[{s:{r:0,c:0},e:{r:0,c:2}},{s:{r:1,c:0},e:{r:1,c:2}}];
+  for(let r=4;r<=13;r++){ setFmt(ws1, "B"+(r+1), MFMT); setFmt(ws1, "C"+(r+1), PFMT); }
+  setFmt(ws1, "B10", PFMT);   // Gross margin %
   XLSX.utils.book_append_sheet(wb, ws1, "Income Statement");
 
-  /* ---------- HOJAS DE DETALLE por producto (una por local) ---------- */
-  const header = ["SKU","Product","Units","Revenue","COGS (FIFO)","Gross margin","Margin %"];
-  const mkDetail = (obj, titulo)=>{
-    let tU=0,tR=0,tC=0;
-    const body=[];
-    Object.values(obj).sort((a,b)=>b.revenue-a.revenue).forEach(e=>{
-      const gm=round2(e.revenue-e.cogs), p = e.revenue>0? (gm/e.revenue):0;
-      body.push([e.sku, e.nombre, e.units, e.revenue, e.cogs, gm, p]);
-      tU+=e.units; tR+=e.revenue; tC+=e.cogs;
-    });
-    const tGM=round2(tR-tC), tP=tR>0?(tGM/tR):0;
-    const aoa=[[titulo],[period],[],header,...body,[],["","TOTAL",tU,round2(tR),round2(tC),tGM,tP]];
-    const ws=XLSX.utils.aoa_to_sheet(aoa);
-    ws["!cols"]=[{wch:14},{wch:42},{wch:8},{wch:13},{wch:13},{wch:13},{wch:10}];
-    ws["!merges"]=[{s:{r:0,c:0},e:{r:0,c:6}},{s:{r:1,c:0},e:{r:1,c:6}}];
-    const last = aoa.length;                    // total row = last
-    for(let r=5;r<=last;r++){                   // data rows start at excel row 5
-      ["D","E","F"].forEach(col=> setFmt(ws, col+r, MFMT));
-      setFmt(ws, "G"+r, PFMT);
-    }
-    return ws;
-  };
-  STORE_IDS.forEach(s=>{
-    XLSX.utils.book_append_sheet(wb, mkDetail(detail[s], storeName(s)+" — Detail by product"), ("Detail "+storeName(s)).slice(0,28));
+  /* ---------- HOJA 2: By seller ---------- */
+  const vHeader = ["Seller","Revenue","COGS (FIFO)","Gross margin","Margin %","Commission"];
+  let sV=0,sC=0,sK=0;
+  const vBody = Object.values(perVend).sort((a,b)=>b.sales-a.sales).map(v=>{
+    const gm=round2(v.sales-v.cogs), p=v.sales>0?(gm/v.sales):0;
+    sV+=v.sales; sC+=v.cogs; sK+=v.commission;
+    return [v.nombre, round2(v.sales), round2(v.cogs), gm, p, round2(v.commission)];
   });
-  // consolidado por producto
-  const consolProd={};
-  STORE_IDS.forEach(s=> Object.entries(detail[s]).forEach(([k,e])=>{ const c=consolProd[k]=consolProd[k]||{sku:e.sku,nombre:e.nombre,units:0,revenue:0,cogs:0}; c.units+=e.units; c.revenue+=e.revenue; c.cogs+=e.cogs; }));
-  XLSX.utils.book_append_sheet(wb, mkDetail(consolProd, "Consolidated — Detail by product"), "Detail Consolidated");
+  const tGM=round2(sV-sC), tP=sV>0?(tGM/sV):0;
+  const vAoa=[["By seller"],[period],[],vHeader,...vBody,[],["TOTAL",round2(sV),round2(sC),tGM,tP,round2(sK)]];
+  const ws2=XLSX.utils.aoa_to_sheet(vAoa);
+  ws2["!cols"]=[{wch:22},{wch:14},{wch:14},{wch:14},{wch:10},{wch:14}];
+  ws2["!merges"]=[{s:{r:0,c:0},e:{r:0,c:5}},{s:{r:1,c:0},e:{r:1,c:5}}];
+  for(let r=5;r<=vAoa.length;r++){ ["B","C","D","F"].forEach(col=> setFmt(ws2, col+r, MFMT)); setFmt(ws2, "E"+r, PFMT); }
+  XLSX.utils.book_append_sheet(wb, ws2, "By seller");
+
+  /* ---------- HOJA 3: Detalle por producto (consolidado) ---------- */
+  const header = ["SKU","Product","Units","Revenue","COGS (FIFO)","Gross margin","Margin %"];
+  let tU=0,tR=0,tC=0; const body=[];
+  Object.values(detail).sort((a,b)=>b.revenue-a.revenue).forEach(e=>{
+    const gm=round2(e.revenue-e.cogs), p = e.revenue>0? (gm/e.revenue):0;
+    body.push([e.sku, e.nombre, e.units, round2(e.revenue), round2(e.cogs), gm, p]);
+    tU+=e.units; tR+=e.revenue; tC+=e.cogs;
+  });
+  const dGM=round2(tR-tC), dP=tR>0?(dGM/tR):0;
+  const dAoa=[["Consolidated — Detail by product"],[period],[],header,...body,[],["","TOTAL",tU,round2(tR),round2(tC),dGM,dP]];
+  const ws3=XLSX.utils.aoa_to_sheet(dAoa);
+  ws3["!cols"]=[{wch:14},{wch:42},{wch:8},{wch:13},{wch:13},{wch:13},{wch:10}];
+  ws3["!merges"]=[{s:{r:0,c:0},e:{r:0,c:6}},{s:{r:1,c:0},e:{r:1,c:6}}];
+  for(let r=5;r<=dAoa.length;r++){ ["D","E","F"].forEach(col=> setFmt(ws3, col+r, MFMT)); setFmt(ws3, "G"+r, PFMT); }
+  XLSX.utils.book_append_sheet(wb, ws3, "Detail Consolidated");
 
   XLSX.writeFile(wb, `income-statement-${new Date().toISOString().slice(0,10)}.xlsx`);
   toast("Income statement exported (Excel)");
@@ -4178,7 +4423,7 @@ function openPnLExport(){
   const today=new Date().toISOString().slice(0,10);
   const first=today.slice(0,8)+"01";
   buildModal("Export income statement", `
-    <p class="hint" style="margin:0 0 12px">Multi-step income statement (net revenue → FIFO COGS → gross profit) by store and consolidated, plus product detail. Excel workbook for the selected period.</p>
+    <p class="hint" style="margin:0 0 12px">Consolidated multi-step income statement (net revenue → FIFO COGS → gross profit), a per-seller breakdown and product detail. Excel workbook for the selected period.</p>
     <div class="grid-form" style="grid-template-columns:1fr 1fr;padding:0">
       <div class="field"><label>From</label><input class="inp" type="date" id="pnl_d0" value="${first}"></div>
       <div class="field"><label>To</label><input class="inp" type="date" id="pnl_d1" value="${today}"></div>
@@ -4200,8 +4445,8 @@ function openImport(){
     </div>
     <div class="drop" id="drop">
       <div class="di">✨</div>
-      <p><span class="fn">Elegí un PDF</span> o arrastralo acá</p>
-      <p style="font-size:12px">se envía a tu servidor (Worker) y de ahí a Gemini para leerlo</p>
+      <p><span class="fn">Choose a PDF</span> or drag it here</p>
+      <p style="font-size:12px">it goes to your server (Worker) and then to Gemini to read it</p>
       <input type="file" id="iaInput" accept="application/pdf" hidden>
     </div>
     <div id="importOut"></div>
@@ -4499,9 +4744,9 @@ function openFicha(id){
     bal += signed;
     serie.push(bal);
     const d=new Date(m.fecha);
-    const fecha = d.toLocaleDateString("es-AR") + " " + d.toLocaleTimeString("es-AR",{hour:"2-digit",minute:"2-digit",hour12:false});
+    const fecha = d.toLocaleDateString("en-US") + " " + d.toLocaleTimeString("en-US",{hour:"2-digit",minute:"2-digit",hour12:false});
     const origen = (m.refTipo==="compra"||m.refTipo==="venta") && m.refId
-      ? `<button class="btn ghost sm" data-fdoc="${m.refTipo}:${m.refId}">${esc(m.ref||"ver factura")}</button>`
+      ? `<button class="btn ghost sm" data-fdoc="${m.refTipo}:${m.refId}">${esc(m.ref||"view invoice")}</button>`
       : `<span style="color:var(--muted)">${esc(m.ref||"—")}</span>`;
     const isInv = m.tipo==="inv-out"||m.tipo==="inv-return";
     const pill = isInv ? `<span class="pill inv">◈ ${m.tipo==="inv-out"?"to vault":"from vault"}</span>`
@@ -4549,10 +4794,10 @@ function openFicha(id){
     </div>`;
 
   buildModal(`${p.sku?("["+esc(p.sku)+"] "):""}${esc(p.nombre)}`, body, [
-    {label:"⇄ Adjust stock",cls:"btn",act:()=>{ closeModal(); openAjuste(id); }},
-    isAdmin() && totalStock>0 ? {label:"◈ To investments",cls:"btn",act:()=>{ closeModal(); openSendToInvestment(id); }} : null,
-    isAdmin() && held>0 ? {label:"◈ Return from vault",cls:"btn",act:()=>{ closeModal(); openReturnFromInvestment(id); }} : null,
-    {label:"Edit product",cls:"btn",act:()=>{ closeModal(); openProd(id); }},
+    puedeAjustar() ? {label:"⇄ Adjust stock",cls:"btn",act:()=>{ closeModal(); openAjuste(id); }} : null,
+    (puedeInvertir() && totalStock>0) ? {label:"◈ To investments",cls:"btn",act:()=>{ closeModal(); openSendToInvestment(id); }} : null,
+    (puedeInvertir() && held>0) ? {label:"◈ Return from vault",cls:"btn",act:()=>{ closeModal(); openReturnFromInvestment(id); }} : null,
+    puedeEditarProductos() ? {label:"Edit product",cls:"btn",act:()=>{ closeModal(); openProd(id); }} : null,
     {label:"Close",cls:"btn primary",act:closeModal}
   ].filter(Boolean), true);
 
@@ -4735,13 +4980,13 @@ if(_pt) _pt.onclick=()=>{
   const mostrar = p.type==="password";
   p.type = mostrar ? "text" : "password";
   _pt.classList.toggle("show", mostrar);
-  const lbl = mostrar ? "Ocultar contraseña" : "Mostrar contraseña";
+  const lbl = mostrar ? "Hide password" : "Show password";
   _pt.setAttribute("aria-label", lbl); _pt.title=lbl;
   p.focus();
 };
-// Botones estáticos del sidebar (tema / cerrar sesión / sincronizar)
-const _slo=document.querySelector("[data-logout-side]"); if(_slo) _slo.onclick=logout;
-const _ssy=document.querySelector("[data-syncside]"); if(_ssy) _ssy.onclick=()=> pullNow();
+// Botones estáticos (tema / cerrar sesión / sincronizar) — hay uno en el sidebar y otro en el nav mobile
+document.querySelectorAll("[data-logout-side]").forEach(b=> b.onclick=logout);
+document.querySelectorAll("[data-syncside]").forEach(b=> b.onclick=()=> pullNow());
 document.querySelectorAll("[data-theme-toggle]").forEach(b=> b.onclick=toggleTheme);
 // Topbar glass: al scrollear aparece el fondo tenue + hairline inferior
 const _tb=document.getElementById("topbar");
@@ -4773,9 +5018,10 @@ function paintThemeBtn(){
 paintThemeBtn();
 
 if(session){
-  // seller is locked to their store; admin defaults to consolidated
-  activeStore = (session.role==="seller" && isStore(session.store)) ? session.store : "all";
-  if(view==="inv" && !isAdmin()) view="dash";
+  // El stock es un pool único: todos (admin y vendedores) arrancan consolidados.
+  activeStore = "all";
+  // si un vendedor tenía abierta una vista admin-only, lo mandamos al panel
+  if(!isAdmin() && ADMIN_VIEWS.includes(view)) view="dash";
   hideLogin();
   render();
   paintSync();
@@ -4800,8 +5046,8 @@ document.addEventListener("visibilitychange", ()=>{ if(!document.hidden && sessi
    lógica de wireXXX() sigue andando sin enterarse.
    ============================================================ */
 (function(){
-  const MESES = ["enero","febrero","marzo","abril","mayo","junio","julio","agosto","septiembre","octubre","noviembre","diciembre"];
-  const DOW   = ["DO","LU","MA","MI","JU","VI","SA"];   // semana arranca domingo (igual que el nativo es-AR)
+  const MESES = ["January","February","March","April","May","June","July","August","September","October","November","December"];
+  const DOW   = ["Su","Mo","Tu","We","Th","Fr","Sa"];   // week starts Sunday (US)
   const CAL_ICON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>';
 
   let openPop = null;   // popup abierto actualmente (select o calendario)
@@ -4910,12 +5156,12 @@ document.addEventListener("visibilitychange", ()=>{ if(!document.hidden && sessi
       for(let i=1;i<=trailing;i++) cells += `<div class="cal-cell out">${i}</div>`;
       pop.innerHTML = `
         <div class="cal-head">
-          <div class="cal-title" data-act="mode">${MESES[viewM]} de ${viewY}</div>
+          <div class="cal-title" data-act="mode">${MESES[viewM]} ${viewY}</div>
           <div class="cal-nav" data-act="prev">‹</div>
           <div class="cal-nav" data-act="next">›</div>
         </div>
         <div class="cal-grid">${DOW.map(d=>`<div class="cal-dow">${d}</div>`).join('')}${cells}</div>
-        <div class="cal-foot"><button data-act="clear">Borrar</button><button data-act="today">Hoy</button></div>`;
+        <div class="cal-foot"><button data-act="clear">Clear</button><button data-act="today">Today</button></div>`;
       pop.querySelectorAll('.cal-cell[data-d]').forEach(c=> c.onclick=()=> commit(new Date(viewY, viewM, +c.dataset.d)));
       pop.querySelector('[data-act="prev"]').onclick = ()=>{ viewM--; if(viewM<0){viewM=11;viewY--;} drawDays(); };
       pop.querySelector('[data-act="next"]').onclick = ()=>{ viewM++; if(viewM>11){viewM=0;viewY++;} drawDays(); };
