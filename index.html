@@ -316,6 +316,9 @@
   table .inp{padding:6px 8px;font-size:13.5px;border-radius:6px}
   .line-tbl td{padding:7px 10px}
   .line-tbl select.inp{min-width:150px}
+  /* Oculta la columna "Target product" del import cuando el flag SHOW_TARGET_PRODUCT_COL está en false.
+     Scopeado a .hide-target para no tocar la otra .line-tbl (editor de líneas de documento). */
+  .line-tbl.hide-target .col-target{display:none}
 
   /* ---------- Modal ---------- */
   .scrim{position:fixed;inset:0;background:rgba(20,26,34,.5);display:flex;align-items:flex-start;justify-content:center;padding:40px 16px;z-index:50;overflow:auto}
@@ -832,6 +835,11 @@ function load(){
      (handling/flete arrancan en 0). El total sigue siendo ultimoCosto.
    - Jerarquía TCG (metadata, sin conversión de stock): categoría/nivel/factores.
    - Clientes y numeración US (arranca en 101). */
+/* Feature flag: columna "Target product" (mapeo manual de SKU) en el editor de factura.
+   Hoy la ocultamos visualmente. El <select> sigue existiendo en el DOM y funcionando,
+   así que la auto-detección por SKU/nombre no cambia en nada. Para reactivar el
+   mapeo manual el día de mañana: poné esto en true. Nada más. */
+const SHOW_TARGET_PRODUCT_COL = false;
 const PACKS_POR_BOX_DEF = 24;
 const BOXES_POR_CASE = { "Pokémon TCG":6, "Magic":6, "One Piece TCG":12, "Yu-Gi-Oh!":12, "Disney Lorcana":4, "Digimon":12, "Dragon Ball":12, "Flesh and Blood":4 };
 function boxesCaseDefault(cat){ return BOXES_POR_CASE[cat] || 6; }
@@ -4865,7 +4873,7 @@ function showImportEditor(fname, parsed){
     <td style="width:74px"><input class="inp num" data-imp="cantidad" data-i="${i}" value="${c.cantidad}"></td>
     <td style="width:104px"><input class="inp num" data-imp="costo" data-i="${i}" value="${c.costo}"></td>
     <td style="width:104px"><input class="inp num" data-imp="msrp" data-i="${i}" value="${c.msrp||0}"></td>
-    <td style="min-width:170px"><select class="inp" data-imp="prod" data-i="${i}">${prodOptions(c.productoId)}</select></td>
+    <td class="col-target" style="min-width:170px"><select class="inp" data-imp="prod" data-i="${i}">${prodOptions(c.productoId)}</select></td>
   </tr>`).join("");
 
   const metaBits = [
@@ -4882,8 +4890,8 @@ function showImportEditor(fname, parsed){
     <p style="font-size:12px;color:var(--muted);margin:0 0 8px">
       <b>Cost</b> = what you pay (NET); updates last cost. <b>List price</b> = suggested selling price (MSRP). Not a sale — just your catalog price.
     </p>
-    <div class="table-scroll"><table class="line-tbl">
-      <thead><tr><th class="c">✓</th><th class="c">SKU</th><th>Description</th><th class="r">Qty</th><th class="r">Cost</th><th class="r">List price</th><th>Target product</th></tr></thead>
+    <div class="table-scroll"><table class="line-tbl${SHOW_TARGET_PRODUCT_COL?'':' hide-target'}">
+      <thead><tr><th class="c">✓</th><th class="c">SKU</th><th>Description</th><th class="r">Qty</th><th class="r">Cost</th><th class="r">List price</th><th class="col-target">Target product</th></tr></thead>
       <tbody>${rows}</tbody></table></div>
     <details><summary>View raw PDF text</summary><div class="rawbox">${esc(pdfLines.join("\n"))}</div></details>
     <div style="display:flex;justify-content:flex-end;margin-top:16px">
