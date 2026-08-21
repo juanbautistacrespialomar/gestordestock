@@ -639,7 +639,7 @@
     </div>
     <div id="loginErr" class="login-err"></div>
     <button class="btn primary login-btn" id="loginBtn">Sign in</button>
-    <p class="login-build">build v45</p>
+    <p class="login-build">build v46</p>
   </div>
 </div>
 <div class="topbar" id="topbar">
@@ -3471,19 +3471,6 @@ function confirmAjuste(){
   render();
 }
 
-function prodOptions(sel, soloConStock){
-  const lista = soloConStock ? db.productos.filter(p=> (p.stock||0) > 0) : db.productos;
-  const opts = lista.map(p=>{
-    const disp = soloConStock ? ` (disp: ${qty(p.stock)})` : "";
-    return `<option value="${p.id}" ${p.id===sel?"selected":""}>${esc(p.sku?("["+p.sku+"] "):"")}${esc(p.nombre)}${disp}</option>`;
-  }).join("");
-  const nuevo = soloConStock ? "" : `<option value="__new">＋ Create new product…</option>`;
-  const vacio = soloConStock && !lista.length
-    ? `<option value="">— no products with stock —</option>`
-    : `<option value="">— choose —</option>`;
-  return vacio + opts + nuevo;
-}
-
 const round2 = n => Math.round((n||0)*100)/100;
 /* Total de un documento = suma de subtotales YA redondeados a 2 decimales.
    Redondear por renglón y después sumar hace que el total guardado coincida
@@ -4846,11 +4833,15 @@ function showImportEditor(fname, parsed){
       <details open><summary>Extracted text</summary><div class="rawbox">${esc(pdfLines.join("\n"))}</div></details>`;
     return;
   }
-  // mapear cada ítem a un producto existente por SKU (o por nombre)
+  /* Matcheo SOLO por SKU. Es determinístico: matchea o no matchea, y nunca puede
+     apuntar al producto equivocado. El matcheo por nombre que había antes usaba
+     includes() + find(), así que una descripción más larga ("… Gift Edition") se
+     enganchaba al producto de nombre más corto y le cargaba la compra a otro SKU
+     en silencio: stock, último costo y capa FIFO iban a la ficha incorrecta.
+     Sin ese riesgo, la columna "Target product" (un <select> por línea) perdió su
+     función correctiva, así que la reemplaza un badge de estado no editable. */
   items.forEach(c=>{
-    const bySku = c.sku ? findProdBySku(c.sku) : null;
-    const byName = bySku ? null : db.productos.find(p=> p.nombre && c.desc.toLowerCase().includes(p.nombre.toLowerCase()));
-    const match = bySku || byName;
+    const match = c.sku ? findProdBySku(c.sku) : null;
     c.productoId = match ? match.id : "";
     c.crear = !match;
     c.nombre = match ? match.nombre : c.desc;
@@ -4865,8 +4856,17 @@ function showImportEditor(fname, parsed){
     <td style="width:74px"><input class="inp num" data-imp="cantidad" data-i="${i}" value="${c.cantidad}"></td>
     <td style="width:104px"><input class="inp num" data-imp="costo" data-i="${i}" value="${c.costo}"></td>
     <td style="width:104px"><input class="inp num" data-imp="msrp" data-i="${i}" value="${c.msrp||0}"></td>
-    <td style="min-width:170px"><select class="inp" data-imp="prod" data-i="${i}">${prodOptions(c.productoId)}</select></td>
+    <td class="c">${c.crear
+      ? `<span class="pill in">＋ new</span>`
+      : `<span class="pill" style="opacity:.7">in master</span>`}</td>
   </tr>`).join("");
+
+  // Resumen del banner: qué va a pasar con esta factura, de un vistazo. El conteo
+  // de costo 0 avisa de líneas que el OCR no pudo leer: confirmarlas así crea una
+  // capa FIFO a costo cero, y la venta que la consuma va a mostrar margen del 100%.
+  const impNuevos = items.filter(c=>c.crear).length;
+  const impExistentes = items.length - impNuevos;
+  const impSinCosto = items.filter(c=>!(c.costo>0)).length;
 
   const metaBits = [
     meta.numero ? `N° <b>${esc(meta.numero)}</b>` : "",
@@ -4877,13 +4877,14 @@ function showImportEditor(fname, parsed){
   out.innerHTML=`
     <div class="banner ok">
       Detected <b>${items.length}</b> line(s) in <b>${esc(fname)}</b>${metaBits?` \u00B7 <span style="font-weight:400">${metaBits}</span>`:""} \u2014 review before confirming.
+      <div style="font-weight:400;margin-top:5px">${impNuevos} new product${impNuevos===1?"":"s"} · ${impExistentes} already in the master${impSinCosto?` · <b style="color:var(--alert)">${impSinCosto} line${impSinCosto===1?"":"s"} with cost 0, fix before confirming</b>`:""}</div>
     </div>
     ${meta.flete? `<div class="banner" style="white-space:normal">Detected a <b>freight/handling</b> charge of ${money(meta.flete)}. It's loaded in the purchase and will be <b>spread across all units</b> when you confirm (not added as stock).</div>`:""}
     <p style="font-size:12px;color:var(--muted);margin:0 0 8px">
       <b>Cost</b> = what you pay (NET); updates last cost. <b>List price</b> = suggested selling price (MSRP). Not a sale — just your catalog price.
     </p>
     <div class="table-scroll"><table class="line-tbl">
-      <thead><tr><th class="c">✓</th><th class="c">SKU</th><th>Description</th><th class="r">Qty</th><th class="r">Cost</th><th class="r">List price</th><th>Target product</th></tr></thead>
+      <thead><tr><th class="c">✓</th><th class="c">SKU</th><th>Description</th><th class="r">Qty</th><th class="r">Cost</th><th class="r">List price</th><th class="c">Status</th></tr></thead>
       <tbody>${rows}</tbody></table></div>
     <details><summary>View raw PDF text</summary><div class="rawbox">${esc(pdfLines.join("\n"))}</div></details>
     <div style="display:flex;justify-content:flex-end;margin-top:16px">
@@ -4898,10 +4899,6 @@ function showImportEditor(fname, parsed){
       if(k==="cantidad") c.cantidad=parseNum(inp.value);
       else if(k==="costo") c.costo=parseNum(inp.value);
       else if(k==="msrp") c.msrp=parseNum(inp.value);
-      else if(k==="prod"){
-        if(inp.value==="__new"){ c.crear=true; c.productoId=""; }
-        else { c.crear=false; c.productoId=inp.value; const p=prodById(inp.value); if(p) c.nombre=p.nombre; }
-      }
     };
   });
   document.getElementById("toDraft").onclick=()=>{

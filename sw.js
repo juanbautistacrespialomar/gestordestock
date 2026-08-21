@@ -13,7 +13,7 @@
    el mensaje {type:"SKIP_WAITING"} y ahí sí se activa y recarga. Así
    nadie pierde una carga a medias por un refresh sorpresa.
    ============================================================ */
-const CACHE = "mayor-stock-v45";   // v45: el foco de sociedad (activeStore) se resetea a consolidado fuera de Productos/Compras -> el dashboard ya no arrastra un foco de tienda latente (Stock on hand mostraba 31 de 39)
+const CACHE = "mayor-stock-v46";   // v46: el import de facturas matchea solo por SKU (fuera el match por nombre, que podia imputar la compra a otro producto) y la columna "Target product" pasa a ser un badge de estado + resumen en el banner
 
 const ASSETS = [
   "./",
