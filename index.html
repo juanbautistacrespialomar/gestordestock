@@ -340,6 +340,13 @@
   .doc-tbl th:first-child, .doc-tbl td:first-child{padding-left:2px}
   .doc-tbl .inp{width:100%;min-width:0}          /* el input llena su columna y nunca la desborda */
   .doc-tbl td.num, .doc-tbl .sub-cell{white-space:nowrap}
+  /* La 1ª fila de controles arranca arriba y mide 34px parejo (igual que el botón de
+     producto). Así el "avail: N" que cuelga bajo el producto extiende SÓLO esa celda
+     hacia abajo, sin centrar/correr las demás columnas. */
+  .doc-tbl tbody td{vertical-align:top}
+  .doc-tbl tbody .inp{height:34px;padding-left:7px;padding-right:7px}
+  .doc-tbl tbody td.num{height:34px;line-height:34px}
+  .doc-tbl tbody td:last-child .btn{height:34px;display:inline-flex;align-items:center;justify-content:center}
   @media (max-width:860px){
     /* En mobile volvemos a layout auto + scroll: 8 columnas no entran en pantalla angosta */
     .doc-tbl{table-layout:auto}
@@ -3943,7 +3950,7 @@ function renderLines(){
   // Con table-layout:fixed esto define el ancho real de cada columna y evita el scroll horizontal.
   const colgroup = isC
     ? `<colgroup><col><col style="width:92px"><col style="width:134px"><col style="width:134px"><col style="width:46px"></colgroup>`
-    : `<colgroup><col><col style="width:78px"><col style="width:96px"><col style="width:78px"><col style="width:94px"><col style="width:80px"><col style="width:112px"><col style="width:46px"></colgroup>`;
+    : `<colgroup><col><col style="width:78px"><col style="width:96px"><col style="width:86px"><col style="width:94px"><col style="width:80px"><col style="width:112px"><col style="width:46px"></colgroup>`;
   const thead = isC
     ? `<tr><th>Product</th><th class="r">Qty</th><th class="r">Unit cost</th><th class="r">Subtotal</th><th></th></tr>`
     : `<tr><th>Product</th><th class="r">Qty</th><th class="r">Cost</th><th class="r" title="Markup %">Mk&nbsp;%</th><th class="r" title="Unit price">Price</th><th class="r" title="Real margin on revenue">Mrg&nbsp;%</th><th class="r">Subtotal</th><th></th></tr>`;
