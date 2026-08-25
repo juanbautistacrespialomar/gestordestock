@@ -330,6 +330,28 @@
   .scrim{position:fixed;inset:0;background:rgba(20,26,34,.5);display:flex;align-items:flex-start;justify-content:center;padding:40px 16px;z-index:50;overflow:auto}
   .modal{background:var(--surface);border-radius:14px;box-shadow:0 20px 60px rgba(0,0,0,.28);width:100%;max-width:760px;overflow:hidden}
   .modal.wide{max-width:940px}
+  /* Documento (venta/compra): más ancho para que la grilla respire y no haga falta scroll horizontal */
+  .modal.doc{max-width:1080px}
+  /* Grilla de líneas del documento: table-layout fijo => las columnas encajan exactas dentro del ancho,
+     el navegador reparte el sobrante a la 1ª columna (producto). Sin desborde => sin barra de scroll.
+     Los anchos reales se definen en el <colgroup> que arma renderLines(). */
+  .doc-tbl{table-layout:fixed;width:100%}
+  .doc-tbl th, .doc-tbl td{padding:7px 8px}
+  .doc-tbl th:first-child, .doc-tbl td:first-child{padding-left:2px}
+  .doc-tbl .inp{width:100%;min-width:0}          /* el input llena su columna y nunca la desborda */
+  .doc-tbl td.num, .doc-tbl .sub-cell{white-space:nowrap}
+  @media (max-width:860px){
+    /* En mobile volvemos a layout auto + scroll: 8 columnas no entran en pantalla angosta */
+    .doc-tbl{table-layout:auto}
+    .doc-tbl colgroup{display:none}
+  }
+  /* Tooltip flotante con el nombre completo del producto (sólo aparece si el texto está truncado) */
+  .name-tip{position:fixed;z-index:200;pointer-events:none;background:var(--ink);color:#fff;
+    font-size:12.5px;line-height:1.35;padding:6px 10px;border-radius:8px;max-width:360px;
+    border:1px solid rgba(255,255,255,.12);
+    box-shadow:0 10px 30px rgba(0,0,0,.32);opacity:0;transform:translateY(3px);
+    transition:opacity .12s ease,transform .12s ease}
+  .name-tip.show{opacity:1;transform:translateY(0)}
   .modal .mhead{display:flex;align-items:center;justify-content:space-between;padding:18px 22px;border-bottom:1px solid var(--line)}
   .modal .mhead h3{margin:0;font-size:18px;font-weight:640}
   .modal .mbody{padding:20px 22px;max-height:66vh;overflow:auto}
@@ -3354,7 +3376,7 @@ function renderDocModal(){
       {label:"Cancel",cls:"btn",act:()=>{ draft.editingId=null; closeModal(); }},
       {label: editing?"Save changes" : (isC?"Confirm purchase (+stock)":"Confirm sale (−stock)"),cls:isC?"btn up":"btn down",act:confirmDoc}
     ],
-    true,
+    "wide doc",
     `<div class="totrow"><span style="color:var(--muted)">Document total</span><span class="num" id="docTotal">${money(docTotal())}</span></div>`
   );
   renderLines();
@@ -3566,7 +3588,7 @@ function pickerBtn(l, i){
   if(info.kind==="prod"){
     // Producto elegido: chip de SKU (si tiene) + nombre que se estira y trunca último
     const chip = info.sku ? `<span class="pb-sku">${esc(info.sku)}</span>` : "";
-    inner = `${chip}<span class="pb-name">${esc(info.name)}</span>`;
+    inner = `${chip}<span class="pb-name" data-fullname="${esc(info.name)}">${esc(info.name)}</span>`;
   } else {
     // Placeholder o "＋ New product": texto plano como antes
     inner = `<span class="ppick-label">${esc(info.txt)}</span>`;
@@ -3590,7 +3612,7 @@ function pickerItemsHTML(i, q){
     let disp = "";
     if(!isC){ disp = `<span class="pi-disp">disp ${qty(dispRestante(p.id,i))}</span>`; }
     const sel = p.id===cur ? " active" : "";
-    return `<button type="button" class="ppick-item${sel}" data-pick="${p.id}">${sku}<span class="pi-name">${esc(p.nombre)}</span>${disp}</button>`;
+    return `<button type="button" class="ppick-item${sel}" data-pick="${p.id}">${sku}<span class="pi-name" data-fullname="${esc(p.nombre)}">${esc(p.nombre)}</span>${disp}</button>`;
   }).join("");
   if(!lista.length){
     const hayStock = db.productos.some(p=> isC ? true : stockVendibleTotal(p)>0);
@@ -3611,7 +3633,31 @@ function positionPicker(pop, anchor){
 function repositionPicker(){ const pop=document.querySelector(".ppick-pop"); if(pop && _pickerAnchor) positionPicker(pop,_pickerAnchor); }
 function onPickerOutside(e){ const pop=document.querySelector(".ppick-pop"); if(pop && !pop.contains(e.target) && (!_pickerAnchor || !_pickerAnchor.contains(e.target))) closeProductPicker(); }
 function onPickerKey(e){ if(e.key==="Escape"){ e.stopPropagation(); e.preventDefault(); closeProductPicker(); } }
+/* ---------- Tooltip de nombre completo (hover sobre producto) ----------
+   Aparece SOLO si el texto está truncado (ellipsis). Así no molesta cuando
+   el nombre ya se ve entero, y rescata los nombres largos que no entran. */
+let _nameTip=null;
+function showNameTip(el){
+  if(!el || el.scrollWidth <= el.clientWidth + 1) return;   // no truncado => no molesta
+  const txt = el.getAttribute("data-fullname"); if(!txt) return;
+  if(!_nameTip){ _nameTip=document.createElement("div"); _nameTip.className="name-tip"; document.body.appendChild(_nameTip); }
+  _nameTip.textContent = txt;
+  _nameTip.style.display="block";
+  const r=el.getBoundingClientRect(), tw=_nameTip.offsetWidth, th=_nameTip.offsetHeight;
+  let left=r.left; if(left+tw>window.innerWidth-8) left=window.innerWidth-8-tw; left=Math.max(8,left);
+  let top=r.top-th-8; if(top<8) top=r.bottom+8;   // arriba; si no entra, abajo
+  _nameTip.style.left=left+"px"; _nameTip.style.top=top+"px";
+  requestAnimationFrame(()=> _nameTip && _nameTip.classList.add("show"));
+}
+function hideNameTip(){ if(_nameTip){ _nameTip.classList.remove("show"); _nameTip.style.display="none"; } }
+function wireNameTips(scope){
+  (scope||document).querySelectorAll("[data-fullname]").forEach(el=>{
+    el.onmouseenter=()=> showNameTip(el);
+    el.onmouseleave=hideNameTip;
+  });
+}
 function closeProductPicker(){
+  hideNameTip();
   document.querySelectorAll(".ppick-pop").forEach(el=>el.remove());
   document.querySelectorAll(".ppick-btn.open").forEach(b=>b.classList.remove("open"));
   window.removeEventListener("scroll", repositionPicker, true);
@@ -3631,6 +3677,7 @@ function openProductPicker(i, anchor){
   const paint = (q)=>{
     listEl.innerHTML = pickerItemsHTML(i, q);
     listEl.querySelectorAll("[data-pick]").forEach(it=> it.onclick=()=>{ const v=it.dataset.pick; closeProductPicker(); applyProdSelection(i, v); });
+    wireNameTips(listEl);   // hover sobre un producto de la lista => nombre completo antes de elegirlo
   };
   paint("");
   search.oninput = ()=> paint(search.value);
@@ -3892,15 +3939,22 @@ function renderLines(){
     </tr>`;
   }).join("");
 
+  // colgroup: 1ª col (producto) sin ancho => absorbe el sobrante; el resto en px fijos.
+  // Con table-layout:fixed esto define el ancho real de cada columna y evita el scroll horizontal.
+  const colgroup = isC
+    ? `<colgroup><col><col style="width:92px"><col style="width:134px"><col style="width:134px"><col style="width:46px"></colgroup>`
+    : `<colgroup><col><col style="width:78px"><col style="width:96px"><col style="width:78px"><col style="width:94px"><col style="width:80px"><col style="width:112px"><col style="width:46px"></colgroup>`;
   const thead = isC
     ? `<tr><th>Product</th><th class="r">Qty</th><th class="r">Unit cost</th><th class="r">Subtotal</th><th></th></tr>`
     : `<tr><th>Product</th><th class="r">Qty</th><th class="r">Cost</th><th class="r" title="Markup %">Mk&nbsp;%</th><th class="r" title="Unit price">Price</th><th class="r" title="Real margin on revenue">Mrg&nbsp;%</th><th class="r">Subtotal</th><th></th></tr>`;
-  host.innerHTML = `<div class="table-scroll"><table class="line-tbl">
+  host.innerHTML = `<div class="table-scroll"><table class="line-tbl doc-tbl">
+    ${colgroup}
     <thead>${thead}</thead>
     <tbody>${rows}</tbody></table></div>`;
 
   // combobox de producto (task 2): abre el buscador flotante
   host.querySelectorAll("[data-ppick]").forEach(b=> b.onclick=()=> openProductPicker(+b.dataset.ppick, b));
+  wireNameTips(host);   // hover => nombre completo si el nombre quedó truncado en la línea
 
   host.querySelectorAll("[data-k]").forEach(inp=>{
     const i=+inp.dataset.i, k=inp.dataset.k;
@@ -5156,7 +5210,7 @@ function buildModal(title, bodyHTML, buttons=[], wide=false, extraFoot=""){
   const root=document.getElementById("modalRoot");
   root.innerHTML=`
     <div class="scrim" id="scrim">
-      <div class="modal ${wide?'wide':''}">
+      <div class="modal ${wide===true?'wide':(typeof wide==='string'?wide:'')}">
         <div class="mhead"><h3>${esc(title)}</h3><button class="x" id="xClose">×</button></div>
         <div class="mbody">${bodyHTML}</div>
         ${extraFoot?`<div class="mextra" style="padding:0 22px">${extraFoot}</div>`:""}
@@ -5183,6 +5237,7 @@ function mkBtn(b){
 function escClose(e){ if(e.key==="Escape") closeModal(); }
 function closeModal(){
   if(typeof closeProductPicker==="function") closeProductPicker();
+  if(typeof hideNameTip==="function") hideNameTip();
   document.getElementById("modalRoot").innerHTML="";
   document.removeEventListener("keydown", escClose);
 }

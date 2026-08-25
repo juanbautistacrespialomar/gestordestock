@@ -13,7 +13,7 @@
    el mensaje {type:"SKIP_WAITING"} y ahí sí se activa y recarga. Así
    nadie pierde una carga a medias por un refresh sorpresa.
    ============================================================ */
-const CACHE = "mayor-stock-v46";   // v46: visibilidad del producto en ventas -> dropdown 480px, chip SKU + nombre flexible en el botón, columnas numéricas mas angostas y celda de producto sin techo de 300px
+const CACHE = "mayor-stock-v47";   // v47: grilla de ventas/compras con table-layout fijo + colgroup (columnas encajan, sin scroll horizontal), modal doc 1080px, y tooltip flotante con nombre completo al pasar el mouse (línea y dropdown) sólo si el texto queda truncado
 
 const ASSETS = [
   "./",
