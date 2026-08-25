@@ -274,8 +274,13 @@
   .ppick-btn .ppick-label{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1}
   .ppick-btn.placeholder .ppick-label{color:var(--muted)}
   .ppick-btn .ppick-caret{color:var(--muted);font-size:10px;flex-shrink:0}
+  /* Botón colapsado con producto elegido: chip de SKU + nombre flexible (igual que el dropdown) */
+  .ppick-btn .pb-sku{font-family:var(--mono);font-size:11px;color:var(--accent-ink);background:var(--surface-2);
+    padding:2px 6px;border-radius:5px;border:1px solid var(--line);flex-shrink:0;white-space:nowrap;
+    max-width:120px;overflow:hidden;text-overflow:ellipsis}
+  .ppick-btn .pb-name{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
   .ppick-pop{position:fixed;z-index:120;background:var(--surface);border:1px solid var(--line-strong);
-    border-radius:12px;box-shadow:0 14px 44px rgba(0,0,0,.28);width:360px;max-width:94vw;
+    border-radius:12px;box-shadow:0 14px 44px rgba(0,0,0,.28);width:480px;max-width:94vw;
     display:flex;flex-direction:column;overflow:hidden}
   .ppick-pop .ppick-search{margin:9px 9px 6px;width:calc(100% - 18px)}
   .ppick-list{max-height:280px;overflow:auto;padding:0 6px 8px}
@@ -292,12 +297,13 @@
   .seg-btn.on{background:var(--accent);color:#fff}
   .crow[data-saga]:hover .cl{color:var(--accent)}
   .crow[data-saga]:hover .cf{filter:brightness(1.08)}
-  /* Punto 6: que el SKU+nombre largo NO rompa el ancho de la fila (ellipsis) */
-  .line-tbl td:first-child{max-width:300px}
+  /* Punto 6: el nombre largo no rompe la fila porque el botón/label ya tienen ellipsis.
+     La celda de producto queda libre para estirarse con el espacio que sobra en el modal. */
+  .line-tbl td:first-child{max-width:none}
   .ppick{min-width:0;max-width:100%}
   .ppick-btn{max-width:100%;min-width:0}
   .imp-desc{font-size:12.5px;max-width:260px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-  .ppick-item .sku{max-width:130px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex-shrink:0}
+  .ppick-item .sku{max-width:110px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex-shrink:0}
 
   .empty{padding:48px 24px;text-align:center;color:var(--muted)}
   .empty .big{font-family:var(--mono);font-size:34px;color:var(--line-strong);margin-bottom:10px}
@@ -3546,14 +3552,27 @@ function updateDispInfos(){
    ============================================================ */
 let _pickerAnchor = null;
 function pickerLabel(l){
-  if(l.crear) return { txt:"＋ New product", ph:false };
-  if(l.productoId){ const p=prodById(l.productoId); return p ? { txt:(p.sku?("["+p.sku+"] "):"")+p.nombre, ph:false } : { txt:"— pick product —", ph:true }; }
-  return { txt:"— pick product —", ph:true };
+  if(l.crear) return { kind:"plain", txt:"＋ New product", ph:false };
+  if(l.productoId){
+    const p=prodById(l.productoId);
+    if(!p) return { kind:"plain", txt:"— pick product —", ph:true };
+    return { kind:"prod", sku:p.sku||"", name:p.nombre||"", ph:false };
+  }
+  return { kind:"plain", txt:"— pick product —", ph:true };
 }
 function pickerBtn(l, i){
-  const {txt, ph} = pickerLabel(l);
-  return `<button type="button" class="ppick-btn${ph?" placeholder":""}" data-ppick="${i}">
-    <span class="ppick-label">${esc(txt)}</span><span class="ppick-caret">▾</span></button>`;
+  const info = pickerLabel(l);
+  let inner;
+  if(info.kind==="prod"){
+    // Producto elegido: chip de SKU (si tiene) + nombre que se estira y trunca último
+    const chip = info.sku ? `<span class="pb-sku">${esc(info.sku)}</span>` : "";
+    inner = `${chip}<span class="pb-name">${esc(info.name)}</span>`;
+  } else {
+    // Placeholder o "＋ New product": texto plano como antes
+    inner = `<span class="ppick-label">${esc(info.txt)}</span>`;
+  }
+  return `<button type="button" class="ppick-btn${info.ph?" placeholder":""}" data-ppick="${i}">
+    ${inner}<span class="ppick-caret">▾</span></button>`;
 }
 function pickerItemsHTML(i, q){
   const isC = draft.tipo==="compra";
@@ -3859,23 +3878,23 @@ function renderLines(){
       ? `<div class="disp-info" data-di="${i}" style="font-size:11px;margin-top:4px;color:${over?'var(--alert)':'var(--muted)'}">avail: ${qty(stockBaseVenta(l.productoId))}${comprom>0?` · left ${qty(rem)}`:""}${over?" · <b>over stock</b>":""}</div>`
       : `<div class="disp-info" data-di="${i}" style="font-size:11px;margin-top:4px"></div>`;
     return `<tr>
-      <td style="min-width:220px">
+      <td style="min-width:260px">
         <div class="ppick">${pickerBtn(l,i)}</div>
         ${dispInfo}
       </td>
-      <td style="width:80px"><input class="inp num" data-k="cantidad" data-i="${i}" value="${l.cantidad}"></td>
-      <td class="r num" style="width:90px;color:var(--muted)">${p?money(l.costoRef):"—"}</td>
-      <td style="width:74px"><input class="inp num" data-k="margen" data-i="${i}" value="${l.margen||0}" placeholder="%"></td>
-      <td style="width:110px"><input class="inp num" data-k="precio" data-i="${i}" value="${l.precio}"></td>
-      <td class="r num" style="width:52px;color:var(--muted)" data-mg="${i}">${p&&l.precio>0?nf0.format((l.precio-l.costoRef)/l.precio*100)+"%":"—"}</td>
-      <td class="r num sub-cell" style="width:100px">${money(l.cantidad*l.precio)}</td>
-      <td style="width:34px"><button class="btn ghost sm" data-del="${i}" title="Remove">✕</button></td>
+      <td style="width:58px"><input class="inp num" data-k="cantidad" data-i="${i}" value="${l.cantidad}"></td>
+      <td class="r num" style="width:74px;color:var(--muted)">${p?money(l.costoRef):"—"}</td>
+      <td style="width:60px"><input class="inp num" data-k="margen" data-i="${i}" value="${l.margen||0}" placeholder="%"></td>
+      <td style="width:86px"><input class="inp num" data-k="precio" data-i="${i}" value="${l.precio}"></td>
+      <td class="r num" style="width:44px;color:var(--muted)" data-mg="${i}">${p&&l.precio>0?nf0.format((l.precio-l.costoRef)/l.precio*100)+"%":"—"}</td>
+      <td class="r num sub-cell" style="width:88px">${money(l.cantidad*l.precio)}</td>
+      <td style="width:30px"><button class="btn ghost sm" data-del="${i}" title="Remove">✕</button></td>
     </tr>`;
   }).join("");
 
   const thead = isC
     ? `<tr><th>Product</th><th class="r">Qty</th><th class="r">Unit cost</th><th class="r">Subtotal</th><th></th></tr>`
-    : `<tr><th>Product</th><th class="r">Qty</th><th class="r">Cost</th><th class="r">Markup&nbsp;%</th><th class="r">Unit price</th><th class="r" title="Real margin on revenue">Mrg&nbsp;%</th><th class="r">Subtotal</th><th></th></tr>`;
+    : `<tr><th>Product</th><th class="r">Qty</th><th class="r">Cost</th><th class="r" title="Markup %">Mk&nbsp;%</th><th class="r" title="Unit price">Price</th><th class="r" title="Real margin on revenue">Mrg&nbsp;%</th><th class="r">Subtotal</th><th></th></tr>`;
   host.innerHTML = `<div class="table-scroll"><table class="line-tbl">
     <thead>${thead}</thead>
     <tbody>${rows}</tbody></table></div>`;
